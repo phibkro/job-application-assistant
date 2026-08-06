@@ -1,4 +1,5 @@
-use std::{net::IpAddr, time::Duration};
+use std::time::Duration;
+use url::Host;
 
 use futures_util::future::{Either, select};
 use hmac::{Hmac, KeyInit, Mac};
@@ -79,12 +80,7 @@ pub async fn create_subscription(
         None => return crate::auth::api_error(&request, "unauthorized", "API key required", 401),
     };
     if !principal.can_mutate() {
-        return crate::auth::api_error(
-            &request,
-            "forbidden",
-            "principal role is read-only",
-            403,
-        );
+        return crate::auth::api_error(&request, "forbidden", "principal role is read-only", 403);
     }
     let search_id = route_search_id(&context)?;
     if !owns_search(&database, &principal.id, &search_id).await? {
@@ -110,9 +106,11 @@ pub async fn create_subscription(
             400,
         );
     }
-    if payload.secret.as_deref().is_some_and(|secret| {
-        !(WEBHOOK_SECRET_MIN..=WEBHOOK_SECRET_MAX).contains(&secret.len())
-    }) {
+    if payload
+        .secret
+        .as_deref()
+        .is_some_and(|secret| !(WEBHOOK_SECRET_MIN..=WEBHOOK_SECRET_MAX).contains(&secret.len()))
+    {
         return crate::auth::api_error(
             &request,
             "invalid_webhook",
@@ -238,12 +236,7 @@ pub async fn delete_subscription(request: Request, context: RouteContext<()>) ->
         None => return crate::auth::api_error(&request, "unauthorized", "API key required", 401),
     };
     if !principal.can_mutate() {
-        return crate::auth::api_error(
-            &request,
-            "forbidden",
-            "principal role is read-only",
-            403,
-        );
+        return crate::auth::api_error(&request, "forbidden", "principal role is read-only", 403);
     }
     let id = context
         .param("subscription_id")
@@ -396,7 +389,10 @@ async fn send_webhook(row: &OutboxRow) -> Result<()> {
     headers.set("user-agent", "job-index-webhook/1")?;
     headers.set("x-job-index-event-id", &row.id.to_string())?;
     if let Some(secret) = row.secret.as_deref() {
-        headers.set("x-job-index-signature", &signature(secret, &row.payload_json)?)?;
+        headers.set(
+            "x-job-index-signature",
+            &signature(secret, &row.payload_json)?,
+        )?;
     }
     let mut init = RequestInit::new();
     init.with_method(Method::Post)
@@ -433,7 +429,6 @@ async fn send_webhook(row: &OutboxRow) -> Result<()> {
     }
 }
 
-
 fn webhook_target_allowed(value: &str, allow_local: bool) -> bool {
     let Ok(url) = worker::Url::parse(value) else {
         return false;
@@ -441,24 +436,29 @@ fn webhook_target_allowed(value: &str, allow_local: bool) -> bool {
     if url.scheme() != "https" && !(allow_local && url.scheme() == "http") {
         return false;
     }
-    let Some(host) = url.host_str() else {
+    // The parsed host is matched by variant rather than re-parsed from text:
+    // `host_str` renders an IPv6 literal in its bracketed form (`[::1]`), which
+    // is not an `IpAddr`, so text parsing silently classified every IPv6
+    // address as a domain name and allowed it.
+    let Some(host) = url.host() else {
         return false;
     };
     if allow_local {
         return true;
     }
-    if host.eq_ignore_ascii_case("localhost") || host.to_ascii_lowercase().ends_with(".localhost") {
-        return false;
-    }
-    host.parse::<IpAddr>().map_or(true, |address| match address {
-        IpAddr::V4(value) => {
+    match host {
+        Host::Domain(domain) => {
+            !(domain.eq_ignore_ascii_case("localhost")
+                || domain.to_ascii_lowercase().ends_with(".localhost"))
+        }
+        Host::Ipv4(value) => {
             !(value.is_private()
                 || value.is_loopback()
                 || value.is_link_local()
                 || value.is_unspecified()
                 || value.is_broadcast())
         }
-        IpAddr::V6(value) => {
+        Host::Ipv6(value) => {
             !(value.is_loopback()
                 || value.is_unspecified()
                 || value.is_unique_local()
@@ -471,7 +471,7 @@ fn webhook_target_allowed(value: &str, allow_local: bool) -> bool {
                         || mapped.is_broadcast()
                 }))
         }
-    })
+    }
 }
 
 fn signature(secret: &str, payload: &str) -> Result<String> {
@@ -531,9 +531,8 @@ impl From<SubscriptionRow> for SubscriptionView {
 mod tests {
     use super::{
         DELIVERY_BATCH_SIZE, DELIVERY_LEASE_MS, DELIVERY_PAGE_DEFAULT, DELIVERY_PAGE_MAX,
-        RETRY_BATCH_SIZE, SUBSCRIPTION_QUOTA, WEBHOOK_SECRET_MAX,
-        WEBHOOK_SECRET_MIN, WEBHOOK_TIMEOUT_MS, WEBHOOK_URL_MAX, signature,
-        webhook_target_allowed,
+        RETRY_BATCH_SIZE, SUBSCRIPTION_QUOTA, WEBHOOK_SECRET_MAX, WEBHOOK_SECRET_MIN,
+        WEBHOOK_TIMEOUT_MS, WEBHOOK_URL_MAX, signature, webhook_target_allowed,
     };
 
     #[test]
@@ -556,8 +555,21 @@ mod tests {
         assert!(!webhook_target_allowed("https://127.0.0.1/hook", false));
         assert!(!webhook_target_allowed("https://10.0.0.1/hook", false));
         assert!(!webhook_target_allowed("https://[::1]/hook", false));
+        // Bracketed literals are the whole IPv6 host syntax, so each private
+        // range is asserted rather than trusting the loopback case alone.
+        assert!(!webhook_target_allowed("https://[fd00::1]/hook", false));
+        assert!(!webhook_target_allowed("https://[fe80::1]/hook", false));
+        assert!(!webhook_target_allowed("https://[::]/hook", false));
+        assert!(!webhook_target_allowed(
+            "https://[::ffff:127.0.0.1]/hook",
+            false
+        ));
+        assert!(webhook_target_allowed("https://[2606:4700::1]/hook", false));
         assert!(webhook_target_allowed("https://example.com/hook", false));
-        assert!(webhook_target_allowed("http://127.0.0.1:8789/webhook", true));
+        assert!(webhook_target_allowed(
+            "http://127.0.0.1:8789/webhook",
+            true
+        ));
     }
 
     #[test]
