@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1786059045343" clover="3.2.0">
-  <project timestamp="1786059045343" name="All files">
+<coverage generated="1786059795166" clover="3.2.0">
+  <project timestamp="1786059795166" name="All files">
     <metrics statements="8" coveredstatements="8" conditionals="4" coveredconditionals="4" methods="2" coveredmethods="2" elements="14" coveredelements="14" complexity="0" loc="8" ncloc="8" packages="1" files="1" classes="1"/>
     <file name="Access.ts" path="/srv/share/projects/job-index/packages/domain/src/decide/Access.ts">
       <metrics statements="8" coveredstatements="8" conditionals="4" coveredconditionals="4" methods="2" coveredmethods="2"/>
@@ -10,8 +10,8 @@
       <line num="33" count="506" type="stmt"/>
       <line num="54" count="2" type="stmt"/>
       <line num="55" count="406" type="cond" truecount="2" falsecount="0"/>
-      <line num="56" count="252" type="stmt"/>
-      <line num="58" count="154" type="cond" truecount="2" falsecount="0"/>
+      <line num="56" count="277" type="stmt"/>
+      <line num="58" count="129" type="cond" truecount="2" falsecount="0"/>
     </file>
   </project>
 </coverage>
