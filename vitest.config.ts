@@ -1,6 +1,24 @@
+import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
 
+const from = (path: string) => fileURLToPath(new URL(path, import.meta.url))
+
 export default defineConfig({
+  /**
+   * Three resolvers must agree. TypeScript reads tsconfig `paths`, Bun reads
+   * them too, and Vite reads neither — so a cross-package import type-checks,
+   * runs under Bun, and fails only in the tests. Worse, an import from inside
+   * a package resolves by Node self-reference and passes, which makes the
+   * defect look fixed when it is not.
+   *
+   * Declaring the alias here is what makes the three agree.
+   */
+  resolve: {
+    alias: [
+      { find: /^@job-index\/domain\/(.*)$/, replacement: from("./packages/domain/src/$1.ts") },
+      { find: /^@job-index\/worker\/(.*)$/, replacement: from("./apps/worker/src/$1.ts") },
+    ],
+  },
   test: {
     /**
      * Doctests. Effect v4 documents its own API with ```ts import.meta.vitest
