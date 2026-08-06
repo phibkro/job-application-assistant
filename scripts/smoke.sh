@@ -160,6 +160,129 @@ else
     > "${OUTPUT_DIR}/owned-search-evaluate.json"
 fi
 
+# The source catalogue drives which platforms may be read and how, so an empty
+# or unseeded catalogue must fail the journey rather than silently leaving the
+# application flow with nothing to work from.
+curl --fail --silent --show-error \
+  "${BASE_URL}/api/v1/sources/catalog?limit=5" > "${OUTPUT_DIR}/source-catalog.json"
+curl --fail --silent --show-error \
+  "${BASE_URL}/api/v1/sources/catalog?tier=agent" > "${OUTPUT_DIR}/source-catalog-agent.json"
+invalid_tier_status="$(curl --silent --output "${OUTPUT_DIR}/invalid-tier.json" --write-out '%{http_code}' \
+  "${BASE_URL}/api/v1/sources/catalog?tier=telepathy")"
+[ "${invalid_tier_status}" = "400" ]
+# The browse page is the front door; a 200 with the search container present
+# proves the route serves the app rather than an error page.
+curl --fail --silent --show-error "${BASE_URL}/browse" > "${OUTPUT_DIR}/browse.html"
+grep -q 'id="results"' "${OUTPUT_DIR}/browse.html"
+python3 - "${OUTPUT_DIR}" <<'PYCATALOG'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+catalog = json.loads((root / "source-catalog.json").read_text())
+agent = json.loads((root / "source-catalog-agent.json").read_text())
+
+assert catalog["meta"]["total"] >= 100, catalog["meta"]
+assert catalog["data"], "catalogue returned no platforms"
+
+# Agent acquisition costs a browser run, so it is the paid tier by
+# construction: an ungated agent source would give the capability away.
+for entry in agent["data"]:
+    assert entry["acquisition_tier"] == "agent", entry
+    assert entry["requires_premium"] == 1, entry
+
+# A platform is never auto-applied to until someone has reviewed its terms.
+for entry in catalog["data"]:
+    if entry["acquisition_tier"] == "unknown":
+        assert entry["automation_policy"] == "unreviewed", entry
+
+print(f"  source catalogue: {catalog['meta']['total']} platforms, "
+      f"{len(agent['data'])} agent-tier all premium-gated")
+PYCATALOG
+
+# The application loop, end to end: an account, a CV, a shortlisted vacancy, a
+# generated CV and letter, and a submission. Each premium capability is asked
+# for by a free account first, because a gate that is never exercised is a gate
+# nobody knows is there.
+app_key="smoke-app-key-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+curl --fail --silent --show-error -H 'content-type: application/json' \
+  -X POST "${BASE_URL}/api/v1/users" \
+  --data "{\"email\":\"smoke-applicant@example.invalid\",\"api_key\":\"${app_key}\",\"display_name\":\"Smoke Applicant\"}" \
+  > "${OUTPUT_DIR}/account.json"
+
+curl --fail --silent --show-error -H "x-api-key: ${app_key}" -H 'content-type: application/json' \
+  -X PUT "${BASE_URL}/api/v1/me/profile" \
+  --data '{"headline":"Customer support specialist","summary":"Support work in Oslo.","location":"Oslo","skills":["support","customer"],"experience":[{"title":"Customer Service Adviser","employer":"Nordic Retail AS","period":"2022-2026","highlights":["Handled chat and telephone support"]}],"education":["BSc OsloMet"]}' \
+  > "${OUTPUT_DIR}/profile.json"
+
+smoke_job_id="$(python3 -c '
+import json, sys
+page = json.load(open(sys.argv[1]))
+print(page["data"][0]["id"])
+' "${OUTPUT_DIR}/jobs.json" 2>/dev/null || true)"
+if [ -z "${smoke_job_id}" ]; then
+  smoke_job_id="$(curl --fail --silent --show-error "${BASE_URL}/api/v1/jobs?limit=1" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"][0]["id"])')"
+fi
+
+curl --fail --silent --show-error -H "x-api-key: ${app_key}" -H 'content-type: application/json' \
+  -X POST "${BASE_URL}/api/v1/me/saved" --data "{\"job_id\":\"${smoke_job_id}\"}" \
+  > "${OUTPUT_DIR}/saved.json"
+smoke_saved_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"][0]["id"])' "${OUTPUT_DIR}/saved.json")"
+
+curl --fail --silent --show-error -H "x-api-key: ${app_key}" -H 'content-type: application/json' \
+  -X POST "${BASE_URL}/api/v1/me/saved/${smoke_saved_id}/draft" --data '{}' \
+  > "${OUTPUT_DIR}/drafts.json"
+
+# Free accounts must be refused the paid capabilities, with 402 rather than a
+# silent downgrade.
+model_draft_status="$(curl --silent --output "${OUTPUT_DIR}/model-draft.json" --write-out '%{http_code}' \
+  -H "x-api-key: ${app_key}" -H 'content-type: application/json' \
+  -X POST "${BASE_URL}/api/v1/me/saved/${smoke_saved_id}/draft" --data '{"generator":"model"}')"
+[ "${model_draft_status}" = "402" ]
+automated_status="$(curl --silent --output "${OUTPUT_DIR}/automated-apply.json" --write-out '%{http_code}' \
+  -H "x-api-key: ${app_key}" -H 'content-type: application/json' \
+  -X POST "${BASE_URL}/api/v1/me/saved/${smoke_saved_id}/apply" --data '{"method":"automated"}')"
+[ "${automated_status}" = "402" ]
+
+curl --fail --silent --show-error -H "x-api-key: ${app_key}" -H 'content-type: application/json' \
+  -X POST "${BASE_URL}/api/v1/me/saved/${smoke_saved_id}/apply" --data '{}' \
+  > "${OUTPUT_DIR}/application.json"
+curl --fail --silent --show-error -H "x-api-key: ${app_key}" \
+  "${BASE_URL}/api/v1/me/applications" > "${OUTPUT_DIR}/applications.json"
+smoke_application_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"][0]["id"])' "${OUTPUT_DIR}/applications.json")"
+curl --fail --silent --show-error -H "x-api-key: ${app_key}" -H 'content-type: application/json' \
+  -X POST "${BASE_URL}/api/v1/me/applications/${smoke_application_id}/status" \
+  --data '{"status":"interview","notes":"first round"}' > "${OUTPUT_DIR}/application-status.json"
+
+python3 - "${OUTPUT_DIR}" <<'PYAPPLY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+drafts = json.loads((root / "drafts.json").read_text())["data"]
+package = json.loads((root / "application.json").read_text())["data"]
+applications = json.loads((root / "applications.json").read_text())["data"]
+
+kinds = {draft["kind"] for draft in drafts}
+assert kinds == {"cv", "letter"}, kinds
+for draft in drafts:
+    assert draft["generator"] == "template", draft
+    assert len(draft["content"]) > 80, draft
+
+# The package must carry what the person submits, not a reference to it.
+assert package["cv"].strip(), package
+assert package["letter"].strip(), package
+assert package["application"]["method"] == "assisted", package
+# An unreviewed or restricted platform must never be auto-submitted to.
+assert package["application"]["status"] in {"ready", "submitted"}, package
+assert applications, "the application should be listed back"
+
+print("  application loop: account, profile, save, draft, assisted apply, status")
+PYAPPLY
+
 curl --fail --silent --show-error -H "x-api-key: ${member_key}" \
   "${BASE_URL}/api/v1/searches/${owned_search_id}/matches?limit=1" \
   > "${OUTPUT_DIR}/owned-matches.json"

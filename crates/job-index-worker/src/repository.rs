@@ -1300,6 +1300,15 @@ pub async fn reset_demo(database: &D1Database) -> Result<()> {
             database.prepare("DELETE FROM search_matches"),
             database.prepare("DELETE FROM saved_searches"),
             database.prepare("DELETE FROM admin_audit_log"),
+            // The application flow hangs off principals, so it is cleared
+            // first and in dependency order: drafts and applications before
+            // the shortlist, the shortlist and profile before the account,
+            // and the account before the principal it is attached to.
+            database.prepare("DELETE FROM application_drafts"),
+            database.prepare("DELETE FROM applications"),
+            database.prepare("DELETE FROM saved_jobs"),
+            database.prepare("DELETE FROM user_profiles"),
+            database.prepare("DELETE FROM users"),
             database.prepare("DELETE FROM principals"),
             database.prepare("DELETE FROM maintenance_runs"),
             database.prepare("DELETE FROM source_failures"),

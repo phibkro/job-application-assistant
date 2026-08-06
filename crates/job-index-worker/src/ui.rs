@@ -243,3 +243,180 @@ pub const PRODUCTION_INDEX_HTML: &str = r#"<!doctype html>
 </main>
 </body>
 </html>"#;
+
+/// The browse-and-inspect page: the corpus as something a person can search.
+///
+/// It reads the same public `/api/v1` endpoints an external client would, so a
+/// regression in the API surfaces here rather than being masked by a private
+/// query path.
+pub const BROWSE_HTML: &str = r#"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Index — browse</title>
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b1020; color: #e8eefc; }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 72px; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.4rem); margin: 0 0 4px; letter-spacing: -0.03em; }
+    p { color: #aebbd5; line-height: 1.6; }
+    .muted { color: #8fa1c1; font-size: .9rem; }
+    form { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; margin: 22px 0 10px; }
+    input, select, button { font: inherit; border-radius: 12px; padding: 11px 13px; }
+    input, select { border: 1px solid #273553; background: #111a2e; color: inherit; }
+    button { border: 1px solid #456088; background: #182744; color: inherit; cursor: pointer; }
+    button.primary { background: #dbeafe; color: #10203b; border-color: #dbeafe; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+    @media (max-width: 900px) { .layout, form { grid-template-columns: 1fr; } }
+    .card { border: 1px solid #273553; background: #111a2e; border-radius: 16px; padding: 16px; }
+    .result { cursor: pointer; margin-bottom: 10px; }
+    .result:hover, .result[aria-selected="true"] { border-color: #6f8fc4; }
+    .result h3 { margin: 0 0 4px; font-size: 1.02rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+    .tag { padding: 4px 9px; border-radius: 999px; background: #24385e; color: #cfe3ff; font-size: .78rem; }
+    .tag.warn { background: #4a3722; color: #ffd9a8; }
+    .tag.ok { background: #1f4535; color: #b7f0d2; }
+    .detail h2 { margin: 0 0 6px; font-size: 1.25rem; }
+    .detail .body { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 46vh; overflow-y: auto; color: #cbd7ee; line-height: 1.65; }
+    dl { display: grid; grid-template-columns: minmax(110px, 150px) 1fr; gap: 6px 14px; margin: 12px 0; }
+    dt { color: #8fa1c1; } dd { margin: 0; overflow-wrap: anywhere; }
+    .coverage { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .empty { padding: 28px; text-align: center; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="muted">Browse · inspect · save</p>
+  <h1>Find a job in the corpus</h1>
+  <p id="coverage" class="muted">Loading source coverage…</p>
+
+  <form id="search" autocomplete="off">
+    <input id="term" name="term" type="search" placeholder="Search title, employer, or description">
+    <input id="location" name="location" type="text" placeholder="Location (e.g. Oslo)">
+    <select id="status" name="status">
+      <option value="active">Active only</option>
+      <option value="">Any status</option>
+      <option value="closed">Closed</option>
+    </select>
+    <button class="primary" type="submit">Search</button>
+  </form>
+
+  <div class="layout">
+    <section>
+      <p id="summary" class="muted">Searching…</p>
+      <div id="results"></div>
+      <button id="more" hidden>Load more</button>
+    </section>
+    <aside id="detail" class="card detail">
+      <p class="muted empty">Select a listing to inspect it.</p>
+    </aside>
+  </div>
+</main>
+<script>
+  const resultsNode = document.querySelector('#results');
+  const detailNode = document.querySelector('#detail');
+  const summaryNode = document.querySelector('#summary');
+  const moreButton = document.querySelector('#more');
+  let cursor = null;
+  let loaded = [];
+
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]
+  ));
+
+  function queryString(withCursor) {
+    const params = new URLSearchParams();
+    const term = document.querySelector('#term').value.trim();
+    const location = document.querySelector('#location').value.trim();
+    const status = document.querySelector('#status').value;
+    if (term) params.set('term', term);
+    if (location) params.set('location', location);
+    if (status) params.set('status', status);
+    params.set('limit', '25');
+    if (withCursor && cursor) params.set('cursor', cursor);
+    return params.toString();
+  }
+
+  function renderResults(append) {
+    if (!loaded.length) {
+      resultsNode.innerHTML = '<div class="card empty"><p class="muted">No listings match that search.</p></div>';
+      return;
+    }
+    const markup = loaded.map((job, index) => `
+      <article class="card result" data-index="${index}" tabindex="0" aria-selected="false">
+        <h3>${escapeHtml(job.title)}</h3>
+        <div class="muted">${escapeHtml(job.employer_name)} · ${escapeHtml(job.location)}</div>
+        <div class="row">
+          <span class="tag ${job.status === 'active' ? 'ok' : ''}">${escapeHtml(job.status)}</span>
+          ${job.deadline ? `<span class="tag warn">apply by ${escapeHtml(job.deadline)}</span>` : ''}
+          ${(job.source_ids || []).map((id) => `<span class="tag">${escapeHtml(id)}</span>`).join('')}
+        </div>
+      </article>`).join('');
+    resultsNode.innerHTML = markup;
+    if (!append) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showDetail(job) {
+    document.querySelectorAll('.result').forEach((node) => node.setAttribute('aria-selected', 'false'));
+    const selected = document.querySelector(`.result[data-index="${loaded.indexOf(job)}"]`);
+    if (selected) selected.setAttribute('aria-selected', 'true');
+    detailNode.innerHTML = `
+      <h2>${escapeHtml(job.title)}</h2>
+      <p class="muted">${escapeHtml(job.employer_name)} · ${escapeHtml(job.location)}</p>
+      <dl>
+        <dt>Status</dt><dd>${escapeHtml(job.status)}</dd>
+        <dt>Published</dt><dd>${escapeHtml(job.published_at)}</dd>
+        <dt>Deadline</dt><dd>${job.deadline ? escapeHtml(job.deadline) : 'not stated'}</dd>
+        <dt>Sources</dt><dd>${escapeHtml((job.source_ids || []).join(', '))}</dd>
+      </dl>
+      <div class="row">
+        <a class="tag" href="${escapeHtml(job.application_url)}" target="_blank" rel="noopener noreferrer">Open advert</a>
+      </div>
+      <h3>Description</h3>
+      <div class="body">${escapeHtml(job.description)}</div>`;
+  }
+
+  async function search(append) {
+    moreButton.disabled = true;
+    try {
+      const response = await fetch(`/api/v1/jobs?${queryString(append)}`);
+      if (!response.ok) throw new Error(`search failed: ${response.status}`);
+      const payload = await response.json();
+      loaded = append ? loaded.concat(payload.data) : payload.data;
+      cursor = payload.meta.next_cursor;
+      moreButton.hidden = !cursor;
+      summaryNode.textContent = `${loaded.length} listing${loaded.length === 1 ? '' : 's'}${cursor ? ' so far' : ''}`;
+      renderResults(append);
+    } catch (error) {
+      summaryNode.textContent = String(error);
+    } finally {
+      moreButton.disabled = false;
+    }
+  }
+
+  resultsNode.addEventListener('click', (event) => {
+    const card = event.target.closest('.result');
+    if (card) showDetail(loaded[Number(card.dataset.index)]);
+  });
+  document.querySelector('#search').addEventListener('submit', (event) => {
+    event.preventDefault();
+    cursor = null;
+    search(false);
+  });
+  moreButton.addEventListener('click', () => search(true));
+
+  fetch('/api/v1/sources/catalog?limit=1').then((response) => response.json()).then((payload) => {
+    const tiers = (payload.meta.tiers || []).map((tier) => `${tier.count} ${tier.acquisition_tier}`).join(' · ');
+    document.querySelector('#coverage').textContent =
+      `${payload.meta.total} researched platforms — ${tiers}`;
+  }).catch(() => {
+    document.querySelector('#coverage').textContent = 'Source coverage unavailable.';
+  });
+
+  search(false);
+</script>
+</body>
+</html>"#;

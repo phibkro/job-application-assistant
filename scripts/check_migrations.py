@@ -21,6 +21,13 @@ EXPECTED_TABLES = {
     "admin_audit_log",
     "webhook_subscriptions",
     "notification_outbox",
+    "source_catalog",
+    "source_catalog_legacy",
+    "users",
+    "user_profiles",
+    "saved_jobs",
+    "application_drafts",
+    "applications",
 }
 
 if not MIGRATIONS:

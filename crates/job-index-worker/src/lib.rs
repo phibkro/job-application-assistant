@@ -1,7 +1,10 @@
 #![forbid(unsafe_code)]
 
+mod adapters;
 mod api;
+mod application;
 mod auth;
+mod catalog;
 mod fixtures;
 mod maintenance;
 mod nav_connector;
@@ -76,6 +79,24 @@ async fn main(request: Request, environment: Env, _context: Context) -> Result<R
         .get_async("/api/searches/:id", searches::get)
         .post_async("/api/searches/:id/evaluate", searches::evaluate)
         .get_async("/api/searches/:id/matches", searches::matches)
+        .get("/browse", |_request, _context| {
+            Response::from_html(ui::BROWSE_HTML)
+        })
+        .post_async("/api/v1/users", application::register)
+        .get_async("/api/v1/me", application::me)
+        .put_async("/api/v1/me/profile", application::put_profile)
+        .post_async("/api/v1/me/saved", application::save_job)
+        .get_async("/api/v1/me/saved", application::list_saved)
+        .delete_async("/api/v1/me/saved/:id", application::unsave_job)
+        .post_async("/api/v1/me/saved/:id/draft", application::draft)
+        .post_async("/api/v1/me/saved/:id/apply", application::apply)
+        .get_async("/api/v1/me/applications", application::list_applications)
+        .post_async(
+            "/api/v1/me/applications/:id/status",
+            application::set_status,
+        )
+        .get_async("/api/v1/sources/catalog", catalog::list)
+        .get_async("/api/v1/sources/:id/listings", adapters::listings)
         .get_async("/api/sources/nav/status", api::nav_status)
         .get_async("/api/sources/nav/failures", api::nav_failures)
         .post_async("/api/sources/nav/sync", api::nav_sync)
