@@ -1,0 +1,7 @@
+{
+  "url": "https://job-index-staging.philib-krogh-d23.workers.dev",
+  "worker": "job-index-staging",
+  "database": "job-index-staging-db",
+  "databaseId": "189879b1-03d6-4141-9965-73917e1d5126",
+  "stage": "staging"
+}

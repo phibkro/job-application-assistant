@@ -1,0 +1,214 @@
+{
+  "status": "created",
+  "fqn": "Api",
+  "logicalId": "Api",
+  "instanceId": "ad922dc3771d0ad2791a912e72a4ff0c",
+  "resourceType": "Cloudflare.Worker",
+  "props": {
+    "name": "job-index-staging",
+    "main": "../crates/job-index-worker/build/index.js",
+    "compatibility": {
+      "date": "2026-05-25"
+    },
+    "url": true,
+    "env": {
+      "DB": {
+        "databaseId": "189879b1-03d6-4141-9965-73917e1d5126",
+        "databaseName": "job-index-staging-db",
+        "jurisdiction": "default",
+        "accountId": "d2319ba5e93bf509a478951e90496374",
+        "migrationsDir": "../migrations",
+        "migrationsTable": "d1_migrations",
+        "migrationsHashes": {
+          "0001_initial.sql": "15a6ff5d85f4f2aba5e5890cefb5924baf0b145ba56cf1340e43a49f723d4994",
+          "0002_source_state.sql": "02f57ba7547b7a5869830cb96da0f1730689d88122662bd6c3998b2ee6aa4a2b",
+          "0003_saved_searches.sql": "fff6a461ecbe9cffc9ef0be9065bd033870fd8a21958e8c94abebf5dad07e703",
+          "0004_ingestion_control.sql": "22ad22523fb2d180ea703c81e5d2197ab7533c0b1394755cef102bbbd02f06c4",
+          "0005_production_platform.sql": "89e3ce1d56fb79a10613705249d4b02ca1f4e07deab1bad5b59670d2a5bd0399",
+          "0006_source_catalog.sql": "73d28835bb1ce33030eabbe0650c7a2e5c667e7c7b7d9701b461a6f0fcffc3d3",
+          "0007_source_catalog_seed.sql": "57aa243a3a85e16c0b58824a171ea89f9aefcf9c4ec97e2df7ba30ef5c3065cb",
+          "0008_application_flow.sql": "7f52218405faff4653dac7ada42d1750ac81e5ddd5af63fce563a42995255dee",
+          "0009_application_agenda.sql": "8a076ceb2ca5e4909171a1066dbc3d0b7388654342a751dad6d7c0eb5f1c9b9c",
+          "0010_linkedin_identity.sql": "89804813a84507f8ad3b5630b3189a7a62617cbfe3393a6e4ed4961e63e0347e"
+        },
+        "importHashes": {}
+      },
+      "ENVIRONMENT": "staging",
+      "ALLOW_DEMO_MUTATIONS": "true",
+      "ALLOW_NAV_SYNC_WITHOUT_TOKEN": "true",
+      "NAV_USE_PUBLIC_TOKEN": "true",
+      "NAV_SYNC_ENABLED": "false",
+      "NAV_DETAIL_FETCH_LIMIT": "40",
+      "NAV_MAX_PAGES_PER_RUN": "4",
+      "NAV_MAX_OBSERVATIONS_PER_RUN": "600",
+      "NAV_MAX_DURATION_MS": "20000",
+      "NAV_LEASE_TTL_MS": "90000"
+    },
+    "crons": [],
+    "observability": {
+      "enabled": true,
+      "logs": {
+        "enabled": true,
+        "invocationLogs": true
+      }
+    },
+    "isExternal": true
+  },
+  "attr": {
+    "workerId": "job-index-staging",
+    "workerName": "job-index-staging",
+    "logpush": false,
+    "url": "https://job-index-staging.philib-krogh-d23.workers.dev",
+    "tags": [
+      "alchemy:stack:JobIndex",
+      "alchemy:stage:staging",
+      "alchemy:id:Api"
+    ],
+    "durableObjectNamespaces": {},
+    "accountId": "d2319ba5e93bf509a478951e90496374",
+    "domains": [
+      "https://job-index-staging.philib-krogh-d23.workers.dev"
+    ],
+    "crons": [],
+    "hash": {
+      "bundle": "e981eb9dd5dec60796010b059bd5a245995af3d246ccb40383b9eb811b0792be"
+    }
+  },
+  "bindings": [
+    {
+      "sid": "DB",
+      "data": {
+        "bindings": [
+          {
+            "type": "d1",
+            "databaseId": "189879b1-03d6-4141-9965-73917e1d5126",
+            "name": "DB"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "ENVIRONMENT",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "ENVIRONMENT",
+            "text": "staging"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "ALLOW_DEMO_MUTATIONS",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "ALLOW_DEMO_MUTATIONS",
+            "text": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "ALLOW_NAV_SYNC_WITHOUT_TOKEN",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "ALLOW_NAV_SYNC_WITHOUT_TOKEN",
+            "text": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_USE_PUBLIC_TOKEN",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_USE_PUBLIC_TOKEN",
+            "text": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_SYNC_ENABLED",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_SYNC_ENABLED",
+            "text": "false"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_DETAIL_FETCH_LIMIT",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_DETAIL_FETCH_LIMIT",
+            "text": "40"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_MAX_PAGES_PER_RUN",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_MAX_PAGES_PER_RUN",
+            "text": "4"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_MAX_OBSERVATIONS_PER_RUN",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_MAX_OBSERVATIONS_PER_RUN",
+            "text": "600"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_MAX_DURATION_MS",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_MAX_DURATION_MS",
+            "text": "20000"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_LEASE_TTL_MS",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_LEASE_TTL_MS",
+            "text": "90000"
+          }
+        ]
+      }
+    }
+  ],
+  "providerVersion": 0,
+  "downstream": [],
+  "removalPolicy": "destroy"
+}

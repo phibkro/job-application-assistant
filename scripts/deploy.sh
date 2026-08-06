@@ -13,12 +13,12 @@ case "${environment}" in
     ;;
 esac
 
-template="wrangler.${environment}.jsonc"
-config="wrangler.${environment}.deploy.jsonc"
+# What the deployment is described by, for the evidence record. The Worker and
+# database themselves are declared in infra/alchemy.run.ts.
+config="infra/alchemy.run.ts"
 state_dir=".deploy"
 log_dir=".artifacts/deploy/${environment}"
 database_name="${JOB_INDEX_D1_NAME:-job-index-${environment}-db}"
-database_location="${JOB_INDEX_D1_LOCATION:-weur}"
 mkdir -p "${state_dir}" "${log_dir}"
 
 dev_vars_file="${JOB_INDEX_DEV_VARS_FILE:-.dev.vars}"
@@ -108,122 +108,90 @@ run_logged() {
   "$@" 2>&1 | tee "${log_dir}/${name}.log"
 }
 
-find_database_id() {
-  local output
-  output="$(wrangler d1 list --json 2>"${log_dir}/d1-list.stderr.log")"
-  printf '%s' "${output}" | python3 -c '
-import json, sys
-name = sys.argv[1]
-text = sys.stdin.read()
-start = text.find("[")
-end = text.rfind("]")
-if start < 0 or end < start:
-    raise SystemExit("wrangler d1 list did not return a JSON array")
-rows = json.loads(text[start:end + 1])
-for row in rows:
-    if row.get("name") == name:
-        print(row.get("uuid") or row.get("id") or "")
-        break
-' "${database_name}"
+# Infrastructure is declared in infra/alchemy.run.ts and applied by Alchemy:
+# the D1 database, its schema, the Worker, its bindings, and its cron triggers.
+# This script keeps what Alchemy is not: the gates. Everything above decided
+# whether this deploy may proceed; everything below proves that it worked.
+#
+# Secrets are passed through the environment because the Worker's binding set
+# is declared in full on each deploy — uploading them separately afterwards
+# would leave them to be dropped by the next one.
+deploy_stack() {
+  local phase="$1"
+  (
+    cd infra
+    ALCHEMY_STAGE="${environment}" \
+    JOB_INDEX_ACTIVATE_SCHEDULES="${phase}" \
+    NAV_API_TOKEN="${private_nav_token}" \
+    ADMIN_SYNC_TOKEN="${admin_token}" \
+    bun alchemy deploy --stage "${environment}" --yes
+  )
 }
 
-database_id="$(find_database_id)"
-if [ -z "${database_id}" ]; then
-  echo "Creating ${environment} D1 database ${database_name} in ${database_location}..."
-  if ! run_logged create-d1 wrangler d1 create "${database_name}" --location "${database_location}"; then
-    echo "Create returned an error; rechecking in case another deployment created it." >&2
-  fi
-  attempt=0
-  while [ "${attempt}" -lt 10 ]; do
-    database_id="$(find_database_id)"
-    [ -n "${database_id}" ] && break
-    attempt=$((attempt + 1))
-    sleep 2
-  done
+if [ ! -d infra/node_modules ]; then
+  echo "Installing infra dependencies..."
+  run_logged infra-install bash -c "cd infra && bun install"
 fi
 
-if [ -z "${database_id}" ]; then
-  echo "D1 database ${database_name} could not be resolved after creation." >&2
-  exit 1
-fi
-
-python3 - "${template}" "${config}" "${database_name}" "${database_id}" "${source_code_url}" <<'PY'
-import json
-import pathlib
-import sys
-
-template, target, name, database_id, source_code_url = sys.argv[1:]
-config = json.loads(pathlib.Path(template).read_text())
-if source_code_url:
-    config.setdefault("vars", {})["SOURCE_CODE_URL"] = source_code_url
-for binding in config.get("d1_databases", []):
-    if binding.get("binding") == "DB":
-        binding["database_name"] = name
-        binding["database_id"] = database_id
-        break
-else:
-    raise SystemExit("source config has no DB binding")
-pathlib.Path(target).write_text(json.dumps(config, indent=2) + "\n")
-PY
-
-run_logged migrations env CI=1 wrangler d1 migrations apply DB --remote --config "${config}"
-
-# Production is published in two phases so a new cron-enabled version can never
-# run before its credentials exist. The bootstrap version has the same code and
-# database binding but disables synchronization and omits scheduled triggers.
-secret_config="${config}"
+# Production publishes in two phases so a cron-enabled version never runs
+# before its credentials exist: triggers and synchronization are off in the
+# first pass and activated in the second.
 if [ "${environment}" = "production" ]; then
-  bootstrap_config="${log_dir}/bootstrap.jsonc"
-  python3 - "${config}" "${bootstrap_config}" <<'PYBOOTSTRAP'
-import json
-import pathlib
-import sys
-
-source, target = map(pathlib.Path, sys.argv[1:])
-config = json.loads(source.read_text())
-config.setdefault("vars", {})["NAV_SYNC_ENABLED"] = "false"
-config.pop("triggers", None)
-target.write_text(json.dumps(config, indent=2) + "\n")
-PYBOOTSTRAP
-  run_logged bootstrap-publish env CI=1 wrangler deploy --config "${bootstrap_config}"
-  secret_config="${bootstrap_config}"
+  run_logged bootstrap-publish deploy_stack 0
+  run_logged publish deploy_stack 1
 else
-  run_logged publish env CI=1 wrangler deploy --config "${config}"
-fi
-
-nav_auth_mode="public-fallback"
-if [ -n "${private_nav_token}" ]; then
-  echo "Uploading configured NAV private consumer token..."
-  printf '%s\n' "${private_nav_token}" \
-    | env CI=1 wrangler secret put NAV_API_TOKEN --config "${secret_config}" \
-      2>&1 | tee "${log_dir}/nav-secret.log"
-  nav_auth_mode="private-secret"
-fi
-if [ -n "${admin_token}" ]; then
-  echo "Uploading administrative sync token..."
-  printf '%s\n' "${admin_token}" \
-    | env CI=1 wrangler secret put ADMIN_SYNC_TOKEN --config "${secret_config}" \
-      2>&1 | tee "${log_dir}/admin-secret.log"
+  run_logged publish deploy_stack 0
 fi
 unset private_nav_token admin_token
 
-if [ "${environment}" = "production" ]; then
-  run_logged publish env CI=1 wrangler deploy --config "${config}"
+nav_auth_mode="public-fallback"
+if grep -q 'NAV_API_TOKEN' "${log_dir}/publish.log" 2>/dev/null; then
+  nav_auth_mode="private-secret"
 fi
 
-deployment_url="$(
-  cat "${log_dir}/publish.log" \
-    | strip_ansi \
-    | grep -Eo 'https://[^[:space:]]+\.workers\.dev' \
-    | tail -n 1 \
-    || true
-)"
+read_stack_output() {
+  python3 - "$1" <<'PYOUT'
+import json
+import pathlib
+import sys
+
+key = sys.argv[1]
+state = sorted(pathlib.Path("infra/.alchemy/state").rglob("__stack_output__.json"))
+if not state:
+    raise SystemExit("")
+payload = json.loads(state[-1].read_text())
+value = payload
+for candidate in ("output", "value", "data"):
+    if isinstance(value, dict) and candidate in value:
+        value = value[candidate]
+print(value.get(key, "") if isinstance(value, dict) else "")
+PYOUT
+}
+
+database_id="$(read_stack_output databaseId)"
+database_name="$(read_stack_output database)"
+
+deployment_url="$(read_stack_output url)"
 
 if [ -z "${deployment_url}" ]; then
-  echo "Could not determine the deployed workers.dev URL." >&2
+  echo "Alchemy did not report a deployed URL." >&2
   echo "Inspect ${log_dir}/publish.log." >&2
   exit 1
 fi
+
+# A freshly published Worker is not immediately answering everywhere. Smoking
+# it straight away reports a 404 that means "not propagated yet", which is
+# indistinguishable in the log from a genuinely missing route.
+echo "Waiting for ${deployment_url} to answer..."
+attempt=0
+until curl --fail --silent --show-error --max-time 10 "${deployment_url}/api/health" >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  if [ "${attempt}" -ge 30 ]; then
+    echo "Deployment did not become healthy within 60 seconds." >&2
+    exit 1
+  fi
+  sleep 2
+done
 
 if [ "${environment}" = "production" ]; then
   SMOKE_OUTPUT_DIR="${log_dir}/smoke" \

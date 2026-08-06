@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "baseUrl": ".",
+    "paths": {
+      "@job-index/domain/*": [
+        "packages/domain/src/*"
+      ]
+    },
+    "types": [
+      "node",
+      "vitest/importMeta"
+    ]
+  },
+  "include": [
+    "packages/**/*.ts",
+    "apps/**/*.ts"
+  ]
+}

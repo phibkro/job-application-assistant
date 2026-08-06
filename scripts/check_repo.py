@@ -9,6 +9,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Directories whose contents are not this repository's source: vendored
+# dependencies and build output. Auditing them reports other projects' broken
+# documentation links and their example credentials as if they were ours, which
+# buries real findings under thousands of irrelevant ones.
+NOT_OUR_SOURCE = {
+    ".git",
+    "node_modules",
+    "target",
+    ".wrangler",
+    ".artifacts",
+    ".alchemy",
+    ".direnv",
+    "__pycache__",
+}
+
+
+def ours(path: Path) -> bool:
+    return not any(part in NOT_OUR_SOURCE for part in path.parts)
+
+
 REQUIRED = [
     "README.md",
     "LICENSE",
@@ -118,7 +138,7 @@ for relative in REQUIRED:
         errors.append(f"missing required file: {relative}")
 
 # JSON syntax and basic lifecycle integrity.
-json_files = sorted(ROOT.rglob("*.json"))
+json_files = sorted(path for path in ROOT.rglob("*.json") if ours(path))
 parsed: dict[Path, object] = {}
 for path in json_files:
     try:
@@ -384,7 +404,7 @@ for path in sorted((ROOT / "memory-bank").glob("*.md")):
 
 # Check relative Markdown links. Ignore anchors, schemes, mail, and template placeholders.
 link_pattern = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-for path in sorted(ROOT.rglob("*.md")):
+for path in sorted(path for path in ROOT.rglob("*.md") if ours(path)):
     text = path.read_text(encoding="utf-8")
     for target in link_pattern.findall(text):
         target = target.strip().split()[0].strip("<>")
@@ -404,8 +424,8 @@ for path in sorted(ROOT.rglob("*.md")):
 
 # Prevent obvious secrets in committed text. This is deliberately narrow and not a secret scanner.
 secret_markers = ["BEGIN PRIVATE KEY", "AKIA", "sk-proj-"]
-for path in sorted(ROOT.rglob("*")):
-    if not path.is_file() or ".git" in path.parts or path == Path(__file__).resolve():
+for path in sorted(path for path in ROOT.rglob("*") if ours(path)):
+    if not path.is_file() or path == Path(__file__).resolve():
         continue
     if path.suffix.lower() not in {".md", ".json", ".jsonc", ".yml", ".yaml", ".toml", ".sh", ".py", ".rs", ".sql"}:
         continue
@@ -507,21 +527,30 @@ if api_path.is_file():
     if "constant_time_eq" not in text:
         errors.append("administrator bearer-token comparison must be constant-time")
 
-production_config = ROOT / "wrangler.production.jsonc"
+# Production safety is declared in the Alchemy program rather than a Wrangler
+# config, so it is asserted against that file. These are the properties a
+# production deploy must not lose: no demo mutations, no public-token
+# fallback, and the three staggered bounded triggers.
+production_config = ROOT / "infra/alchemy.run.ts"
 if production_config.is_file():
-    config = json.loads(production_config.read_text(encoding="utf-8"))
-    vars_config = config.get("vars", {})
-    if vars_config.get("ALLOW_DEMO_MUTATIONS") != "false":
+    infra_text = production_config.read_text(encoding="utf-8")
+    if 'ALLOW_DEMO_MUTATIONS: PRODUCTION ? "false" : "true"' not in infra_text:
         errors.append("production must disable demo mutations")
-    if vars_config.get("NAV_USE_PUBLIC_TOKEN") != "false":
+    if 'NAV_USE_PUBLIC_TOKEN: PRODUCTION ? "false" : "true"' not in infra_text:
         errors.append("production must not use NAV's rotating public token")
-    expected_crons = [
-        "0,15,30,45 * * * *",
-        "2,7,12,17,22,27,32,37,42,47,52,57 * * * *",
-        "4,9,14,19,24,29,34,39,44,49,54,59 * * * *",
-    ]
-    if config.get("triggers", {}).get("crons") != expected_crons:
-        errors.append("production must declare the three staggered bounded scheduled triggers")
+    for cron in (
+        '"0,15,30,45 * * * *"',
+        '"2,7,12,17,22,27,32,37,42,47,52,57 * * * *"',
+        '"4,9,14,19,24,29,34,39,44,49,54,59 * * * *"',
+    ):
+        if cron not in infra_text:
+            errors.append("production must declare the three staggered bounded scheduled triggers")
+            break
+    # Ingestion must not start before the second phase of a production deploy.
+    if 'NAV_SYNC_ENABLED: PRODUCTION && ACTIVATE_SCHEDULES ? "true" : "false"' not in infra_text:
+        errors.append("production ingestion must activate only with its schedules")
+else:
+    errors.append("missing infra/alchemy.run.ts")
 
 for path in sorted((ROOT / "crates").rglob("*.rs")):
     text = path.read_text(encoding="utf-8")

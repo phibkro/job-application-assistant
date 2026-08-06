@@ -130,7 +130,7 @@ _bundle-check: _build
   mkdir -p .artifacts/dry-run
   # Recipe lines reach the shell verbatim, so shell variables take a single `$`.
   # A doubled `$$` is Make escaping and expands to the shell's process id here.
-  for config in wrangler.local.jsonc wrangler.staging.jsonc wrangler.production.jsonc; do \
+  for config in wrangler.local.jsonc wrangler.test.jsonc; do \
     name="${config%.jsonc}"; \
     wrangler deploy --config "${config}" --dry-run --outdir ".artifacts/dry-run/${name}"; \
   done

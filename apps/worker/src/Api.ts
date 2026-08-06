@@ -1,0 +1,168 @@
+import * as Schema from "effect/Schema";
+import * as HttpApi from "effect/unstable/httpapi/HttpApi";
+import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
+import { CanonicalJob } from "@job-index/domain/Job";
+import { CatalogEntry } from "@job-index/domain/Source";
+import { Profile } from "@job-index/domain/Profile";
+
+/**
+ * The contract between the worker and everything that calls it.
+ *
+ * This is the seam the interface, the chat surface, and any external client
+ * share, so it is frozen before slots open. It also replaces three artefacts
+ * that previously had to agree by hand — the router, `openapi/job-index-v1.json`,
+ * and the smoke suite's assumptions about routes — because the document, a
+ * typed client, and test helpers are all derived from this declaration.
+ *
+ * Endpoint schemas are the domain models' JSON variants, so a field marked
+ * `Model.Sensitive` cannot reach a response by construction rather than by
+ * review. That is the personal-data boundary made structural.
+ */
+
+/** Errors carried across the wire, mirroring the domain's failure taxonomy. */
+export class Unauthorized extends Schema.TaggedError<Unauthorized>()("Unauthorized", {
+  message: Schema.String,
+}) {}
+
+export class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+  message: Schema.String,
+}) {}
+
+/** Returned when the account's tier lacks the capability. Distinct from Forbidden. */
+export class UpgradeRequired extends Schema.TaggedError<UpgradeRequired>()("UpgradeRequired", {
+  capability: Schema.String,
+}) {}
+
+/** Returned when the platform's terms forbid it, whatever the account has paid. */
+export class ForbiddenByPlatform extends Schema.TaggedError<ForbiddenByPlatform>()(
+  "ForbiddenByPlatform",
+  { platform: Schema.String, policy: Schema.String },
+) {}
+
+const PageMeta = Schema.Struct({
+  limit: Schema.Number,
+  nextCursor: Schema.NullOr(Schema.String),
+});
+
+const JobPage = Schema.Struct({
+  data: Schema.Array(CanonicalJob),
+  meta: PageMeta,
+});
+
+/**
+ * Browsing the corpus. Unauthenticated reads stay possible so the catalogue is
+ * inspectable without an account.
+ */
+const corpus = HttpApiGroup.make("corpus").add(
+  HttpApiEndpoint.get("listJobs", "/api/v1/jobs", {
+    query: {
+      term: Schema.optional(Schema.String),
+      location: Schema.optional(Schema.String),
+      status: Schema.optional(Schema.String),
+      cursor: Schema.optional(Schema.String),
+      limit: Schema.optional(Schema.String),
+    },
+    success: JobPage,
+  }),
+  HttpApiEndpoint.get("getJob", "/api/v1/jobs/:id", {
+    params: { id: Schema.String },
+    success: CanonicalJob,
+    error: NotFound,
+  }),
+  HttpApiEndpoint.get("listSources", "/api/v1/sources/catalog", {
+    query: { tier: Schema.optional(Schema.String) },
+    success: Schema.Struct({ data: Schema.Array(CatalogEntry) }),
+  }),
+);
+
+/**
+ * Fresh listings: what this person has not already been offered.
+ *
+ * Separate from `listJobs` because it is a different question — freshness is
+ * per profile, so it needs the caller's identity and cannot be a query
+ * parameter on a public read.
+ */
+const feed = HttpApiGroup.make("feed").add(
+  HttpApiEndpoint.get("fresh", "/api/v1/me/feed", {
+    query: { limit: Schema.optional(Schema.String) },
+    success: JobPage,
+    error: Unauthorized,
+  }),
+  HttpApiEndpoint.post("dismiss", "/api/v1/me/feed/:id/dismiss", {
+    params: { id: Schema.String },
+    payload: Schema.Struct({ verdict: Schema.String, reason: Schema.optional(Schema.String) }),
+    success: Schema.Struct({ dismissed: Schema.String }),
+    error: Unauthorized,
+  }),
+);
+
+/** The profile and its answers: everything an application is enriched from. */
+const profile = HttpApiGroup.make("profile").add(
+  HttpApiEndpoint.get("me", "/api/v1/me", {
+    success: Schema.Struct({
+      profile: Profile,
+      capabilities: Schema.Array(Schema.String),
+    }),
+    error: Unauthorized,
+  }),
+  HttpApiEndpoint.put("setProfile", "/api/v1/me/profile", {
+    payload: Profile,
+    success: Profile,
+    error: Unauthorized,
+  }),
+  HttpApiEndpoint.put("setAnswer", "/api/v1/me/answers/:question", {
+    params: { question: Schema.String },
+    payload: Schema.Struct({ value: Schema.String, label: Schema.optional(Schema.String) }),
+    success: Schema.Struct({ question: Schema.String }),
+    error: Unauthorized,
+  }),
+);
+
+/**
+ * The application loop.
+ *
+ * `prepare` returns what was actually done rather than what was asked: a
+ * request to submit automatically may come back assisted because the platform
+ * forbids it, and the caller must be able to say why. That is a success with a
+ * reason, not a failure.
+ */
+const applications = HttpApiGroup.make("applications").add(
+  HttpApiEndpoint.post("save", "/api/v1/me/saved", {
+    payload: Schema.Struct({ jobId: Schema.String, note: Schema.optional(Schema.String) }),
+    success: Schema.Struct({ savedJobId: Schema.String }),
+    error: [Unauthorized, NotFound],
+  }),
+  HttpApiEndpoint.post("draft", "/api/v1/me/saved/:id/draft", {
+    params: { id: Schema.String },
+    payload: Schema.Struct({ generator: Schema.optional(Schema.String) }),
+    success: Schema.Struct({
+      cv: Schema.String,
+      letter: Schema.String,
+      generator: Schema.String,
+    }),
+    error: [Unauthorized, NotFound, UpgradeRequired],
+  }),
+  HttpApiEndpoint.post("prepare", "/api/v1/me/saved/:id/apply", {
+    params: { id: Schema.String },
+    payload: Schema.Struct({ method: Schema.optional(Schema.String) }),
+    success: Schema.Struct({
+      applicationId: Schema.String,
+      method: Schema.String,
+      applicationUrl: Schema.String,
+      cv: Schema.String,
+      letter: Schema.String,
+      downgradeReason: Schema.NullOr(Schema.String),
+    }),
+    error: [Unauthorized, NotFound, UpgradeRequired, ForbiddenByPlatform],
+  }),
+  HttpApiEndpoint.post("decide", "/api/v1/me/applications/:id/decision", {
+    params: { id: Schema.String },
+    /** approve · rework · decline — the human step in an automated run. */
+    payload: Schema.Struct({ decision: Schema.String, notes: Schema.optional(Schema.String) }),
+    success: Schema.Struct({ applicationId: Schema.String, status: Schema.String }),
+    error: [Unauthorized, NotFound],
+  }),
+);
+
+export const api = HttpApi.make("job-index").add(corpus, feed, profile, applications);
