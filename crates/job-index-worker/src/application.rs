@@ -1221,3 +1221,347 @@ mod tests {
         assert!(letter.contains("Nora Berg"));
     }
 }
+
+/// What a scheduled run did, so the agenda can record why it stopped.
+#[derive(Debug, Default)]
+pub struct ScheduleOutcome {
+    pub considered: usize,
+    pub prepared: usize,
+    pub stopped_reason: String,
+}
+
+/// Resolves the caller to an account without deciding what to do about it.
+pub async fn caller_account(request: &Request, database: &D1Database) -> Result<Option<User>> {
+    let Some(principal) = crate::auth::principal_from_request(request, database).await? else {
+        return Ok(None);
+    };
+    load_user(database, &principal.id).await
+}
+
+pub fn account_is_premium(user: &User) -> bool {
+    user.is_premium()
+}
+
+/// Re-checks the tier at run time: a lapsed subscription must stop the work,
+/// not keep it running because the schedule was created while it was active.
+pub async fn user_is_premium(database: &D1Database, user_id: &str) -> Result<bool> {
+    #[derive(Deserialize)]
+    struct TierRow {
+        subscription_tier: String,
+    }
+    let row = worker::query!(
+        database,
+        "SELECT subscription_tier FROM users WHERE id = ?1 AND erasure_requested_at IS NULL",
+        user_id
+    )?
+    .first::<TierRow>(None)
+    .await?;
+    Ok(row.is_some_and(|value| value.subscription_tier == "premium"))
+}
+
+/// Shortlists, drafts for, and prepares an application for each vacancy the
+/// saved search has newly matched, up to the schedule's budget.
+///
+/// This is the same composition the manual path uses, so a scheduled letter is
+/// the letter the person would have got by pressing the button — there is no
+/// second, lower-quality generator hiding behind the subscription.
+pub async fn prepare_for_schedule(
+    database: &D1Database,
+    user_id: &str,
+    saved_search_id: &str,
+    max_per_run: i64,
+    method: &str,
+) -> Result<ScheduleOutcome> {
+    #[derive(Deserialize)]
+    struct MatchRow {
+        canonical_job_id: String,
+    }
+
+    // Currently-matching vacancies this person has not already shortlisted.
+    // Excluding the shortlist is what stops a daily schedule re-applying to
+    // the same advert every day.
+    let matches = database
+        .prepare(
+            "SELECT sm.canonical_job_id
+             FROM search_matches sm
+             JOIN canonical_jobs cj ON cj.id = sm.canonical_job_id
+             WHERE sm.saved_search_id = ?1
+               AND sm.currently_matches = 1
+               AND cj.status = 'active'
+               AND NOT EXISTS (
+                 SELECT 1 FROM saved_jobs sj
+                 WHERE sj.user_id = ?2 AND sj.canonical_job_id = sm.canonical_job_id
+               )
+             ORDER BY cj.sequence DESC
+             LIMIT ?3",
+        )
+        .bind(&[
+            saved_search_id.into(),
+            user_id.into(),
+            worker::wasm_bindgen::JsValue::from_f64(max_per_run as f64),
+        ])?
+        .all()
+        .await?
+        .results::<MatchRow>()?;
+
+    let mut outcome = ScheduleOutcome {
+        considered: matches.len(),
+        ..ScheduleOutcome::default()
+    };
+    if matches.is_empty() {
+        outcome.stopped_reason = "no new matches".to_string();
+        return Ok(outcome);
+    }
+
+    let Some(user) = load_user_by_id(database, user_id).await? else {
+        outcome.stopped_reason = "account not found".to_string();
+        return Ok(outcome);
+    };
+    let profile = load_profile(database, user_id).await?;
+    if profile.headline.trim().is_empty() && profile.experience.is_empty() {
+        outcome.stopped_reason = "profile has nothing to draft from".to_string();
+        return Ok(outcome);
+    }
+
+    for entry in matches {
+        let Some(job) = load_job(database, &entry.canonical_job_id).await? else {
+            continue;
+        };
+        let observed_at = now_ms().to_string();
+        let saved_id = identifier("saved", &format!("{user_id}|{}", job.id));
+        database
+            .prepare(
+                "INSERT INTO saved_jobs (id, user_id, canonical_job_id, job_title, job_employer,
+                                         job_location, job_application_url, job_deadline,
+                                         stage, note, saved_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'saved', ?9, ?10, ?10)
+                 ON CONFLICT(user_id, canonical_job_id) DO NOTHING",
+            )
+            .bind(&[
+                saved_id.as_str().into(),
+                user_id.into(),
+                job.id.as_str().into(),
+                job.title.as_str().into(),
+                job.employer_name.as_str().into(),
+                job.location.as_str().into(),
+                job.application_url.as_str().into(),
+                job.deadline.as_deref().map_or(
+                    worker::wasm_bindgen::JsValue::NULL,
+                    worker::wasm_bindgen::JsValue::from,
+                ),
+                "prepared by a schedule".into(),
+                observed_at.as_str().into(),
+            ])?
+            .run()
+            .await?;
+
+        let cv = compose_cv(&user, &profile, &job);
+        let letter = compose_letter(&user, &profile, &job);
+        for (kind, content) in [("cv", cv), ("letter", letter)] {
+            let version = next_version(database, &saved_id, kind).await?;
+            let draft_id = identifier("draft", &format!("{saved_id}|{kind}|{version}"));
+            database
+                .prepare(
+                    "INSERT INTO application_drafts (id, saved_job_id, kind, version, generator, content, created_at)
+                     VALUES (?1, ?2, ?3, ?4, 'template', ?5, ?6)",
+                )
+                .bind(&[
+                    draft_id.as_str().into(),
+                    saved_id.as_str().into(),
+                    kind.into(),
+                    worker::wasm_bindgen::JsValue::from_f64(version as f64),
+                    content.as_str().into(),
+                    observed_at.as_str().into(),
+                ])?
+                .run()
+                .await?;
+        }
+
+        // A schedule cannot widen what the platform permits: automated is
+        // honoured only where the catalogue records it as allowed.
+        let policy = source_policy(database, &job.id).await?;
+        let effective = if method == "automated"
+            && policy
+                .as_ref()
+                .is_some_and(|row| row.automation_policy == "allowed")
+        {
+            "automated"
+        } else {
+            "assisted"
+        };
+        let application_id = identifier("application", &saved_id);
+        database
+            .prepare(
+                "INSERT INTO applications (id, saved_job_id, user_id, method, status,
+                                           application_url, notes, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+                 ON CONFLICT(saved_job_id) DO NOTHING",
+            )
+            .bind(&[
+                application_id.as_str().into(),
+                saved_id.as_str().into(),
+                user_id.into(),
+                effective.into(),
+                if effective == "automated" {
+                    "submitted"
+                } else {
+                    "ready"
+                }
+                .into(),
+                job.application_url.as_str().into(),
+                "prepared by a scheduled run".into(),
+                observed_at.as_str().into(),
+            ])?
+            .run()
+            .await?;
+        advance_stage(database, &saved_id, "applied", &observed_at).await?;
+        outcome.prepared += 1;
+    }
+
+    if outcome.prepared as i64 >= max_per_run {
+        outcome.stopped_reason = "reached the run budget".to_string();
+    }
+    Ok(outcome)
+}
+
+async fn load_user_by_id(database: &D1Database, user_id: &str) -> Result<Option<User>> {
+    let row = worker::query!(
+        database,
+        "SELECT id, email, display_name, subscription_tier
+         FROM users WHERE id = ?1 AND erasure_requested_at IS NULL",
+        user_id
+    )?
+    .first::<UserRow>(None)
+    .await?;
+    Ok(row.map(|value| User {
+        id: value.id,
+        email: value.email,
+        display_name: value.display_name,
+        subscription_tier: value.subscription_tier,
+    }))
+}
+
+/// The result of linking an external identity to an account.
+pub struct LinkedIdentity {
+    pub user_id: String,
+    pub email: String,
+    pub display_name: String,
+    pub subscription_tier: String,
+    /// Present only when the account was created by this link, because the key
+    /// is stored as a hash and cannot be shown again.
+    pub issued_api_key: Option<String>,
+}
+
+/// Links an external sign-in to an account, creating one on first use.
+///
+/// Matching is by provider subject first and email second: a member who
+/// changes their email keeps their account, and a member who signed up
+/// directly keeps theirs when they later link.
+pub async fn link_external_identity(
+    database: &D1Database,
+    provider: &str,
+    subject: &str,
+    email: &str,
+    display_name: &str,
+    avatar_url: &str,
+) -> Result<LinkedIdentity> {
+    let email = email.trim().to_ascii_lowercase();
+    let observed_at = now_ms().to_string();
+
+    #[derive(Deserialize)]
+    struct ExistingRow {
+        id: String,
+        email: String,
+        display_name: String,
+        subscription_tier: String,
+    }
+    let existing = database
+        .prepare(
+            "SELECT id, email, display_name, subscription_tier FROM users
+             WHERE (linkedin_subject = ?1 OR email = ?2) AND erasure_requested_at IS NULL
+             ORDER BY linkedin_subject IS NULL
+             LIMIT 1",
+        )
+        .bind(&[subject.into(), email.as_str().into()])?
+        .first::<ExistingRow>(None)
+        .await?;
+
+    if let Some(found) = existing {
+        database
+            .prepare(
+                "UPDATE users SET linkedin_subject = ?1, avatar_url = ?2, updated_at = ?3
+                 WHERE id = ?4",
+            )
+            .bind(&[
+                subject.into(),
+                avatar_url.into(),
+                observed_at.as_str().into(),
+                found.id.as_str().into(),
+            ])?
+            .run()
+            .await?;
+        return Ok(LinkedIdentity {
+            user_id: found.id,
+            email: found.email,
+            display_name: found.display_name,
+            subscription_tier: found.subscription_tier,
+            issued_api_key: None,
+        });
+    }
+
+    // First sign-in: mint an API key so the account has a credential for the
+    // API surface. It is returned once and stored only as a hash.
+    let api_key = format!(
+        "ji_{}{}",
+        stable_hash_hex(&format!("{provider}|{subject}|{observed_at}")),
+        stable_hash_hex(&format!("{email}|{observed_at}|key"))
+    );
+    let principal_id = identifier("principal", &format!("{provider}|{subject}"));
+    let user_id = identifier("user", &email);
+    let name = if display_name.trim().is_empty() {
+        email.clone()
+    } else {
+        display_name.trim().chars().take(MAX_NAME).collect()
+    };
+
+    database
+        .prepare(
+            "INSERT INTO principals (id, name, api_key_hash, role, status, search_quota, created_at, updated_at)
+             VALUES (?1, ?2, ?3, 'member', 'active', 20, ?4, ?4)
+             ON CONFLICT(id) DO NOTHING",
+        )
+        .bind(&[
+            principal_id.as_str().into(),
+            name.as_str().into(),
+            crate::auth::sha256_hex(&api_key).as_str().into(),
+            observed_at.as_str().into(),
+        ])?
+        .run()
+        .await?;
+    database
+        .prepare(
+            "INSERT INTO users (id, principal_id, email, display_name, subscription_tier,
+                                linkedin_subject, avatar_url, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 'free', ?5, ?6, ?7, ?7)
+             ON CONFLICT(email) DO NOTHING",
+        )
+        .bind(&[
+            user_id.as_str().into(),
+            principal_id.as_str().into(),
+            email.as_str().into(),
+            name.as_str().into(),
+            subject.into(),
+            avatar_url.into(),
+            observed_at.as_str().into(),
+        ])?
+        .run()
+        .await?;
+
+    Ok(LinkedIdentity {
+        user_id,
+        email,
+        display_name: name,
+        subscription_tier: "free".to_string(),
+        issued_api_key: Some(api_key),
+    })
+}

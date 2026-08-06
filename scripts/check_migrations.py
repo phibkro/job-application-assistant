@@ -28,6 +28,9 @@ EXPECTED_TABLES = {
     "saved_jobs",
     "application_drafts",
     "applications",
+    "application_schedules",
+    "application_runs",
+    "oauth_states",
 }
 
 if not MIGRATIONS:

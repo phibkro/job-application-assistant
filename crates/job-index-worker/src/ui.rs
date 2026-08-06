@@ -289,7 +289,7 @@ pub const BROWSE_HTML: &str = r#"<!doctype html>
 </head>
 <body>
 <main>
-  <p class="muted">Browse · inspect · save</p>
+  <p class="muted">Browse · inspect · save — <a href="/apply">my applications →</a></p>
   <h1>Find a job in the corpus</h1>
   <p id="coverage" class="muted">Loading source coverage…</p>
 
@@ -374,7 +374,9 @@ pub const BROWSE_HTML: &str = r#"<!doctype html>
       </dl>
       <div class="row">
         <a class="tag" href="${escapeHtml(job.application_url)}" target="_blank" rel="noopener noreferrer">Open advert</a>
+        <button id="save" data-job="${escapeHtml(job.id)}">Save to shortlist</button>
       </div>
+      <p id="save-status" class="muted"></p>
       <h3>Description</h3>
       <div class="body">${escapeHtml(job.description)}</div>`;
   }
@@ -397,6 +399,35 @@ pub const BROWSE_HTML: &str = r#"<!doctype html>
     }
   }
 
+  detailNode.addEventListener('click', async (event) => {
+    const button = event.target.closest('#save');
+    if (!button) return;
+    const status = document.querySelector('#save-status');
+    let key = sessionStorage.getItem('jobIndexKey');
+    if (!key) {
+      key = window.prompt('API key for your account (kept in this browser only):') || '';
+      if (!key.trim()) return;
+      sessionStorage.setItem('jobIndexKey', key.trim());
+    }
+    button.disabled = true;
+    status.textContent = 'Saving…';
+    try {
+      const response = await fetch('/api/v1/me/saved', {
+        method: 'POST',
+        headers: { 'x-api-key': sessionStorage.getItem('jobIndexKey'), 'content-type': 'application/json' },
+        body: JSON.stringify({ job_id: button.dataset.job }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      status.innerHTML = response.ok
+        ? 'Saved — <a href="/apply">draft and apply</a>.'
+        : escapeHtml(payload?.error?.message || `save failed: ${response.status}`);
+    } catch (error) {
+      status.textContent = String(error);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   resultsNode.addEventListener('click', (event) => {
     const card = event.target.closest('.result');
     if (card) showDetail(loaded[Number(card.dataset.index)]);
@@ -417,6 +448,215 @@ pub const BROWSE_HTML: &str = r#"<!doctype html>
   });
 
   search(false);
+</script>
+</body>
+</html>"#;
+
+/// The application workspace: shortlist, drafts, and submissions.
+///
+/// Drives the same `/api/v1/me` endpoints an external client would, with the
+/// account's API key held only in this browser session, so the page never
+/// becomes a second, weaker authentication path.
+pub const APPLY_HTML: &str = r#"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Index — my applications</title>
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b1020; color: #e8eefc; }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 72px; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.4rem); margin: 0 0 4px; letter-spacing: -0.03em; }
+    p, li { color: #aebbd5; line-height: 1.6; }
+    .muted { color: #8fa1c1; font-size: .9rem; }
+    a { color: #b9e5ff; }
+    input, textarea, button, select { font: inherit; border-radius: 12px; padding: 11px 13px; }
+    input, textarea, select { border: 1px solid #273553; background: #111a2e; color: inherit; width: 100%; }
+    textarea { min-height: 92px; resize: vertical; }
+    button { border: 1px solid #456088; background: #182744; color: inherit; cursor: pointer; }
+    button.primary { background: #dbeafe; color: #10203b; border-color: #dbeafe; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .card { border: 1px solid #273553; background: #111a2e; border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+    .tag { padding: 4px 9px; border-radius: 999px; background: #24385e; color: #cfe3ff; font-size: .78rem; }
+    .tag.stage-applied { background: #1f4535; color: #b7f0d2; }
+    .tag.stage-drafted { background: #4a3722; color: #ffd9a8; }
+    .tag.premium { background: #3b2a55; color: #dcc9ff; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0d1526; border: 1px solid #22304d;
+          border-radius: 12px; padding: 12px; max-height: 40vh; overflow-y: auto; color: #cbd7ee; }
+    .notice { border-left: 3px solid #6f8fc4; padding-left: 10px; }
+    .error { color: #ffb4c0; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="muted"><a href="/browse">← browse</a> · save · draft · apply</p>
+  <h1>My applications</h1>
+
+  <section class="card">
+    <p class="muted">The key is kept in this browser only, and sent as <code>x-api-key</code>.</p>
+    <div class="row">
+      <input id="key" type="password" placeholder="Your API key" style="flex:1 1 320px">
+      <button id="connect" class="primary">Connect</button>
+    </div>
+    <p id="who" class="muted"></p>
+  </section>
+
+  <div class="grid">
+    <section>
+      <h2>Shortlist</h2>
+      <div id="saved"><p class="muted">Connect to load your shortlist.</p></div>
+    </section>
+    <section>
+      <h2>Drafts and submission</h2>
+      <div id="workspace"><p class="muted">Select a shortlisted vacancy.</p></div>
+    </section>
+  </div>
+</main>
+<script>
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const savedNode = document.querySelector('#saved');
+  const workNode = document.querySelector('#workspace');
+  const whoNode = document.querySelector('#who');
+  let apiKey = sessionStorage.getItem('jobIndexKey') || '';
+  let selected = null;
+
+  async function api(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: { 'x-api-key': apiKey, 'content-type': 'application/json', ...(options.headers || {}) },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload?.error?.message || `request failed: ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  }
+
+  async function connect() {
+    apiKey = document.querySelector('#key').value.trim();
+    if (!apiKey) return;
+    sessionStorage.setItem('jobIndexKey', apiKey);
+    try {
+      const me = await api('/api/v1/me');
+      const capabilities = me.data.capabilities;
+      const premium = capabilities.model_drafting;
+      whoNode.innerHTML = `Signed in as ${escapeHtml(me.data.user.display_name)} ·
+        <span class="tag ${premium ? 'premium' : ''}">${escapeHtml(me.data.user.subscription_tier)}</span>
+        ${premium ? '' : '<span class="muted">— model drafting and automated apply need premium</span>'}`;
+      await loadSaved();
+    } catch (error) {
+      whoNode.innerHTML = `<span class="error">${escapeHtml(error.message)}</span>`;
+    }
+  }
+
+  async function loadSaved() {
+    const page = await api('/api/v1/me/saved');
+    if (!page.data.length) {
+      savedNode.innerHTML = '<p class="muted">Nothing saved yet — <a href="/browse">find a job</a>.</p>';
+      return;
+    }
+    savedNode.innerHTML = page.data.map((job) => `
+      <article class="card">
+        <strong>${escapeHtml(job.title)}</strong>
+        <div class="muted">${escapeHtml(job.employer_name)} · ${escapeHtml(job.location)}</div>
+        <div class="row">
+          <span class="tag stage-${escapeHtml(job.stage)}">${escapeHtml(job.stage)}</span>
+          ${job.deadline ? `<span class="tag">apply by ${escapeHtml(job.deadline)}</span>` : ''}
+          <button data-open="${escapeHtml(job.id)}">Open</button>
+          <button data-remove="${escapeHtml(job.id)}">Remove</button>
+        </div>
+      </article>`).join('');
+  }
+
+  async function openJob(savedId) {
+    selected = savedId;
+    workNode.innerHTML = '<p class="muted">Loading…</p>';
+    const applications = await api('/api/v1/me/applications');
+    const existing = applications.data.find((item) => item.saved_job_id === savedId);
+    workNode.innerHTML = `
+      <div class="card">
+        <div class="row">
+          <button id="draft" class="primary">Draft CV + letter</button>
+          <button id="draft-model">Draft with model (premium)</button>
+          <button id="apply">Prepare application</button>
+          <button id="apply-auto">Submit automatically (premium)</button>
+        </div>
+        <p id="status" class="muted"></p>
+        ${existing ? `<p class="notice muted">Recorded as <strong>${escapeHtml(existing.status)}</strong>
+           via ${escapeHtml(existing.method)}.</p>` : ''}
+      </div>
+      <div id="documents"></div>`;
+
+    document.querySelector('#draft').onclick = () => runDraft('template');
+    document.querySelector('#draft-model').onclick = () => runDraft('model');
+    document.querySelector('#apply').onclick = () => runApply('assisted');
+    document.querySelector('#apply-auto').onclick = () => runApply('automated');
+  }
+
+  function setStatus(message, isError) {
+    const node = document.querySelector('#status');
+    if (node) node.innerHTML = isError ? `<span class="error">${escapeHtml(message)}</span>` : escapeHtml(message);
+  }
+
+  async function runDraft(generator) {
+    setStatus('Drafting…');
+    try {
+      const result = await api(`/api/v1/me/saved/${selected}/draft`, {
+        method: 'POST', body: JSON.stringify({ generator }),
+      });
+      document.querySelector('#documents').innerHTML = result.data.map((draft) => `
+        <div class="card">
+          <strong>${escapeHtml(draft.kind)} · v${draft.version} · ${escapeHtml(draft.generator)}</strong>
+          <pre>${escapeHtml(draft.content)}</pre>
+        </div>`).join('');
+      setStatus('Drafted.');
+      await loadSaved();
+    } catch (error) {
+      setStatus(error.status === 402 ? `${error.message}` : error.message, true);
+    }
+  }
+
+  async function runApply(method) {
+    setStatus('Preparing…');
+    try {
+      const result = await api(`/api/v1/me/saved/${selected}/apply`, {
+        method: 'POST', body: JSON.stringify({ method }),
+      });
+      const data = result.data;
+      document.querySelector('#documents').innerHTML = `
+        <div class="card">
+          <strong>${escapeHtml(data.application.method)} · ${escapeHtml(data.application.status)}</strong>
+          ${data.automation_note ? `<p class="notice">${escapeHtml(data.automation_note)}</p>` : ''}
+          <p><a href="${escapeHtml(data.application.application_url)}" target="_blank" rel="noopener noreferrer">Open the advert to submit</a></p>
+          <pre>${escapeHtml(data.letter)}</pre>
+          <pre>${escapeHtml(data.cv)}</pre>
+        </div>`;
+      setStatus('Ready.');
+      await loadSaved();
+    } catch (error) {
+      setStatus(error.message, true);
+    }
+  }
+
+  savedNode.addEventListener('click', async (event) => {
+    const open = event.target.dataset.open;
+    const remove = event.target.dataset.remove;
+    if (open) await openJob(open);
+    if (remove) {
+      await api(`/api/v1/me/saved/${remove}`, { method: 'DELETE' });
+      await loadSaved();
+    }
+  });
+  document.querySelector('#connect').onclick = connect;
+  if (apiKey) { document.querySelector('#key').value = apiKey; connect(); }
 </script>
 </body>
 </html>"#;

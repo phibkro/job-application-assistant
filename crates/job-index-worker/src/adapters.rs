@@ -80,7 +80,8 @@ pub async fn listings(request: Request, context: RouteContext<()>) -> Result<Res
         return crate::auth::api_error(&request, "not_found", "no such catalogued source", 404);
     };
 
-    if source.requires_premium == 1 {
+    let agent_tier = source.requires_premium == 1;
+    if agent_tier {
         // Agent-tier reads are gated on the account, not on the client.
         let premium = crate::application::caller_is_premium(&request, &database).await?;
         if !premium {
@@ -91,12 +92,6 @@ pub async fn listings(request: Request, context: RouteContext<()>) -> Result<Res
                 402,
             );
         }
-        return crate::auth::api_error(
-            &request,
-            "agent_runner_unavailable",
-            "agent acquisition is enabled for this account but no runner is attached to this environment",
-            503,
-        );
     }
 
     if source.listings_url.trim().is_empty() {
@@ -108,26 +103,113 @@ pub async fn listings(request: Request, context: RouteContext<()>) -> Result<Res
         );
     }
 
-    let body = fetch_page(&source.listings_url).await?;
-    let listings = extract_job_postings(&body);
-    let note = if listings.is_empty() {
-        "the page published no schema.org JobPosting data; this platform needs the agent tier"
-            .to_string()
-    } else {
+    // A plain fetch returns the server response. Most Norwegian boards render
+    // their listings in the browser, so that response carries no vacancies at
+    // all — which is what the agent tier is for: the page is rendered first,
+    // then read the same way.
+    let mut strategy = "schema.org/JobPosting (JSON-LD)";
+    let mut note = String::new();
+    let mut body = if agent_tier {
         String::new()
+    } else {
+        fetch_page(&source.listings_url).await?
     };
+    let mut listings = extract_job_postings(&body);
+
+    if listings.is_empty() {
+        match render_with_browser(&context, &source.listings_url).await {
+            Ok(Some(rendered)) => {
+                body = rendered;
+                listings = extract_job_postings(&body);
+                strategy = "schema.org/JobPosting after browser rendering";
+                if listings.is_empty() {
+                    note = "the rendered page still published no JobPosting data; this platform needs a per-source extraction recipe".to_string();
+                }
+            }
+            Ok(None) => {
+                note = if agent_tier {
+                    "this source needs browser rendering, which is not configured in this environment".to_string()
+                } else {
+                    "the page published no schema.org JobPosting data".to_string()
+                };
+            }
+            Err(error) => {
+                note = format!("browser rendering failed: {error}");
+            }
+        }
+    }
 
     Response::from_json(&AdapterResponse {
         meta: AdapterMeta {
             source_id: source.id,
             platform: source.platform,
-            strategy: "schema.org/JobPosting (JSON-LD)",
+            strategy,
             acquisition_tier: source.acquisition_tier,
             count: listings.len(),
             note,
         },
         data: listings,
     })
+}
+
+/// Renders a page with Cloudflare Browser Run and returns its HTML.
+///
+/// Returns `Ok(None)` when the environment has no Browser Run credentials, so
+/// an unconfigured deployment degrades to the plain fetch rather than
+/// pretending a platform published nothing.
+async fn render_with_browser(context: &RouteContext<()>, url: &str) -> Result<Option<String>> {
+    let (Ok(account), Ok(token)) = (
+        context.env.secret("CLOUDFLARE_ACCOUNT_ID"),
+        context.env.secret("BROWSER_RENDERING_TOKEN"),
+    ) else {
+        return Ok(None);
+    };
+    let account = account.to_string();
+    let token = token.to_string();
+    if account.is_empty() || token.is_empty() {
+        return Ok(None);
+    }
+
+    let endpoint = format!(
+        "https://api.cloudflare.com/client/v4/accounts/{account}/browser-rendering/content"
+    );
+    let headers = Headers::new();
+    headers.set("authorization", &format!("Bearer {token}"))?;
+    headers.set("content-type", "application/json")?;
+    let payload = serde_json::json!({
+        "url": url,
+        // The listings are what matters; blocking assets keeps a render inside
+        // the Worker's time budget.
+        "rejectResourceTypes": ["image", "media", "font"],
+        "gotoOptions": { "waitUntil": "networkidle0", "timeout": 20000 }
+    })
+    .to_string();
+    let mut init = RequestInit::new();
+    init.with_method(Method::Post)
+        .with_headers(headers)
+        .with_body(Some(payload.into()));
+    let request = Request::new_with_init(&endpoint, &init)?;
+    let mut response = Fetch::Request(request).send().await?;
+    if response.status_code() != 200 {
+        return Err(worker::Error::RustError(format!(
+            "browser rendering returned status {}",
+            response.status_code()
+        )));
+    }
+
+    #[derive(Deserialize)]
+    struct RenderEnvelope {
+        success: bool,
+        #[serde(default)]
+        result: String,
+    }
+    let envelope = response.json::<RenderEnvelope>().await?;
+    if !envelope.success {
+        return Err(worker::Error::RustError(
+            "browser rendering reported failure".to_string(),
+        ));
+    }
+    Ok(Some(envelope.result.chars().take(MAX_PAGE_BYTES).collect()))
 }
 
 async fn fetch_page(url: &str) -> Result<String> {

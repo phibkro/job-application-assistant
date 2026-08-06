@@ -23,7 +23,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Primary job board', 'Norway', 'High',
   'Mostly Norwegian', 'https://www.finn.no/job/', 'https://www.finn.no/job/',
   '1 Core', 'High', 'Verified active',
-  'scripted', 'prohibited', 0,
+  'agent', 'prohibited', 1,
   'One of Norway’s largest commercial job boards.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -35,7 +35,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Primary job board / ATS', 'Norway', 'High',
   'Norwegian + English', 'https://www.jobbnorge.no/search/en', 'https://www.jobbnorge.no/search/en',
   '1 Core', 'High', 'Verified active',
-  'scripted', 'assisted_only', 0,
+  'agent', 'assisted_only', 1,
   'Strong for public and academic vacancies.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -47,7 +47,7 @@ INSERT OR REPLACE INTO source_catalog (
   'ATS with public vacancy index', 'Norway', 'High',
   'Norwegian + English', 'https://candidate.webcruiter.com/nb-no/home/alladverts', 'https://candidate.webcruiter.com/nb-no/home/alladverts',
   '1 Core', 'High', 'Verified active',
-  'scripted', 'assisted_only', 0,
+  'agent', 'assisted_only', 1,
   'Many Norwegian employers publish directly through this ATS.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -95,7 +95,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Aggregator / job board', 'Norway', 'High',
   'Norwegian', 'https://www.jobbsafari.no/', 'https://www.jobbsafari.no/',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Often overlaps with primary boards.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -107,7 +107,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Aggregator', 'Norway', 'High',
   'Norwegian + English', 'https://www.careerjet.no/', 'https://www.careerjet.no/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Use as a coverage check rather than the only source.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -131,7 +131,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Aggregator', 'Norway', 'High',
   'Norwegian + English', 'https://no.talent.com/', 'https://no.talent.com/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Supplementary search engine.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -155,7 +155,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Job board', 'Norway', 'Medium',
   'Norwegian', 'https://www.jobs.no/', 'https://www.jobs.no/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Smaller general board.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -191,7 +191,7 @@ INSERT OR REPLACE INTO source_catalog (
   'English-language job board', 'Oslo + Norway', 'High',
   'English', 'https://jobsinoslo.com/', 'https://jobsinoslo.com/',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Part of the Jobsin Network.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -203,7 +203,7 @@ INSERT OR REPLACE INTO source_catalog (
   'English-language aggregator', 'Norway', 'High',
   'English', 'https://englishjobs.no/', 'https://englishjobs.no/',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Good supplementary filter; verify the original listing.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -227,7 +227,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Official European search portal', 'Europe incl. Norway', 'Medium',
   'Multilingual', 'https://europa.eu/europass/en/find-jobs', 'https://europa.eu/europass/en/find-jobs',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Overlaps heavily with EURES.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -239,7 +239,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Employer network / public portal', 'Oslo', 'High',
   'Norwegian', 'https://www.oslo.kommune.no/ledige-stillinger/', 'https://www.oslo.kommune.no/ledige-stillinger/',
   '1 Core', 'High', 'Verified active',
-  'scripted', 'assisted_only', 0,
+  'agent', 'assisted_only', 1,
   'Major Oslo employer with many role types.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -251,7 +251,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector job board', 'Norway', 'High',
   'Norwegian', 'https://www.kommunaljobb.no/', 'https://www.kommunaljobb.no/',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Useful alongside Arbeidsplassen and Webcruiter.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -263,7 +263,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Employer network / public portal', 'Norway', 'Medium',
   'Norwegian', 'https://www.forsvaret.no/jobb/ledige-stillinger', 'https://www.forsvaret.no/jobb/ledige-stillinger',
   '3 Niche', 'High', 'Verified active',
-  'scripted', 'assisted_only', 0,
+  'agent', 'assisted_only', 1,
   'Some roles have citizenship, clearance, fitness or location constraints.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -275,7 +275,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Employer network / public portal', 'Norway', 'High',
   'Norwegian', 'https://www.politiet.no/om-politiet/jobb-i-politiet/ledige-stillinger/', 'https://www.politiet.no/om-politiet/jobb-i-politiet/ledige-stillinger/',
   '3 Niche', 'High', 'Verified active',
-  'scripted', 'assisted_only', 0,
+  'agent', 'assisted_only', 1,
   'Listings are also commonly mirrored to Arbeidsplassen.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -287,7 +287,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Startup job board', 'Nordics incl. Norway', 'High',
   'Mostly English', 'https://thehub.io/jobs?countryCode=NO', 'https://thehub.io/jobs?countryCode=NO',
   '1 Core', 'High', 'Verified active',
-  'scripted', 'assisted_only', 0,
+  'agent', 'assisted_only', 1,
   'Primary Nordic startup board; absorbed Startupmatcher.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -299,7 +299,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Startup ecosystem job board', 'Norway / Oslo', 'High',
   'English + Norwegian', 'https://jobs.startuplab.no/', 'https://jobs.startuplab.no/',
   '1 Core', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Strong local startup ecosystem source.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -311,7 +311,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Developer job board', 'Norway', 'High',
   'Norwegian', 'https://kodejobb.no/', 'https://kodejobb.no/',
   '2 Supplemental', 'High', 'Verified active',
-  'scripted', 'assisted_only', 0,
+  'agent', 'assisted_only', 1,
   'Developer-focused Norwegian board.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -323,7 +323,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Engineering / technology job board', 'Norway', 'High',
   'Norwegian', 'https://www.tekjobb.no/', 'https://www.tekjobb.no/',
   '2 Supplemental', 'High', 'Verified active',
-  'scripted', 'assisted_only', 0,
+  'agent', 'assisted_only', 1,
   'Operated in the TU Media ecosystem.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -335,7 +335,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Global startup job board', 'Norway filter', 'Medium',
   'English', 'https://startup.jobs/locations/norway', 'https://startup.jobs/locations/norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Supplementary global startup source.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -359,7 +359,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Tech job board', 'Norway / Nordics', 'Medium',
   'English', 'https://nordictechjobs.com/jobs/norway', 'https://nordictechjobs.com/jobs/norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Nordic-specific technology listings.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -383,7 +383,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Startup community / job board', 'Norway filter', 'Medium',
   'English', 'https://www.f6s.com/jobs/norway', 'https://www.f6s.com/jobs/norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Coverage varies.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -431,7 +431,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway', 'High',
   'Norwegian + English', 'https://www.academicwork.no/ledige-stillinger', 'https://www.academicwork.no/ledige-stillinger',
   '1 Core', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Often targets students and recent graduates.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -455,7 +455,7 @@ INSERT OR REPLACE INTO source_catalog (
   'University career portal', 'Oslo / Norway', 'High',
   'English + Norwegian', 'https://www.uio.no/english/studies/career/career-opportunities/', 'https://www.uio.no/english/studies/career/career-opportunities/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Especially relevant to UiO students and recent graduates.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -467,7 +467,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Nordic seasonal-work programme', 'Nordics incl. Norway', 'Medium',
   'Scandinavian + English', 'https://www.nordjobb.org/en/', 'https://www.nordjobb.org/en/',
   '3 Niche', 'Medium', 'Seasonal / active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Age and Nordic-language/residency eligibility can apply.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -491,7 +491,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Official research job network', 'Europe incl. Norway', 'High',
   'English', 'https://euraxess.ec.europa.eu/jobs/search', 'https://euraxess.ec.europa.eu/jobs/search',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Official European research careers portal.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -503,7 +503,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Academic job board', 'Norway filter', 'High',
   'English', 'https://academicpositions.com/jobs/country/norway', 'https://academicpositions.com/jobs/country/norway',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Good international-facing academic coverage.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -515,7 +515,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Academic job board', 'Norway', 'High',
   'English + Norwegian', 'https://universitypositions.no/', 'https://universitypositions.no/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Dedicated Norwegian academic portal.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -527,7 +527,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector job board', 'Norway', 'High',
   'Norwegian', 'https://stilling.khrono.no/', 'https://stilling.khrono.no/',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Covers academic, technical, administrative and communications roles.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -539,7 +539,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway', 'High',
   'Norwegian + English', 'https://www.adecco.com/nb-no/ledige-stillinger', 'https://www.adecco.com/nb-no',
   '1 Core', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Large general staffing agency.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -551,7 +551,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway', 'High',
   'Norwegian', 'https://www.manpower.no/nb/sok', 'https://www.manpower.no/nb/sok',
   '1 Core', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Large general staffing agency.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -563,7 +563,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway', 'High',
   'Norwegian + English', 'https://www.randstad.no/ledige-stillinger/', 'https://www.randstad.no/ledige-stillinger/',
   '1 Core', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Large recruiter with Oslo coverage.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -575,7 +575,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway', 'High',
   'Norwegian', 'https://jobzone.no/ledige-stillinger', 'https://jobzone.no/',
   '1 Core', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'More than 30 local offices and broad sector coverage.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -623,7 +623,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway', 'High',
   'Norwegian', 'https://www.workshop.no/ledige-stillinger', 'https://www.workshop.no/ledige-stillinger',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Many roles are trade-specific.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -683,7 +683,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Specialist recruiter board', 'Norway', 'Medium',
   'English', 'https://www.nesfircroft.com/regions/recruitment-in-europe/norway-jobs/', 'https://www.nesfircroft.com/regions/recruitment-in-europe/norway-jobs/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Strongest in specialist technical sectors.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -695,7 +695,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway / Oslo', 'High',
   'Norwegian', 'https://meyerhaugen.no/ledige-stillinger/', 'https://meyerhaugen.no/ledige-stillinger/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Oslo-oriented recruitment company.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -743,7 +743,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway', 'High',
   'Norwegian', 'https://people.no/ledige-stillinger', 'https://people.no/ledige-stillinger',
   '1 Core', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Current listings include Oslo retail and service roles.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -755,7 +755,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Recruiter job board', 'Norway / Oslo', 'High',
   'Norwegian', 'https://dreamwork.no/ledige-stillinger/', 'https://dreamwork.recman.io/',
   '1 Core', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Direct RecMan vacancy feed is searchable.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -767,7 +767,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector recruiter / employer board', 'Norway', 'High',
   'Norwegian + English', 'https://logent.no/en/work-at-logent/open-positions-no/', 'https://logent.no/en/work-at-logent/open-positions-no/',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Relevant to stockroom and warehouse searches.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -779,7 +779,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector job board', 'Norway', 'High',
   'Norwegian', 'https://www.legejobber.no/', 'https://www.legejobber.no/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Professional healthcare board.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -815,7 +815,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Healthcare staffing board', 'Norway', 'Medium',
   'Norwegian', 'https://vacant.no/ledige-stillinger/', 'https://vacant.no/ledige-stillinger/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Healthcare staffing assignments.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -851,7 +851,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Healthcare staffing board', 'Norway / Scandinavia', 'Medium',
   'Norwegian + Scandinavian', 'https://www.dedicare.no/jobb/', 'https://www.dedicare.no/jobb/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Cross-Nordic healthcare staffing.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -863,7 +863,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Healthcare staffing board', 'Norway', 'Medium',
   'Norwegian', 'https://pacuramed.no/ledige-stillinger/', 'https://pacuramed.no/ledige-stillinger/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Large searchable healthcare assignment pool.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -899,7 +899,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Regional employer network', 'Central Norway', 'Low',
   'Norwegian', 'https://www.helse-midt.no/om-oss/om-oss-oversikt/ledige-stillinger/', 'https://www.helse-midt.no/om-oss/om-oss-oversikt/ledige-stillinger/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Regional, not Oslo-focused.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -911,7 +911,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Regional employer network', 'Northern Norway', 'Low',
   'Norwegian', 'https://www.helse-nord.no/om-oss/ledige-stillinger/', 'https://www.helse-nord.no/om-oss/ledige-stillinger/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Regional, not Oslo-focused.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -923,7 +923,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector job board', 'Norway', 'High',
   'Norwegian', 'https://kampanje.com/jobb/', 'https://kampanje.com/jobb/',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Strong specialist board for commercial communication roles.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -935,7 +935,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector job board', 'Norway', 'High',
   'Norwegian', 'https://stilling.m24.no/', 'https://stilling.m24.no/',
   '3 Niche', 'High', 'Active; may be sparse',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Operated by Medier24.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -947,7 +947,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector job board', 'Norway', 'High',
   'Norwegian', 'https://www.mediejobb.no/', 'https://www.mediejobb.no/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Journalist-focused vacancies.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -959,7 +959,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector job board', 'Norway', 'High',
   'Norwegian', 'https://www.arkitektur.no/ledige-stillinger/', 'https://www.arkitektur.no/ledige-stillinger/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Current listings include Oslo architecture roles.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -983,7 +983,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector vacancy board', 'Norway', 'High',
   'Norwegian', 'https://scenekunst.no/stillingsannonser', 'https://scenekunst.no/stillingsannonser',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Includes front-of-house and technical positions as well as artistic roles.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -995,7 +995,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Sector job board', 'Norway', 'High',
   'Norwegian', 'https://advokatjobb.no/', 'https://advokatjobb.no/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Legal specialist board.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1031,7 +1031,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Global accounting job board', 'Norway filter', 'Medium',
   'English', 'https://jobs.accaglobal.com/jobs/norway/', 'https://jobs.accaglobal.com/jobs/norway/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Specialist accounting source.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1043,7 +1043,7 @@ INSERT OR REPLACE INTO source_catalog (
   'International impact job board', 'Norway filter + global', 'High',
   'English', 'https://www.impactpool.org/search', 'https://www.impactpool.org/search',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Useful for organisations headquartered in Oslo and remote/international roles.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1055,7 +1055,7 @@ INSERT OR REPLACE INTO source_catalog (
   'International development job board', 'Norway filter', 'Medium',
   'English', 'https://www.developmentaid.org/jobs-in-norway', 'https://www.developmentaid.org/jobs-in-norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Specialist development-sector coverage.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1079,7 +1079,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Impact job board', 'Europe / remote', 'Medium',
   'English', 'https://theimpactjob.com/', 'https://theimpactjob.com/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Supplementary European impact board.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1091,7 +1091,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Global energy job board', 'Norway filter', 'Low',
   'English', 'https://www.rigzone.com/oil/jobs/search/?fl=Norway', 'https://www.rigzone.com/oil/jobs/search/?fl=Norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'More relevant outside Oslo, but some corporate and engineering roles appear.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1103,7 +1103,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Global energy job board', 'Norway filter', 'Medium',
   'English', 'https://www.energyjobline.com/jobs/norway', 'https://www.energyjobline.com/jobs/norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Check original employer listing.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1115,7 +1115,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Consulting assignment portal', 'Norway + international', 'Medium',
   'English + Norwegian', 'https://omega365.com/jobs', 'https://omega365.com/jobs',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Recurring Norwegian consultant assignments.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1151,7 +1151,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Remote job board', 'Europe incl. Norway', 'High',
   'English', 'https://euremotejobs.com/', 'https://euremotejobs.com/',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Better geographic fit than US-only remote boards.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1163,7 +1163,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Remote job board', 'Global', 'Medium',
   'English', 'https://weworkremotely.com/', 'https://weworkremotely.com/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Confirm that the employer can hire in Norway.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1175,7 +1175,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Remote job board', 'Global', 'Medium',
   'English', 'https://nodesk.co/remote-jobs/', 'https://nodesk.co/remote-jobs/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Confirm Norway eligibility.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1187,7 +1187,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Tech talent marketplace', 'Remote / Norway', 'High',
   'English', 'https://arc.dev/remote-jobs/norway', 'https://arc.dev/remote-jobs/norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Developer-heavy and often experience-sensitive.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1199,7 +1199,7 @@ INSERT OR REPLACE INTO source_catalog (
   'English-language aggregator', 'Norway', 'Medium',
   'English', 'https://faruse.com/english-speaking/jobs/norway', 'https://faruse.com/english-speaking/jobs/norway',
   '3 Niche', 'Medium', 'Active; lower confidence',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Use as a supplementary lead source and verify originals.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1223,7 +1223,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Consultant assignment marketplace', 'Nordics incl. Norway', 'High',
   'English', 'https://www.eworkgroup.com/find-work', 'https://www.eworkgroup.com/find-work',
   '2 Supplemental', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Requires consultant profile and often substantial experience.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1235,7 +1235,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Consultant assignment marketplace', 'Nordics / Europe incl. Norway', 'High',
   'English', 'https://emagine.org/consultants/available-assignments/', 'https://emagine.org/consultants/available-assignments/',
   '3 Niche', 'Medium', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Former ProData Consult ecosystem; senior-experience bias.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1247,7 +1247,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Freelance project board', 'Norway filter', 'High',
   'English', 'https://www.freelancermap.com/projects/norway', 'https://www.freelancermap.com/projects/norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Dedicated Norway project page; often senior contracts.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1271,7 +1271,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Freelance marketplace', 'Norway client filter', 'Medium',
   'English + other', 'https://www.workana.com/en/jobs?country=NO', 'https://www.workana.com/en/jobs?country=NO',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Global marketplace; Norwegian project volume varies.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1283,7 +1283,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Creative freelance marketplace', 'Norway filter', 'Medium',
   'English', 'https://www.twine.net/jobs/in/norway', 'https://www.twine.net/jobs/in/norway',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Best for portfolio-based project work.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog (
@@ -1307,7 +1307,7 @@ INSERT OR REPLACE INTO source_catalog (
   'Gig / freelance partner portal', 'Norway', 'High',
   'Norwegian + English', 'https://www.payoutpartner.com/no/en/jobs/', 'https://www.payoutpartner.com/no/en/jobs/',
   '3 Niche', 'High', 'Verified active',
-  'unknown', 'unreviewed', 0,
+  'agent', 'unreviewed', 1,
   'Designed to support freelance work without establishing a company.', '2026-08-05'
 );
 INSERT OR REPLACE INTO source_catalog_legacy (

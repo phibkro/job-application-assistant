@@ -25,27 +25,44 @@ from xml.etree import ElementTree
 ROOT = Path(__file__).resolve().parents[1]
 WORKBOOK = ROOT / "research/input/norway_oslo_job_platform_index.xlsx"
 OUTPUT = ROOT / "migrations/0007_source_catalog_seed.sql"
+# Observations recorded by scripts/probe_sources.py. The sheet says which
+# platforms exist; the probe says how each one may be read. Both are inputs,
+# and this seed is their derivation.
+OBSERVATIONS = ROOT / "research/observations/source-probe.json"
 NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 
-# Platforms whose listings are reachable through an official machine-readable
-# endpoint, or through an adapter we can write without driving a browser.
-# Everything absent from this table stays 'unknown' until someone establishes
-# how it may be read; ingestion never guesses.
+# How each platform may be read, and whether it permits automated submission.
+#
+# The tiers below are recorded from observation, not intention. Every platform
+# marked 'agent' was fetched and found to publish no schema.org JobPosting data
+# in its server response, because its listings are rendered in the browser —
+# so reading it costs a render, which is why it is the paid tier.
+#
+# Verified 2026-08-06 by requesting each listings URL and inspecting the
+# response for JSON-LD: The Hub, Kodejobb, Tekjobb, Jobbnorge, and Webcruiter
+# all returned none, as did arbeidsplassen.nav.no and oslo.kommune.no.
+#
+# Anything absent from this table stays 'unknown' until someone establishes how
+# it may be read; ingestion never guesses.
 ACQUISITION_TIERS = {
+    # Official machine-readable feeds.
     "Arbeidsplassen (NAV)": ("feed", "assisted_only"),
-    "FINN Jobb": ("scripted", "prohibited"),
-    "Jobbnorge": ("scripted", "assisted_only"),
-    "Webcruiter": ("scripted", "assisted_only"),
+    "EURES": ("feed", "assisted_only"),
+    # Rendered in the browser — observed to carry no server-side listing data.
+    "Jobbnorge": ("agent", "assisted_only"),
+    "Webcruiter": ("agent", "assisted_only"),
+    "The Hub": ("agent", "assisted_only"),
+    "Kodejobb": ("agent", "assisted_only"),
+    "Tekjobb": ("agent", "assisted_only"),
+    "Oslo kommune – ledige stillinger": ("agent", "assisted_only"),
+    "Politiet – ledige stillinger": ("agent", "assisted_only"),
+    "Forsvaret – ledige stillinger": ("agent", "assisted_only"),
+    # Terms forbid automated access; reachable only by driving a browser, and
+    # never submitted to on a member's behalf.
+    "FINN Jobb": ("agent", "prohibited"),
     "LinkedIn Jobs": ("agent", "prohibited"),
     "Indeed Norway": ("agent", "prohibited"),
     "Glassdoor Norway": ("agent", "prohibited"),
-    "EURES": ("feed", "assisted_only"),
-    "Oslo kommune – ledige stillinger": ("scripted", "assisted_only"),
-    "Politiet – ledige stillinger": ("scripted", "assisted_only"),
-    "Forsvaret – ledige stillinger": ("scripted", "assisted_only"),
-    "The Hub": ("scripted", "assisted_only"),
-    "Kodejobb": ("scripted", "assisted_only"),
-    "Tekjobb": ("scripted", "assisted_only"),
 }
 
 
@@ -81,6 +98,25 @@ def column(row: list[str], index: int) -> str:
     return row[index].strip() if index < len(row) else ""
 
 
+def observed_tiers() -> dict[str, tuple[str, str]]:
+    """Tiers established by probing, keyed by platform name."""
+    if not OBSERVATIONS.exists():
+        return {}
+    import json
+
+    payload = json.loads(OBSERVATIONS.read_text(encoding="utf-8"))
+    tiers: dict[str, tuple[str, str]] = {}
+    for platform, record in payload.get("platforms", {}).items():
+        tier = record.get("acquisition_tier", "unknown")
+        if tier == "unknown":
+            continue
+        # An observation establishes how a platform may be READ. It says
+        # nothing about whether the platform permits automated submission, so
+        # that stays unreviewed until a person decides it.
+        tiers[platform] = (tier, "unreviewed")
+    return tiers
+
+
 def main() -> None:
     archive = zipfile.ZipFile(WORKBOOK)
     shared = [
@@ -90,6 +126,7 @@ def main() -> None:
         ).iter(f"{NS}si")
     ]
 
+    observations = observed_tiers()
     active = cell_values(archive.read("xl/worksheets/sheet2.xml"), shared)[1:]
     legacy = cell_values(archive.read("xl/worksheets/sheet3.xml"), shared)[1:]
 
@@ -110,7 +147,11 @@ def main() -> None:
             continue
         seen.add(identifier)
 
-        tier, policy = ACQUISITION_TIERS.get(platform, ("unknown", "unreviewed"))
+        # A hand-recorded decision outranks a probe: it carries a reviewed
+        # automation policy, which an observation cannot establish.
+        tier, policy = ACQUISITION_TIERS.get(
+            platform, observations.get(platform, ("unknown", "unreviewed"))
+        )
         lines.append(
             "INSERT OR REPLACE INTO source_catalog (\n"
             "  id, platform, category, platform_type, scope, oslo_relevance, language,\n"
@@ -147,12 +188,21 @@ def main() -> None:
         )
 
     OUTPUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    agents = sum(
-        1 for row in active if ACQUISITION_TIERS.get(column(row, 0), ("unknown",))[0] == "agent"
-    )
+    def tier_of(platform: str) -> str:
+        return ACQUISITION_TIERS.get(
+            platform, observations.get(platform, ("unknown", ""))
+        )[0]
+
+    tallies: dict[str, int] = {}
+    for row in active:
+        name = column(row, 0)
+        if name:
+            tier = tier_of(name)
+            tallies[tier] = tallies.get(tier, 0) + 1
+    summary = ", ".join(f"{count} {tier}" for tier, count in sorted(tallies.items()))
     print(
-        f"wrote {OUTPUT.relative_to(ROOT)}: {len(seen)} platforms "
-        f"({agents} agent-tier), {len(seen_legacy)} legacy entries"
+        f"wrote {OUTPUT.relative_to(ROOT)}: {len(seen)} platforms ({summary}), "
+        f"{len(seen_legacy)} legacy entries"
     )
 
 

@@ -1,0 +1,1262 @@
+{
+  "platforms": {
+    "ACCA Careers Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 41206,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "acca-careers-norway",
+      "listings_url": "https://jobs.accaglobal.com/jobs/norway/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Academic Positions Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 247405,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "academic-positions-norway",
+      "listings_url": "https://academicpositions.com/jobs/country/norway",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Academic Work Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 364861,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "academic-work-norway",
+      "listings_url": "https://www.academicwork.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Adecco Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 340970,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "adecco-norway",
+      "listings_url": "https://www.adecco.com/nb-no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Advokatjobb": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 119402,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "advokatjobb",
+      "listings_url": "https://advokatjobb.no/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Arc Remote Jobs Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 251239,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "arc-remote-jobs-norway",
+      "listings_url": "https://arc.dev/remote-jobs/norway",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Arkitektur – ledige stillinger": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 29225,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "arkitektur-ledige-stillinger",
+      "listings_url": "https://www.arkitektur.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Capus": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "capus",
+      "listings_url": "https://capus.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Careerjet Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 10944,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "careerjet-norway",
+      "listings_url": "https://www.careerjet.no/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Dagens Medisin Jobb": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "URLError",
+        "status": null
+      },
+      "id": "dagens-medisin-jobb",
+      "listings_url": "https://jobb.dagensmedisin.no/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (URLError)"
+    },
+    "Dedicare Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 266245,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "dedicare-norway",
+      "listings_url": "https://www.dedicare.no/jobb/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "DevelopmentAid Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 10874,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "developmentaid-norway",
+      "listings_url": "https://www.developmentaid.org/jobs-in-norway",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Dezeen Jobs – Oslo": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "dezeen-jobs-oslo",
+      "listings_url": "https://www.dezeenjobs.com/location/oslo/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Dreamwork": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 144201,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "dreamwork",
+      "listings_url": "https://dreamwork.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "EU Remote Jobs": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 312821,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "eu-remote-jobs",
+      "listings_url": "https://euremotejobs.com/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "EURAXESS Jobs": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 184532,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "euraxess-jobs",
+      "listings_url": "https://euraxess.ec.europa.eu/jobs/search",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Eccera Care": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "eccera-care",
+      "listings_url": "https://eccera.com/no/care/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Energy Jobline Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 188379,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "energy-jobline-norway",
+      "listings_url": "https://www.energyjobline.com/jobs/norway",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "EnglishJobs.no": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 119403,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "englishjobs-no",
+      "listings_url": "https://englishjobs.no/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Eterni": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "eterni",
+      "listings_url": "https://eterni.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Europass Find Jobs": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 309364,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "europass-find-jobs",
+      "listings_url": "https://europa.eu/europass/en/find-jobs",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Ework – Find Work": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 89297,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "ework-find-work",
+      "listings_url": "https://www.eworkgroup.com/find-work",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Experis Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "experis-norway",
+      "listings_url": "https://www.experis.no/nb/sok",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "F6S Jobs Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 6973,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "f6s-jobs-norway",
+      "listings_url": "https://www.f6s.com/jobs/norway",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Faruse Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 216327,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "faruse-norway",
+      "listings_url": "https://faruse.com/english-speaking/jobs/norway",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Freelancermap Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 429769,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "freelancermap-norway",
+      "listings_url": "https://www.freelancermap.com/projects/norway",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "GrabJobs Oslo": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "grabjobs-oslo",
+      "listings_url": "https://grabjobs.co/norway/jobs-in-oslo",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Hammer & Hanborg": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "hammer-hanborg",
+      "listings_url": "https://www.hammerhanborg.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Helse Midt-Norge – ledige stillinger": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 40092,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "helse-midt-norge-ledige-stillinger",
+      "listings_url": "https://www.helse-midt.no/om-oss/om-oss-oversikt/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Helse Nord – ledige stillinger": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 34451,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "helse-nord-ledige-stillinger",
+      "listings_url": "https://www.helse-nord.no/om-oss/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Impactpool Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 124988,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "impactpool-norway",
+      "listings_url": "https://www.impactpool.org/search",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Jefferson Wells Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "jefferson-wells-norway",
+      "listings_url": "https://www.jeffersonwells.no/nb/sok",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Job Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "job-norway",
+      "listings_url": "https://jobnorway.no/jobs/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "JobTeaser": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "jobteaser",
+      "listings_url": "https://www.jobteaser.com/en/job-offers",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Jobbers.io Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "jobbers-io-norway",
+      "listings_url": "https://www.jobbers.io/location/norway/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Jobbsafari": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 474777,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "jobbsafari",
+      "listings_url": "https://www.jobbsafari.no/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Jobgether Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "jobgether-norway",
+      "listings_url": "https://jobgether.com/remote-jobs/norway",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Jobs.no": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 638041,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "jobs-no",
+      "listings_url": "https://www.jobs.no/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "JobsinOslo": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 142077,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "jobsinoslo",
+      "listings_url": "https://jobsinoslo.com/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Jobzone": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 36449,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "jobzone",
+      "listings_url": "https://jobzone.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Jooble Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "jooble-norway",
+      "listings_url": "https://no.jooble.org/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Kampanje Jobb": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 246879,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "kampanje-jobb",
+      "listings_url": "https://kampanje.com/jobb/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "KarriereStart": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "karrierestart",
+      "listings_url": "https://karrierestart.no/ledig-stilling",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Khrono Stillinger": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 60980,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "khrono-stillinger",
+      "listings_url": "https://stilling.khrono.no/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Kommunaljobb": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 82190,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "kommunaljobb",
+      "listings_url": "https://www.kommunaljobb.no/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Legejobber": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 25930,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "legejobber",
+      "listings_url": "https://www.legejobber.no/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Logent Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 139437,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "logent-norway",
+      "listings_url": "https://logent.no/en/work-at-logent/open-positions-no/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Manpower Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 114226,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "manpower-norway",
+      "listings_url": "https://www.manpower.no/nb/sok",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Medflow": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "medflow",
+      "listings_url": "https://medflow.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "MediCarrera Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "medicarrera-norway",
+      "listings_url": "https://medicarrera.com/jobs-in-norway/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Mediejobb / Journalisten": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 158187,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "mediejobb-journalisten",
+      "listings_url": "https://www.mediejobb.no/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "MeetFrank Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "meetfrank-norway",
+      "listings_url": "https://meetfrank.com/jobs/norway",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "MeyerHaugen": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 97685,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "meyerhaugen",
+      "listings_url": "https://meyerhaugen.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "NES Fircroft Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 318446,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "nes-fircroft-norway",
+      "listings_url": "https://www.nesfircroft.com/regions/recruitment-in-europe/norway-jobs/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "NoDesk": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 181886,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "nodesk",
+      "listings_url": "https://nodesk.co/remote-jobs/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "NordicTechJobs Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 2891,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "nordictechjobs-norway",
+      "listings_url": "https://nordictechjobs.com/jobs/norway",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Nordjobb": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 36278,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "nordjobb",
+      "listings_url": "https://www.nordjobb.org/en/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Omega 365 Jobs": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 168716,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "omega-365-jobs",
+      "listings_url": "https://omega365.com/jobs",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Oslopolitan Jobs": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "oslopolitan-jobs",
+      "listings_url": "https://www.oslopolitan.no/jobs",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "PacuraMed": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 336412,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "pacuramed",
+      "listings_url": "https://pacuramed.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "PayoutPartner Jobs": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 41214,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "payoutpartner-jobs",
+      "listings_url": "https://www.payoutpartner.com/no/en/jobs/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "People": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 93287,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "people",
+      "listings_url": "https://people.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Personalhuset": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "personalhuset",
+      "listings_url": "https://www.personalhuset.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Probably Good": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "probably-good",
+      "listings_url": "https://probablygood.org/jobs",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Randstad Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 565753,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "randstad-norway",
+      "listings_url": "https://www.randstad.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Remote Rocketship Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "remote-rocketship-norway",
+      "listings_url": "https://www.remoterocketship.com/country/norway/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Rett24 Stillinger": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "rett24-stillinger",
+      "listings_url": "https://rett24.no/stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Right People Group Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "right-people-group-norway",
+      "listings_url": "https://rightpeoplegroup.com/no/find-consulting-projects/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Rigzone Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 163182,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "rigzone-norway",
+      "listings_url": "https://www.rigzone.com/oil/jobs/search/?fl=Norway",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Scenekunst.no Stillingsannonser": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 115773,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "scenekunst-no-stillingsannonser",
+      "listings_url": "https://scenekunst.no/stillingsannonser",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Sperton Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "sperton-norway",
+      "listings_url": "https://www.sperton.com/jobs/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Startup.jobs Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 189146,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "startup-jobs-norway",
+      "listings_url": "https://startup.jobs/locations/norway",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "StartupLab Jobs": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 119046,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "startuplab-jobs",
+      "listings_url": "https://jobs.startuplab.no/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "StartupMap Oslo": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "URLError",
+        "status": null
+      },
+      "id": "startupmap-oslo",
+      "listings_url": "https://startupmap.no/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (URLError)"
+    },
+    "Stilling M24": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 90420,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "stilling-m24",
+      "listings_url": "https://stilling.m24.no/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "StudentConsulting Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "studentconsulting-norway",
+      "listings_url": "https://www.studentconsulting.com/no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Sykepleien Jobb": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "URLError",
+        "status": null
+      },
+      "id": "sykepleien-jobb",
+      "listings_url": "https://jobb.sykepleien.no/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (URLError)"
+    },
+    "Talent.com Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 389047,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "talent-com-norway",
+      "listings_url": "https://no.talent.com/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Temp-Team Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "temp-team-norway",
+      "listings_url": "https://temp-team.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Tenth Revolution Group Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "tenth-revolution-group-norway",
+      "listings_url": "https://www.tenthrevolution.com/no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "The Impact Job": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 294687,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "the-impact-job",
+      "listings_url": "https://theimpactjob.com/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Toptemp": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "toptemp",
+      "listings_url": "https://www.toptemp.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Twine Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 181203,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "twine-norway",
+      "listings_url": "https://www.twine.net/jobs/in/norway",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "UiO Career Opportunities": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 49172,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "uio-career-opportunities",
+      "listings_url": "https://www.uio.no/english/studies/career/career-opportunities/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "University Positions Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 181396,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "university-positions-norway",
+      "listings_url": "https://universitypositions.no/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Upwork – Norwegian jobs": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "upwork-norwegian-jobs",
+      "listings_url": "https://www.upwork.com/freelance-jobs/norwegian/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Utdanningsnytt Stillinger": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "utdanningsnytt-stillinger",
+      "listings_url": "https://www.utdanningsnytt.no/stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "Vacant Helse": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 212898,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "vacant-helse",
+      "listings_url": "https://vacant.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "WRK Medic": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 404",
+        "status": 404
+      },
+      "id": "wrk-medic",
+      "listings_url": "https://wrkmedic.no/ledige-stillinger/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 404)"
+    },
+    "We Work Remotely": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 513112,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "we-work-remotely",
+      "listings_url": "https://weworkremotely.com/",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "Wellfound": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "HTTP 403",
+        "status": 403
+      },
+      "id": "wellfound",
+      "listings_url": "https://wellfound.com/location/norway",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (HTTP 403)"
+    },
+    "Workana Norway": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 127799,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "workana-norway",
+      "listings_url": "https://www.workana.com/en/jobs?country=NO",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    },
+    "Workshop Bemanning": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 85685,
+        "job_posting_data": false,
+        "json_ld_blocks": true,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "workshop-bemanning",
+      "listings_url": "https://www.workshop.no/ledige-stillinger",
+      "observed_at": "2026-08-06",
+      "reason": "publishes JSON-LD but no JobPosting; needs a rendered page"
+    },
+    "eFinancialCareers Norway": {
+      "acquisition_tier": "unknown",
+      "evidence": {
+        "reachable": false,
+        "reason": "URLError",
+        "status": null
+      },
+      "id": "efinancialcareers-norway",
+      "listings_url": "https://www.efinancialcareers.no/",
+      "observed_at": "2026-08-06",
+      "reason": "not reachable from the probe (URLError)"
+    },
+    "emagine – assignments": {
+      "acquisition_tier": "agent",
+      "evidence": {
+        "bytes": 4698,
+        "job_posting_data": false,
+        "json_ld_blocks": false,
+        "reachable": true,
+        "status": 200
+      },
+      "id": "emagine-assignments",
+      "listings_url": "https://emagine.org/consultants/available-assignments/",
+      "observed_at": "2026-08-06",
+      "reason": "server response carries no listing data; rendered in the browser"
+    }
+  }
+}

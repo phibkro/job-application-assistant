@@ -1,11 +1,13 @@
 #![forbid(unsafe_code)]
 
 mod adapters;
+mod agenda;
 mod api;
 mod application;
 mod auth;
 mod catalog;
 mod fixtures;
+mod linkedin;
 mod maintenance;
 mod nav_connector;
 mod outbox;
@@ -82,6 +84,11 @@ async fn main(request: Request, environment: Env, _context: Context) -> Result<R
         .get("/browse", |_request, _context| {
             Response::from_html(ui::BROWSE_HTML)
         })
+        .get("/apply", |_request, _context| {
+            Response::from_html(ui::APPLY_HTML)
+        })
+        .get_async("/api/v1/auth/linkedin/start", linkedin::start)
+        .get_async("/api/v1/auth/linkedin/callback", linkedin::callback)
         .post_async("/api/v1/users", application::register)
         .get_async("/api/v1/me", application::me)
         .put_async("/api/v1/me/profile", application::put_profile)
@@ -90,6 +97,10 @@ async fn main(request: Request, environment: Env, _context: Context) -> Result<R
         .delete_async("/api/v1/me/saved/:id", application::unsave_job)
         .post_async("/api/v1/me/saved/:id/draft", application::draft)
         .post_async("/api/v1/me/saved/:id/apply", application::apply)
+        .post_async("/api/admin/schedules/run", agenda::run_now)
+        .post_async("/api/v1/me/schedules", agenda::create)
+        .get_async("/api/v1/me/schedules", agenda::list)
+        .delete_async("/api/v1/me/schedules/:id", agenda::cancel)
         .get_async("/api/v1/me/applications", application::list_applications)
         .post_async(
             "/api/v1/me/applications/:id/status",
@@ -147,7 +158,12 @@ async fn scheduled(event: ScheduledEvent, environment: Env, _context: ScheduleCo
     let cron = event.cron();
     match ScheduledTask::from_cron(&cron) {
         Some(ScheduledTask::NavSync) => run_scheduled_nav(&environment).await,
-        Some(ScheduledTask::SearchEvaluation) => run_scheduled_searches(&environment).await,
+        Some(ScheduledTask::SearchEvaluation) => {
+            // Schedules run straight after evaluation, while the matches they
+            // read are the ones that sweep just produced.
+            run_scheduled_searches(&environment).await;
+            run_scheduled_agenda(&environment).await;
+        }
         Some(ScheduledTask::OutboxDelivery) => run_scheduled_outbox(&environment).await,
         None => worker::console_error!("unknown scheduled trigger: {cron}"),
     }
@@ -172,6 +188,19 @@ async fn run_scheduled_nav(environment: &Env) {
             report.cursor_after
         ),
         Err(error) => worker::console_error!("scheduled NAV sync failed: {error}"),
+    }
+}
+
+async fn run_scheduled_agenda(environment: &Env) {
+    match agenda::run_due_schedules(environment).await {
+        Ok(report) => worker::console_log!(
+            "scheduled applications due={}, run={}, prepared={}, skipped_not_premium={}",
+            report.schedules_due,
+            report.schedules_run,
+            report.applications_prepared,
+            report.skipped_not_premium
+        ),
+        Err(error) => worker::console_error!("scheduled applications failed: {error}"),
     }
 }
 
