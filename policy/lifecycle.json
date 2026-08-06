@@ -1,0 +1,290 @@
+{
+  "version": 1,
+  "initial_state": "proposed",
+  "terminal_states": [
+    "closed",
+    "rejected",
+    "cancelled",
+    "superseded"
+  ],
+  "states": [
+    "proposed",
+    "triaged",
+    "scoped",
+    "planned",
+    "ready",
+    "executing",
+    "evidence_ready",
+    "reviewing",
+    "accepted",
+    "integrated",
+    "released",
+    "observed",
+    "closed",
+    "needs_work",
+    "blocked",
+    "rejected",
+    "cancelled",
+    "superseded"
+  ],
+  "gates": [
+    {
+      "id": "G0",
+      "name": "intake",
+      "from": [
+        "proposed"
+      ],
+      "to": "triaged",
+      "authority": [
+        "human_product_owner"
+      ],
+      "evidence": [
+        "problem",
+        "beneficiary",
+        "initial_risk"
+      ]
+    },
+    {
+      "id": "G1",
+      "name": "scope",
+      "from": [
+        "triaged"
+      ],
+      "to": "scoped",
+      "authority": [
+        "human_product_owner"
+      ],
+      "evidence": [
+        "work_scope_revision",
+        "acceptance_criteria",
+        "exclusions"
+      ]
+    },
+    {
+      "id": "G2",
+      "name": "plan",
+      "from": [
+        "scoped",
+        "needs_work",
+        "blocked"
+      ],
+      "to": "planned",
+      "authority": [
+        "human",
+        "delegated_supervisor"
+      ],
+      "evidence": [
+        "execution_plan",
+        "test_strategy",
+        "risk_assessment",
+        "capability_request"
+      ]
+    },
+    {
+      "id": "G3",
+      "name": "ready",
+      "from": [
+        "planned"
+      ],
+      "to": "ready",
+      "authority": [
+        "policy_engine"
+      ],
+      "evidence": [
+        "exact_repository_ref",
+        "clean_baseline",
+        "approved_capabilities"
+      ]
+    },
+    {
+      "id": "G4A",
+      "name": "start_execution",
+      "from": [
+        "ready"
+      ],
+      "to": "executing",
+      "authority": [
+        "policy_engine"
+      ],
+      "evidence": [
+        "execution_receipt",
+        "attempt_budget"
+      ]
+    },
+    {
+      "id": "G4B",
+      "name": "execution_evidence",
+      "from": [
+        "executing"
+      ],
+      "to": "evidence_ready",
+      "authority": [
+        "implementing_actor_proposes"
+      ],
+      "evidence": [
+        "diff",
+        "verification_results",
+        "attempt_summary",
+        "documentation_impact"
+      ]
+    },
+    {
+      "id": "G5A",
+      "name": "begin_review",
+      "from": [
+        "evidence_ready"
+      ],
+      "to": "reviewing",
+      "authority": [
+        "policy_engine"
+      ],
+      "evidence": [
+        "complete_evidence_bundle"
+      ]
+    },
+    {
+      "id": "G5B",
+      "name": "accept",
+      "from": [
+        "reviewing"
+      ],
+      "to": "accepted",
+      "authority": [
+        "independent_reviewer",
+        "human_for_material_risk"
+      ],
+      "evidence": [
+        "review_decision",
+        "acceptance_mapping",
+        "residual_risk"
+      ]
+    },
+    {
+      "id": "G5C",
+      "name": "needs_work",
+      "from": [
+        "reviewing"
+      ],
+      "to": "needs_work",
+      "authority": [
+        "independent_reviewer"
+      ],
+      "evidence": [
+        "failed_predicates",
+        "required_remediation"
+      ]
+    },
+    {
+      "id": "G6",
+      "name": "integration",
+      "from": [
+        "accepted"
+      ],
+      "to": "integrated",
+      "authority": [
+        "human_integration_owner",
+        "delegated_policy"
+      ],
+      "evidence": [
+        "clean_merge",
+        "integration_checks",
+        "rollback_readiness"
+      ]
+    },
+    {
+      "id": "G7",
+      "name": "release",
+      "from": [
+        "integrated"
+      ],
+      "to": "released",
+      "authority": [
+        "human_release_owner",
+        "delegated_policy_low_risk"
+      ],
+      "evidence": [
+        "artifact_provenance",
+        "release_checks",
+        "operational_plan"
+      ]
+    },
+    {
+      "id": "G8",
+      "name": "observation",
+      "from": [
+        "released"
+      ],
+      "to": "observed",
+      "authority": [
+        "policy_engine_with_escalation"
+      ],
+      "evidence": [
+        "health_window",
+        "telemetry_summary",
+        "critical_regression_check"
+      ]
+    },
+    {
+      "id": "G9",
+      "name": "closure",
+      "from": [
+        "observed"
+      ],
+      "to": "closed",
+      "authority": [
+        "human",
+        "delegated_supervisor"
+      ],
+      "evidence": [
+        "outcome",
+        "documentation_update",
+        "followups"
+      ]
+    }
+  ],
+  "exception_transitions": [
+    {
+      "from": [
+        "proposed",
+        "triaged"
+      ],
+      "to": "rejected",
+      "authority": [
+        "human_product_owner"
+      ]
+    },
+    {
+      "from": [
+        "scoped",
+        "planned",
+        "ready"
+      ],
+      "to": "superseded",
+      "authority": [
+        "human_product_owner"
+      ]
+    },
+    {
+      "from": [
+        "executing"
+      ],
+      "to": "blocked",
+      "authority": [
+        "implementing_actor",
+        "supervisor",
+        "policy_engine"
+      ]
+    },
+    {
+      "from": [
+        "executing",
+        "blocked"
+      ],
+      "to": "cancelled",
+      "authority": [
+        "human",
+        "supervisor_with_policy"
+      ]
+    }
+  ]
+}

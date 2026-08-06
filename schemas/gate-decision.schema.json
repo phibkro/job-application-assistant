@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/gate-decision.schema.json",
+  "title": "GateDecision",
+  "type": "object",
+  "required": [
+    "gate_id",
+    "work_scope",
+    "requested_transition",
+    "decision",
+    "actor",
+    "evidence_refs",
+    "decided_at"
+  ],
+  "properties": {
+    "gate_id": {
+      "type": "string"
+    },
+    "work_scope": {
+      "type": "string"
+    },
+    "requested_transition": {
+      "type": "object",
+      "required": [
+        "from",
+        "to"
+      ]
+    },
+    "decision": {
+      "enum": [
+        "pass",
+        "fail",
+        "needs_work",
+        "waived"
+      ]
+    },
+    "actor": {
+      "type": "string"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "failed_predicates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "waiver_expiry": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

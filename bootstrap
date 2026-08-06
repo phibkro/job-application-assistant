@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${root}"
+
+if [ "$#" -eq 0 ]; then
+  set -- help
+fi
+
+if [ "${JOB_INDEX_NIX_SHELL:-0}" = "1" ]; then
+  exec just "$@"
+fi
+
+if ! command -v nix >/dev/null 2>&1; then
+  cat >&2 <<'MESSAGE'
+Nix is required. On NixOS it is already installed.
+
+Run this repository with:
+  ./deploy
+
+The command enters the pinned flake automatically and does not modify your
+shell profile or install tools into your home directory.
+MESSAGE
+  exit 1
+fi
+
+exec nix \
+  --extra-experimental-features "nix-command flakes" \
+  develop \
+  --no-write-lock-file \
+  --command just "$@"

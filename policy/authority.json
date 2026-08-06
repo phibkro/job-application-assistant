@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "principles": [
+    "human_owned_by_default",
+    "agents_propose_transitions",
+    "no_self_approval_for_independent_gates",
+    "capabilities_are_action_scoped_and_time_bounded",
+    "waivers_are_explicit_and_expire"
+  ],
+  "roles": {
+    "human_product_owner": [
+      "approve_scope",
+      "revise_scope",
+      "reject_work"
+    ],
+    "implementing_actor": [
+      "execute_with_receipt",
+      "propose_evidence",
+      "report_blocked"
+    ],
+    "independent_reviewer": [
+      "review_diff",
+      "evaluate_evidence",
+      "accept_or_request_work_within_delegation"
+    ],
+    "supervisor": [
+      "assign",
+      "pause",
+      "bounded_retry",
+      "cancel_within_policy",
+      "request_review"
+    ],
+    "policy_engine": [
+      "validate_transition",
+      "enforce_budget",
+      "verify_receipts"
+    ],
+    "capability_system": [
+      "grant",
+      "scope",
+      "revoke",
+      "record_capability_receipt"
+    ],
+    "human_release_owner": [
+      "approve_release",
+      "approve_waiver",
+      "order_rollback"
+    ]
+  }
+}

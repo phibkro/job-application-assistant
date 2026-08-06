@@ -1,0 +1,28 @@
+{
+  "ad_content": {
+    "uuid": "active-vacancy-1",
+    "status": "ACTIVE",
+    "sistEndret": "2026-08-05T11:00:00Z",
+    "json": {
+      "uuid": "active-vacancy-1",
+      "published": "2026-08-05T07:45:00Z",
+      "expires": "2026-08-25T23:59:59Z",
+      "updated": "2026-08-05T11:00:00Z",
+      "workLocations": [
+        {
+          "country": "NORGE",
+          "city": "Oslo",
+          "county": "Oslo",
+          "municipal": "Oslo"
+        }
+      ],
+      "title": "Warehouse Operative",
+      "description": "Receive goods, organize stock, and prepare orders.",
+      "applicationUrl": "https://careers.example/jobs/100?utm_source=nav",
+      "applicationDue": "2026-08-25",
+      "employer": {
+        "name": "Example Technology AS"
+      }
+    }
+  }
+}

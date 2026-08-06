@@ -1,0 +1,32 @@
+{
+  "name": "job-index-test",
+  "main": "crates/job-index-worker/build/index.js",
+  "compatibility_date": "2026-05-25",
+  "workers_dev": true,
+  "build": {
+    "command": "cd crates/job-index-worker && worker-build --release"
+  },
+  "vars": {
+    "ENVIRONMENT": "test",
+    "ALLOW_DEMO_MUTATIONS": "true",
+    "ALLOW_NAV_SYNC_WITHOUT_TOKEN": "true",
+    "NAV_USE_PUBLIC_TOKEN": "true",
+    "NAV_SYNC_ENABLED": "false",
+    "NAV_BASE_URL": "http://127.0.0.1:9797",
+    "NAV_DETAIL_FETCH_LIMIT": "40",
+    "NAV_MAX_PAGES_PER_RUN": "4",
+    "NAV_MAX_OBSERVATIONS_PER_RUN": "600",
+    "NAV_MAX_DURATION_MS": "20000",
+    "NAV_LEASE_TTL_MS": "90000"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

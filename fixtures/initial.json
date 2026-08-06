@@ -1,0 +1,38 @@
+[
+  {
+    "source_id": "arbeidsplassen-fixture",
+    "source_name": "Arbeidsplassen fixture",
+    "external_id": "nav-100",
+    "title": "Technical Support Specialist",
+    "employer_name": "Example Technology AS",
+    "location": "Oslo",
+    "description": "Help customers configure and use consumer technology products.",
+    "application_url": "https://careers.example.no/jobs/technical-support-100?utm_source=arbeidsplassen",
+    "published_at": "2026-08-05T08:00:00Z",
+    "deadline": "2026-08-25"
+  },
+  {
+    "source_id": "recruiter-fixture",
+    "source_name": "Recruiter fixture",
+    "external_id": "recruiter-900",
+    "title": "Technical Support Specialist",
+    "employer_name": "Example Technology AS",
+    "location": "Oslo",
+    "description": "Help customers configure and use consumer technology products.",
+    "application_url": "https://careers.example.no/jobs/technical-support-100?utm_source=recruiter",
+    "published_at": "2026-08-05T08:00:00Z",
+    "deadline": "2026-08-25"
+  },
+  {
+    "source_id": "arbeidsplassen-fixture",
+    "source_name": "Arbeidsplassen fixture",
+    "external_id": "nav-101",
+    "title": "Customer Service Adviser",
+    "employer_name": "Oslo Service Group AS",
+    "location": "Oslo",
+    "description": "Answer customer questions through chat, email, and telephone.",
+    "application_url": "https://jobs.example.no/customer-service-101?ref=arbeidsplassen",
+    "published_at": "2026-08-05T09:00:00Z",
+    "deadline": "2026-08-29"
+  }
+]

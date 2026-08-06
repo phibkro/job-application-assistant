@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "service": "job-index",
+  "window_days": 7,
+  "objectives": {
+    "nav_feed_lag_seconds_p95": 1800,
+    "scheduled_run_success_ratio": 0.99,
+    "public_api_availability_ratio": 0.995,
+    "duplicate_canonical_changes": 0,
+    "skipped_feed_pages": 0,
+    "admin_mutations_audited_ratio": 1.0,
+    "notification_delivery_success_ratio": 0.99
+  }
+}

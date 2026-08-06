@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/evidence-bundle.schema.json",
+  "title": "EvidenceBundle",
+  "type": "object",
+  "required": [
+    "id",
+    "work_scope",
+    "repository_ref",
+    "actor",
+    "changes",
+    "verification",
+    "residual_risk"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "work_scope": {
+      "type": "string"
+    },
+    "repository_ref": {
+      "type": "string"
+    },
+    "actor": {
+      "type": "object"
+    },
+    "environment": {
+      "type": "object"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "capability_receipts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "documentation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "residual_risk": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

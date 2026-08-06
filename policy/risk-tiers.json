@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "tiers": [
+    {
+      "id": "R0",
+      "name": "observation_only",
+      "examples": [
+        "read documentation",
+        "inspect code",
+        "run non-mutating analysis"
+      ],
+      "requirements": [
+        "bounded context",
+        "no secret access"
+      ],
+      "human_gates": []
+    },
+    {
+      "id": "R1",
+      "name": "low",
+      "examples": [
+        "documentation",
+        "tests",
+        "local refactor without behaviour change"
+      ],
+      "requirements": [
+        "work scope",
+        "automated checks",
+        "evidence bundle"
+      ],
+      "human_gates": [
+        "scope_or_delegated"
+      ]
+    },
+    {
+      "id": "R2",
+      "name": "medium",
+      "examples": [
+        "new feature",
+        "schema change",
+        "external integration",
+        "dependency addition"
+      ],
+      "requirements": [
+        "plan review",
+        "independent review",
+        "rollback plan",
+        "provenance"
+      ],
+      "human_gates": [
+        "scope",
+        "acceptance_or_integration"
+      ]
+    },
+    {
+      "id": "R3",
+      "name": "high",
+      "examples": [
+        "authentication",
+        "personal data",
+        "security boundary",
+        "production mutation",
+        "irreversible external action"
+      ],
+      "requirements": [
+        "threat model",
+        "least-capability grant",
+        "independent security review",
+        "human release",
+        "observed rollout"
+      ],
+      "human_gates": [
+        "scope",
+        "capability",
+        "acceptance",
+        "integration",
+        "release"
+      ]
+    }
+  ]
+}

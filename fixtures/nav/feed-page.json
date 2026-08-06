@@ -1,0 +1,40 @@
+{
+  "version": "1",
+  "title": "NAV vacancies",
+  "feed_url": "/api/v1/feed/page-1",
+  "next_url": "/api/v1/feed/page-2",
+  "id": "page-1",
+  "next_id": "page-2",
+  "items": [
+    {
+      "id": "entry-1",
+      "url": "/api/v1/feedentry/active-vacancy-1",
+      "title": "Technical Support Specialist",
+      "content_text": "Help customers use technical products.",
+      "date_modified": "2026-08-05T08:00:00Z",
+      "_feed_entry": {
+        "uuid": "active-vacancy-1",
+        "status": "ACTIVE",
+        "title": "Technical Support Specialist",
+        "businessName": "Example Technology AS",
+        "municipal": "Oslo",
+        "sistEndret": "2026-08-05T08:00:00Z"
+      }
+    },
+    {
+      "id": "entry-2",
+      "url": "/api/v1/feedentry/inactive-vacancy-2",
+      "title": "",
+      "content_text": "",
+      "date_modified": "2026-08-05T08:05:00Z",
+      "_feed_entry": {
+        "uuid": "inactive-vacancy-2",
+        "status": "INACTIVE",
+        "title": "",
+        "businessName": "",
+        "municipal": "Bergen",
+        "sistEndret": "2026-08-05T08:05:00Z"
+      }
+    }
+  ]
+}
