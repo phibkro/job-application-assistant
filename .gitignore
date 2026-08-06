@@ -40,3 +40,6 @@
 # Python caches
 __pycache__/
 *.pyc
+
+# Generated test artefacts
+/coverage/
