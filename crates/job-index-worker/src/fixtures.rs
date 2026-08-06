@@ -1,13 +1,12 @@
-use job_index_core::nav;
 use job_index_core::RawListing;
+use job_index_core::nav;
 use worker::{Error, Result};
 
 const INITIAL_FIXTURE: &str = include_str!("../../../fixtures/initial.json");
 const NAV_FEED_PAGE: &str = include_str!("../../../fixtures/nav/feed-page.json");
 const NAV_ACTIVE_DETAIL: &str = include_str!("../../../fixtures/nav/detail-active.json");
 const NAV_UPDATED_DETAIL: &str = include_str!("../../../fixtures/nav/detail-updated.json");
-const NAV_NONMATCHING_DETAIL: &str =
-    include_str!("../../../fixtures/nav/detail-nonmatching.json");
+const NAV_NONMATCHING_DETAIL: &str = include_str!("../../../fixtures/nav/detail-nonmatching.json");
 
 pub trait JobSource {
     fn scenario(&self) -> &'static str;

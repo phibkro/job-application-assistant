@@ -1,6 +1,6 @@
-use job_index_core::nav::{self, FeedPage, ParseError};
 use job_index_core::RawListing;
-use worker::{Env, Error, Fetch, Headers, Method, Request, RequestInit, Response, Result};
+use job_index_core::nav::{self, FeedPage, ParseError};
+use worker::{Env, Error, Fetch, Headers, Method, Request, RequestInit, Result};
 
 const DEFAULT_NAV_BASE_URL: &str = "https://pam-stilling-feed.nav.no";
 pub const NAV_INITIAL_CURSOR: &str = "/api/v1/feed?last=true";
@@ -116,8 +116,7 @@ pub async fn fetch_page(
     match response.status_code() {
         304 => Ok(PageResponse::NotModified {
             etag: response_etag.or_else(|| etag.map(str::to_string)),
-            last_modified: response_last_modified
-                .or_else(|| last_modified.map(str::to_string)),
+            last_modified: response_last_modified.or_else(|| last_modified.map(str::to_string)),
         }),
         200 => {
             let body = response
@@ -125,7 +124,9 @@ pub async fn fetch_page(
                 .await
                 .map_err(|error| Error::RustError(format!("nav_network: {error}")))?;
             let page = nav::parse_feed_page(&body).map_err(|error| {
-                Error::RustError(format!("nav_malformed_page: feed page parse failed: {error}"))
+                Error::RustError(format!(
+                    "nav_malformed_page: feed page parse failed: {error}"
+                ))
             })?;
             Ok(PageResponse::Page {
                 page,
@@ -174,7 +175,9 @@ pub async fn build_observations(
         detail_fetches += 1;
 
         match fetch_detail(environment, item, token).await {
-            Ok(DetailResponse::Active(listing)) => observations.push(NavObservation::Active(listing)),
+            Ok(DetailResponse::Active(listing)) => {
+                observations.push(NavObservation::Active(listing))
+            }
             Ok(DetailResponse::Inactive) => observations.push(NavObservation::Inactive {
                 external_id: item.external_id.clone(),
             }),

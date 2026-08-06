@@ -2,10 +2,9 @@ use crate::fixtures::{InitialFixtureSource, JobSource, NavFixtureScenario, nav_f
 use crate::repository::{
     LeaseDecision, ObservationOutcome, acquire_source_lease, begin_collection_run,
     clear_source_retry, clear_stale_source_lease, complete_collection_run, corpus_counts,
-    ensure_source_state, list_jobs, list_source_failures, mark_source_attempt,
-    mark_source_failure, process_inactive_observation, process_observation,
-    release_source_lease, reset_demo, restart_source_from, set_source_paused, source_state,
-    verify_atomic_rollback,
+    ensure_source_state, list_jobs, list_source_failures, mark_source_attempt, mark_source_failure,
+    process_inactive_observation, process_observation, release_source_lease, reset_demo,
+    restart_source_from, set_source_paused, source_state, verify_atomic_rollback,
 };
 use crate::sync::{SyncTrigger, sync_nav};
 use job_index_core::{NAV_SOURCE_ID, normalize};
@@ -66,7 +65,6 @@ struct CursorFailureProbeResponse {
     consecutive_failures: i64,
 }
 
-
 #[derive(Debug, Deserialize)]
 struct RestartSourceRequest {
     #[serde(default = "default_restart_cursor")]
@@ -120,7 +118,10 @@ pub async fn about(_request: Request, context: RouteContext<()>) -> Result<Respo
 
 pub async fn jobs(_request: Request, context: RouteContext<()>) -> Result<Response> {
     if !demo_mutations_allowed(&context) {
-        return json_error("legacy unbounded job route is disabled; use /api/v1/jobs", 403);
+        return json_error(
+            "legacy unbounded job route is disabled; use /api/v1/jobs",
+            403,
+        );
     }
     let database = context.env.d1("DB")?;
     let data = list_jobs(&database).await?;
@@ -183,7 +184,17 @@ pub async fn nav_pause(request: Request, context: RouteContext<()>) -> Result<Re
     let database = context.env.d1("DB")?;
     ensure_nav_state(&database).await?;
     set_source_paused(&database, NAV_SOURCE_ID, true, &now_marker()).await?;
-    crate::auth::audit(&database, &request, "admin", None, "nav.pause", "source", Some(NAV_SOURCE_ID), "{}").await?;
+    crate::auth::audit(
+        &database,
+        &request,
+        "admin",
+        None,
+        "nav.pause",
+        "source",
+        Some(NAV_SOURCE_ID),
+        "{}",
+    )
+    .await?;
     Response::from_json(&SourceStatusResponse {
         data: source_state(&database, NAV_SOURCE_ID).await?,
     })
@@ -197,7 +208,17 @@ pub async fn nav_resume(request: Request, context: RouteContext<()>) -> Result<R
     ensure_nav_state(&database).await?;
     set_source_paused(&database, NAV_SOURCE_ID, false, &now_marker()).await?;
     clear_source_retry(&database, NAV_SOURCE_ID, &now_marker()).await?;
-    crate::auth::audit(&database, &request, "admin", None, "nav.resume", "source", Some(NAV_SOURCE_ID), "{}").await?;
+    crate::auth::audit(
+        &database,
+        &request,
+        "admin",
+        None,
+        "nav.resume",
+        "source",
+        Some(NAV_SOURCE_ID),
+        "{}",
+    )
+    .await?;
     Response::from_json(&SourceStatusResponse {
         data: source_state(&database, NAV_SOURCE_ID).await?,
     })
@@ -275,12 +296,8 @@ pub async fn nav_release_stale_lease(
     }
     let database = context.env.d1("DB")?;
     ensure_nav_state(&database).await?;
-    let released = clear_stale_source_lease(
-        &database,
-        NAV_SOURCE_ID,
-        js_sys::Date::now() as i64,
-    )
-    .await?;
+    let released =
+        clear_stale_source_lease(&database, NAV_SOURCE_ID, js_sys::Date::now() as i64).await?;
     crate::auth::audit(
         &database,
         &request,
@@ -355,7 +372,9 @@ pub async fn nav_cursor_failure_probe(
     .await?;
     let after = source_state(&database, PROBE_SOURCE_ID)
         .await?
-        .ok_or_else(|| worker::Error::RustError("failure-probe source state disappeared".to_string()))?;
+        .ok_or_else(|| {
+            worker::Error::RustError("failure-probe source state disappeared".to_string())
+        })?;
 
     Response::from_json(&CursorFailureProbeResponse {
         cursor_unchanged: before.cursor == after.cursor,
@@ -385,13 +404,9 @@ pub async fn nav_fixture_closed(_request: Request, context: RouteContext<()>) ->
         return json_error("demo mutation endpoints are disabled", 403);
     }
     let database = context.env.d1("DB")?;
-    let outcome = process_inactive_observation(
-        &database,
-        NAV_SOURCE_ID,
-        "active-vacancy-1",
-        &now_marker(),
-    )
-    .await?;
+    let outcome =
+        process_inactive_observation(&database, NAV_SOURCE_ID, "active-vacancy-1", &now_marker())
+            .await?;
     Response::from_json(&TransitionResponse {
         scenario: "closed",
         outcome: outcome_name(outcome),

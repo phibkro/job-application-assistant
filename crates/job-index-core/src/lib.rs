@@ -108,7 +108,10 @@ pub fn normalize(raw: RawListing) -> Result<NormalizedListing, NormalizeError> {
 }
 
 pub fn occurrence_id(source_id: &str, external_id: &str) -> String {
-    format!("occ_{}", stable_hash_hex(&format!("{source_id}|{external_id}")))
+    format!(
+        "occ_{}",
+        stable_hash_hex(&format!("{source_id}|{external_id}"))
+    )
 }
 
 pub fn canonicalize_url(value: &str) -> String {
@@ -290,7 +293,9 @@ pub mod nav {
             match self {
                 Self::InvalidJson(message) => write!(formatter, "invalid NAV JSON: {message}"),
                 Self::MissingField(field) => write!(formatter, "NAV response is missing {field}"),
-                Self::InactiveDetail => write!(formatter, "inactive NAV entry has no active detail"),
+                Self::InactiveDetail => {
+                    write!(formatter, "inactive NAV entry has no active detail")
+                }
             }
         }
     }
@@ -397,8 +402,9 @@ pub mod nav {
             .items
             .into_iter()
             .map(|item| {
-                let modified_at = first_non_empty([item.date_modified, item.feed_entry.modified_at])
-                    .ok_or(ParseError::MissingField("feed item modified timestamp"))?;
+                let modified_at =
+                    first_non_empty([item.date_modified, item.feed_entry.modified_at])
+                        .ok_or(ParseError::MissingField("feed item modified timestamp"))?;
                 Ok(FeedItem {
                     external_id: non_empty(item.feed_entry.uuid)
                         .ok_or(ParseError::MissingField("_feed_entry.uuid"))?,
@@ -473,9 +479,7 @@ pub mod nav {
             return Err(ParseError::InactiveDetail);
         }
 
-        let content = detail
-            .json
-            .ok_or(ParseError::MissingField("detail.json"))?;
+        let content = detail.json.ok_or(ParseError::MissingField("detail.json"))?;
         let title = first_non_empty([
             content.title,
             content.jobtitle,

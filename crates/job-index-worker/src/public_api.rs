@@ -246,9 +246,7 @@ pub async fn job(request: Request, context: RouteContext<()>) -> Result<Response
     .first::<JobSummaryRow>(None)
     .await?;
     match row {
-        Some(value) => Response::from_json(&JobDetailResponse {
-            data: value.into(),
-        }),
+        Some(value) => Response::from_json(&JobDetailResponse { data: value.into() }),
         None => crate::auth::api_error(&request, "not_found", "job not found", 404),
     }
 }
@@ -364,7 +362,8 @@ impl Query {
                 "source" => value.source = Some(bounded_filter(item)?),
                 "cursor" => value.cursor = Some(nonnegative_integer(item, "invalid cursor")?),
                 "after_sequence" => {
-                    value.after_sequence = Some(nonnegative_integer(item, "invalid after_sequence")?);
+                    value.after_sequence =
+                        Some(nonnegative_integer(item, "invalid after_sequence")?);
                 }
                 "limit" => {
                     value.requested_limit = Some(
@@ -393,7 +392,10 @@ fn bounded_filter(value: &str) -> std::result::Result<String, &'static str> {
     }
 }
 
-fn nonnegative_integer(value: &str, message: &'static str) -> std::result::Result<i64, &'static str> {
+fn nonnegative_integer(
+    value: &str,
+    message: &'static str,
+) -> std::result::Result<i64, &'static str> {
     value
         .parse::<i64>()
         .ok()
@@ -471,7 +473,6 @@ impl From<SourceRow> for SourceView {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,4 @@
-use job_index_core::{
-    NormalizedSearchDefinition, SavedSearchDefinition, SearchableJob,
-};
+use job_index_core::{NormalizedSearchDefinition, SavedSearchDefinition, SearchableJob};
 use serde::{Deserialize, Serialize};
 use worker::{D1Database, Error, Request, Response, Result, RouteContext};
 
@@ -619,9 +617,8 @@ pub async fn evaluate_due_searches(database: &D1Database) -> Result<ScheduledEva
 #[cfg(test)]
 mod tests {
     use super::{
-        EVALUATION_BATCH_SIZE, MATCH_PAGE_DEFAULT, MATCH_PAGE_MAX,
-        SCHEDULED_SEARCH_BATCH_SIZE, SEARCH_NAME_MAX, SEARCH_TERMS_PER_FIELD_MAX,
-        SEARCH_TERM_MAX,
+        EVALUATION_BATCH_SIZE, MATCH_PAGE_DEFAULT, MATCH_PAGE_MAX, SCHEDULED_SEARCH_BATCH_SIZE,
+        SEARCH_NAME_MAX, SEARCH_TERM_MAX, SEARCH_TERMS_PER_FIELD_MAX,
     };
 
     #[test]
@@ -654,12 +651,7 @@ pub async fn create_owned(mut request: Request, context: RouteContext<()>) -> Re
         None => return crate::auth::api_error(&request, "unauthorized", "API key required", 401),
     };
     if !principal.can_mutate() {
-        return crate::auth::api_error(
-            &request,
-            "forbidden",
-            "principal role is read-only",
-            403,
-        );
+        return crate::auth::api_error(&request, "forbidden", "principal role is read-only", 403);
     }
     let payload = match request.json::<CreateSavedSearchRequest>().await {
         Ok(value) => value,
@@ -764,7 +756,10 @@ pub async fn list_owned(request: Request, context: RouteContext<()>) -> Result<R
     .all()
     .await?
     .results::<SavedSearchRow>()?;
-    let data = rows.into_iter().map(row_to_view).collect::<Result<Vec<_>>>()?;
+    let data = rows
+        .into_iter()
+        .map(row_to_view)
+        .collect::<Result<Vec<_>>>()?;
     Response::from_json(&OwnedSearchListResponse { data })
 }
 
@@ -788,12 +783,7 @@ pub async fn update_owned(mut request: Request, context: RouteContext<()>) -> Re
         None => return crate::auth::api_error(&request, "unauthorized", "API key required", 401),
     };
     if !principal.can_mutate() {
-        return crate::auth::api_error(
-            &request,
-            "forbidden",
-            "principal role is read-only",
-            403,
-        );
+        return crate::auth::api_error(&request, "forbidden", "principal role is read-only", 403);
     }
     let id = route_id(&context)?;
     let Some(current) = load_owned_search(&database, &id, &principal.id).await? else {
@@ -886,12 +876,7 @@ pub async fn delete_owned(request: Request, context: RouteContext<()>) -> Result
         None => return crate::auth::api_error(&request, "unauthorized", "API key required", 401),
     };
     if !principal.can_mutate() {
-        return crate::auth::api_error(
-            &request,
-            "forbidden",
-            "principal role is read-only",
-            403,
-        );
+        return crate::auth::api_error(&request, "forbidden", "principal role is read-only", 403);
     }
     let id = route_id(&context)?;
     let result = worker::query!(
@@ -926,15 +911,13 @@ pub async fn evaluate_owned(request: Request, context: RouteContext<()>) -> Resu
         None => return crate::auth::api_error(&request, "unauthorized", "API key required", 401),
     };
     if !principal.can_mutate() {
-        return crate::auth::api_error(
-            &request,
-            "forbidden",
-            "principal role is read-only",
-            403,
-        );
+        return crate::auth::api_error(&request, "forbidden", "principal role is read-only", 403);
     }
     let id = route_id(&context)?;
-    if load_owned_search(&database, &id, &principal.id).await?.is_none() {
+    if load_owned_search(&database, &id, &principal.id)
+        .await?
+        .is_none()
+    {
         return crate::auth::api_error(&request, "not_found", "saved search not found", 404);
     }
     let report = evaluate_saved_search(&database, &id, &now_marker()).await?;
@@ -959,7 +942,10 @@ pub async fn matches_owned(request: Request, context: RouteContext<()>) -> Resul
         None => return crate::auth::api_error(&request, "unauthorized", "API key required", 401),
     };
     let id = route_id(&context)?;
-    if load_owned_search(&database, &id, &principal.id).await?.is_none() {
+    if load_owned_search(&database, &id, &principal.id)
+        .await?
+        .is_none()
+    {
         return crate::auth::api_error(&request, "not_found", "saved search not found", 404);
     }
     let url = request.url()?;
@@ -1031,10 +1017,7 @@ pub async fn matches_owned(request: Request, context: RouteContext<()>) -> Resul
         .await?
         .results::<SearchMatchJoinRow>()?
     };
-    let data: Vec<SearchMatchView> = rows
-        .into_iter()
-        .map(SearchMatchView::from)
-        .collect();
+    let data: Vec<SearchMatchView> = rows.into_iter().map(SearchMatchView::from).collect();
     let next_cursor = if data.len() == limit as usize {
         data.last().map(|job| job.sequence.to_string())
     } else {
@@ -1053,15 +1036,13 @@ pub async fn reset_owned(request: Request, context: RouteContext<()>) -> Result<
         None => return crate::auth::api_error(&request, "unauthorized", "API key required", 401),
     };
     if !principal.can_mutate() {
-        return crate::auth::api_error(
-            &request,
-            "forbidden",
-            "principal role is read-only",
-            403,
-        );
+        return crate::auth::api_error(&request, "forbidden", "principal role is read-only", 403);
     }
     let id = route_id(&context)?;
-    if load_owned_search(&database, &id, &principal.id).await?.is_none() {
+    if load_owned_search(&database, &id, &principal.id)
+        .await?
+        .is_none()
+    {
         return crate::auth::api_error(&request, "not_found", "saved search not found", 404);
     }
     database

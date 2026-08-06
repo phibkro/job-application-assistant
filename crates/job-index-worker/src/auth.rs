@@ -177,12 +177,14 @@ pub async fn audit(
     Ok(())
 }
 
-pub async fn create_principal(
-    mut request: Request,
-    context: RouteContext<()>,
-) -> Result<Response> {
+pub async fn create_principal(mut request: Request, context: RouteContext<()>) -> Result<Response> {
     if !crate::api::admin_allowed(&request, &context)? {
-        return api_error(&request, "forbidden", "administrator authorization required", 403);
+        return api_error(
+            &request,
+            "forbidden",
+            "administrator authorization required",
+            403,
+        );
     }
     let payload = match request.json::<CreatePrincipalRequest>().await {
         Ok(value) => value,
@@ -201,7 +203,12 @@ pub async fn create_principal(
         return api_error(&request, "invalid_role", "unsupported principal role", 400);
     }
     if !(1..=1000).contains(&payload.search_quota) {
-        return api_error(&request, "invalid_quota", "search_quota must be 1..1000", 400);
+        return api_error(
+            &request,
+            "invalid_quota",
+            "search_quota must be 1..1000",
+            400,
+        );
     }
     let database = context.env.d1("DB")?;
     let hash = sha256_hex(&payload.api_key);
@@ -324,7 +331,12 @@ struct AuditListResponse {
 
 pub async fn list_principals(request: Request, context: RouteContext<()>) -> Result<Response> {
     if !crate::api::admin_allowed(&request, &context)? {
-        return api_error(&request, "forbidden", "administrator authorization required", 403);
+        return api_error(
+            &request,
+            "forbidden",
+            "administrator authorization required",
+            403,
+        );
     }
     let database = context.env.d1("DB")?;
     let data = database
@@ -351,7 +363,12 @@ pub async fn list_principals(request: Request, context: RouteContext<()>) -> Res
 
 pub async fn revoke_principal(request: Request, context: RouteContext<()>) -> Result<Response> {
     if !crate::api::admin_allowed(&request, &context)? {
-        return api_error(&request, "forbidden", "administrator authorization required", 403);
+        return api_error(
+            &request,
+            "forbidden",
+            "administrator authorization required",
+            403,
+        );
     }
     let id = context
         .param("id")
@@ -413,7 +430,12 @@ pub async fn revoke_principal(request: Request, context: RouteContext<()>) -> Re
 
 pub async fn list_audit(request: Request, context: RouteContext<()>) -> Result<Response> {
     if !crate::api::admin_allowed(&request, &context)? {
-        return api_error(&request, "forbidden", "administrator authorization required", 403);
+        return api_error(
+            &request,
+            "forbidden",
+            "administrator authorization required",
+            403,
+        );
     }
     let database = context.env.d1("DB")?;
     let data = database

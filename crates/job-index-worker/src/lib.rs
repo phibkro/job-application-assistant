@@ -44,8 +44,14 @@ async fn main(request: Request, environment: Env, _context: Context) -> Result<R
         .post_async("/api/v1/searches/:id/evaluate", searches::evaluate_owned)
         .get_async("/api/v1/searches/:id/matches", searches::matches_owned)
         .post_async("/api/v1/searches/:id/reset", searches::reset_owned)
-        .post_async("/api/v1/searches/:id/subscriptions", outbox::create_subscription)
-        .get_async("/api/v1/searches/:id/subscriptions", outbox::list_subscriptions)
+        .post_async(
+            "/api/v1/searches/:id/subscriptions",
+            outbox::create_subscription,
+        )
+        .get_async(
+            "/api/v1/searches/:id/subscriptions",
+            outbox::list_subscriptions,
+        )
         .delete_async(
             "/api/v1/searches/:id/subscriptions/:subscription_id",
             outbox::delete_subscription,
@@ -77,7 +83,10 @@ async fn main(request: Request, environment: Env, _context: Context) -> Result<R
         .post_async("/api/sources/nav/resume", api::nav_resume)
         .post_async("/api/sources/nav/retry", api::nav_retry)
         .post_async("/api/sources/nav/restart", api::nav_restart)
-        .post_async("/api/sources/nav/lease/release", api::nav_release_stale_lease)
+        .post_async(
+            "/api/sources/nav/lease/release",
+            api::nav_release_stale_lease,
+        )
         .post_async("/api/demo/nav/active", api::nav_fixture_active)
         .post_async("/api/demo/nav/update", api::nav_fixture_updated)
         .post_async("/api/demo/nav/nonmatching", api::nav_fixture_nonmatching)
@@ -105,12 +114,8 @@ impl ScheduledTask {
     fn from_cron(cron: &str) -> Option<Self> {
         match cron {
             "0,15,30,45 * * * *" => Some(Self::NavSync),
-            "2,7,12,17,22,27,32,37,42,47,52,57 * * * *" => {
-                Some(Self::SearchEvaluation)
-            }
-            "4,9,14,19,24,29,34,39,44,49,54,59 * * * *" => {
-                Some(Self::OutboxDelivery)
-            }
+            "2,7,12,17,22,27,32,37,42,47,52,57 * * * *" => Some(Self::SearchEvaluation),
+            "4,9,14,19,24,29,34,39,44,49,54,59 * * * *" => Some(Self::OutboxDelivery),
             _ => None,
         }
     }

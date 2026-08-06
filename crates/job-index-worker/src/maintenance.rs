@@ -119,9 +119,7 @@ pub async fn reconcile(mut request: Request, context: RouteContext<()>) -> Resul
         Err(error) => {
             let message = truncate(&error.to_string(), 500);
             if let Err(mark_error) = fail_run(&database, run_id, &now, &message).await {
-                worker::console_error!(
-                    "failed to record maintenance run failure: {mark_error}"
-                );
+                worker::console_error!("failed to record maintenance run failure: {mark_error}");
             }
             return Err(error);
         }
@@ -241,7 +239,6 @@ pub async fn purge(mut request: Request, context: RouteContext<()>) -> Result<Re
     Response::from_json(&response)
 }
 
-
 async fn reconcile_jobs(
     database: &D1Database,
     dry_run: bool,
@@ -323,7 +320,8 @@ async fn reconcile_jobs(
 
 pub async fn corpus_audit(database: &D1Database) -> Result<CorpusAudit> {
     let canonical_jobs = count(database, "SELECT COUNT(*) AS count FROM canonical_jobs").await?;
-    let source_occurrences = count(database, "SELECT COUNT(*) AS count FROM source_listings").await?;
+    let source_occurrences =
+        count(database, "SELECT COUNT(*) AS count FROM source_listings").await?;
     let canonical_without_occurrences = count(
         database,
         "SELECT COUNT(*) AS count
@@ -465,12 +463,7 @@ async fn complete_run(
     Ok(())
 }
 
-async fn fail_run(
-    database: &D1Database,
-    run_id: i64,
-    now: &str,
-    error: &str,
-) -> Result<()> {
+async fn fail_run(database: &D1Database, run_id: i64, now: &str, error: &str) -> Result<()> {
     worker::query!(
         database,
         "UPDATE maintenance_runs
