@@ -2,6 +2,10 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# `env -i` below isolates deployment *variables*, which is what the preflight
+# reads. The pinned toolchain PATH is prepended with the stub directory instead
+# of being replaced, because deploy.sh legitimately runs inside that toolchain.
+bash_bin="$(command -v bash)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 mkdir -p "${tmp}/bin"
@@ -36,11 +40,11 @@ assert_preflight_failure() {
   output="$(
     env -i \
       HOME="${tmp}" \
-      PATH="${tmp}/bin:/usr/bin:/bin" \
+      PATH="${tmp}/bin:${PATH}" \
       WRANGLER_CALL_LOG="${tmp}/wrangler-calls" \
       JOB_INDEX_DEV_VARS_FILE="${tmp}/missing.dev.vars" \
       "$@" \
-      bash "${root}/scripts/deploy.sh" production 2>&1
+      "${bash_bin}" "${root}/scripts/deploy.sh" production 2>&1
   )"
   status=$?
   set -e

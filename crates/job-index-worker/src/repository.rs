@@ -261,9 +261,9 @@ pub async fn ensure_source_state(
         ])
         .await?;
 
-    source_state(database, source_id).await?.ok_or_else(|| {
-        Error::RustError(format!("D1 did not return source state for {source_id}"))
-    })
+    source_state(database, source_id)
+        .await?
+        .ok_or_else(|| Error::RustError(format!("D1 did not return source state for {source_id}")))
 }
 
 pub async fn source_state(
@@ -619,7 +619,9 @@ pub async fn clear_stale_source_lease(
         Error::RustError(format!("D1 did not return source state for {source_id}"))
     })?;
     let was_stale = before.lease_owner.is_some()
-        && before.lease_expires_at.is_some_and(|expires_at| expires_at <= now_ms);
+        && before
+            .lease_expires_at
+            .is_some_and(|expires_at| expires_at <= now_ms);
     worker::query!(
         database,
         "UPDATE source_state
@@ -729,20 +731,34 @@ pub async fn list_source_failures(
     .results::<SourceFailureView>()
 }
 
+/// Mutable progress counters and cursor window recorded against a collection run.
+///
+/// The counters and the two cursors are positionally interchangeable when passed
+/// as bare arguments, so they travel as named fields instead.
+#[derive(Debug, Clone, Copy)]
+pub struct CollectionRunProgress<'a> {
+    pub pages: usize,
+    pub observations: usize,
+    pub canonical_changes: usize,
+    pub duration_ms: i64,
+    pub cursor_before: &'a str,
+    pub cursor_after: &'a str,
+    pub lease_owner: &'a str,
+}
+
 pub async fn update_collection_run_progress(
     database: &D1Database,
     run_id: i64,
-    pages: usize,
-    observations: usize,
-    canonical_changes: usize,
-    duration_ms: i64,
-    cursor_before: &str,
-    cursor_after: &str,
-    lease_owner: &str,
+    progress: CollectionRunProgress<'_>,
 ) -> Result<()> {
-    let pages = count_to_i32(pages, "collection pages")?;
-    let observations = count_to_i32(observations, "collection observations")?;
-    let canonical_changes = count_to_i32(canonical_changes, "collection canonical changes")?;
+    let pages = count_to_i32(progress.pages, "collection pages")?;
+    let observations = count_to_i32(progress.observations, "collection observations")?;
+    let canonical_changes =
+        count_to_i32(progress.canonical_changes, "collection canonical changes")?;
+    let duration_ms = progress.duration_ms;
+    let cursor_before = progress.cursor_before;
+    let cursor_after = progress.cursor_after;
+    let lease_owner = progress.lease_owner;
     worker::query!(
         database,
         "UPDATE collection_runs
@@ -772,26 +788,9 @@ pub async fn complete_collection_run_detailed(
     database: &D1Database,
     run_id: i64,
     observed_at: &str,
-    pages: usize,
-    observations: usize,
-    canonical_changes: usize,
-    duration_ms: i64,
-    cursor_before: &str,
-    cursor_after: &str,
-    lease_owner: &str,
+    progress: CollectionRunProgress<'_>,
 ) -> Result<()> {
-    update_collection_run_progress(
-        database,
-        run_id,
-        pages,
-        observations,
-        canonical_changes,
-        duration_ms,
-        cursor_before,
-        cursor_after,
-        lease_owner,
-    )
-    .await?;
+    update_collection_run_progress(database, run_id, progress).await?;
     worker::query!(
         database,
         "UPDATE collection_runs

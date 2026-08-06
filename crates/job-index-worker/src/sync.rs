@@ -3,11 +3,11 @@ use crate::nav_connector::{
     next_checkpoint, resolve_token,
 };
 use crate::repository::{
-    CorpusCounts, LeaseDecision, ObservationOutcome, SourceStateView, acquire_source_lease,
-    begin_collection_run_for_source, complete_collection_run_detailed, corpus_counts,
-    ensure_source_state, fail_collection_run, mark_source_attempt, mark_source_failure,
-    mark_source_success, record_source_failure, release_source_lease, renew_source_lease,
-    resolve_source_failures, source_state, update_collection_run_progress,
+    CollectionRunProgress, CorpusCounts, LeaseDecision, ObservationOutcome, SourceStateView,
+    acquire_source_lease, begin_collection_run_for_source, complete_collection_run_detailed,
+    corpus_counts, ensure_source_state, fail_collection_run, mark_source_attempt,
+    mark_source_failure, mark_source_success, record_source_failure, release_source_lease,
+    renew_source_lease, resolve_source_failures, source_state, update_collection_run_progress,
 };
 use job_index_core::{NAV_SOURCE_ID, NAV_SOURCE_NAME, normalize, stable_hash_hex};
 use serde::Serialize;
@@ -283,18 +283,22 @@ pub async fn sync_nav(environment: &Env, trigger: SyncTrigger) -> Result<SyncRep
             )
             .await
             {
-                worker::console_error!("failed to update NAV source failure state: {persist_error}");
+                worker::console_error!(
+                    "failed to update NAV source failure state: {persist_error}"
+                );
             }
             if let Err(persist_error) = update_collection_run_progress(
                 &database,
                 run_id,
-                pages,
-                observations,
-                0,
-                duration_ms,
-                &initial_state.cursor,
-                &current.cursor,
-                &lease_owner,
+                CollectionRunProgress {
+                    pages,
+                    observations,
+                    canonical_changes: 0,
+                    duration_ms,
+                    cursor_before: &initial_state.cursor,
+                    cursor_after: &current.cursor,
+                    lease_owner: &lease_owner,
+                },
             )
             .await
             {
@@ -308,7 +312,9 @@ pub async fn sync_nav(environment: &Env, trigger: SyncTrigger) -> Result<SyncRep
             if let Err(release_error) =
                 release_source_lease(&database, NAV_SOURCE_ID, &lease_owner).await
             {
-                worker::console_error!("failed to release failed NAV source lease: {release_error}");
+                worker::console_error!(
+                    "failed to release failed NAV source lease: {release_error}"
+                );
             }
             log_failure(
                 trigger,
@@ -500,8 +506,13 @@ async fn sync_nav_attempt(
             duration_ms,
         )
         .await?;
-        resolve_source_failures(database, NAV_SOURCE_ID, &requested_cursor, &ended.to_string())
-            .await?;
+        resolve_source_failures(
+            database,
+            NAV_SOURCE_ID,
+            &requested_cursor,
+            &ended.to_string(),
+        )
+        .await?;
 
         report.pages += 1;
         report.observations = report
@@ -517,13 +528,15 @@ async fn sync_nav_attempt(
         update_collection_run_progress(
             database,
             run_id,
-            report.pages,
-            report.observations,
-            report.canonical_changes,
-            report.duration_ms,
-            &report.cursor_before,
-            &report.cursor_after,
-            lease_owner,
+            CollectionRunProgress {
+                pages: report.pages,
+                observations: report.observations,
+                canonical_changes: report.canonical_changes,
+                duration_ms: report.duration_ms,
+                cursor_before: &report.cursor_before,
+                cursor_after: &report.cursor_after,
+                lease_owner,
+            },
         )
         .await?;
 
@@ -550,13 +563,15 @@ async fn sync_nav_attempt(
         database,
         run_id,
         &ended.to_string(),
-        report.pages,
-        report.observations,
-        report.canonical_changes,
-        report.duration_ms,
-        &report.cursor_before,
-        &report.cursor_after,
-        lease_owner,
+        CollectionRunProgress {
+            pages: report.pages,
+            observations: report.observations,
+            canonical_changes: report.canonical_changes,
+            duration_ms: report.duration_ms,
+            cursor_before: &report.cursor_before,
+            cursor_after: &report.cursor_after,
+            lease_owner,
+        },
     )
     .await?;
     Ok(report)
@@ -665,19 +680,11 @@ fn empty_report(
 }
 
 fn run_budget(environment: &Env) -> RunBudget {
-    let max_duration_ms = numeric_var(
-        environment,
-        "NAV_MAX_DURATION_MS",
-        DEFAULT_MAX_DURATION_MS,
-    )
-    .clamp(1_000, HARD_MAX_DURATION_MS);
-    let lease_ttl_ms = numeric_var(
-        environment,
-        "NAV_LEASE_TTL_MS",
-        DEFAULT_LEASE_TTL_MS,
-    )
-    .clamp(MIN_LEASE_TTL_MS, HARD_MAX_LEASE_TTL_MS)
-    .max(max_duration_ms.saturating_mul(2));
+    let max_duration_ms = numeric_var(environment, "NAV_MAX_DURATION_MS", DEFAULT_MAX_DURATION_MS)
+        .clamp(1_000, HARD_MAX_DURATION_MS);
+    let lease_ttl_ms = numeric_var(environment, "NAV_LEASE_TTL_MS", DEFAULT_LEASE_TTL_MS)
+        .clamp(MIN_LEASE_TTL_MS, HARD_MAX_LEASE_TTL_MS)
+        .max(max_duration_ms.saturating_mul(2));
     RunBudget {
         max_pages: usize_var(
             environment,
@@ -785,7 +792,11 @@ fn retry_after(policy: FailurePolicy, now_ms: i64, failures: i64) -> Option<i64>
     if let Some(retry_at) = policy.retry_after_at.filter(|retry_at| *retry_at > now_ms) {
         return Some(retry_at);
     }
-    let base_seconds = if policy.class == "rate_limited" { 300 } else { 30 };
+    let base_seconds = if policy.class == "rate_limited" {
+        300
+    } else {
+        30
+    };
     let exponent = failures.saturating_sub(1).clamp(0, 5) as u32;
     let delay_seconds = base_seconds * 2_i64.pow(exponent);
     Some(now_ms.saturating_add(delay_seconds.min(1_800).saturating_mul(1_000)))
@@ -838,7 +849,7 @@ fn numeric_var(environment: &Env, name: &str, default: i64) -> i64 {
 }
 
 fn sanitized_error(message: &str) -> String {
-    let mut sanitized = message.replace('\n', " ").replace('\r', " ");
+    let mut sanitized = message.replace(['\n', '\r'], " ");
     sanitized.truncate(500);
     sanitized
 }

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source_dir="${BASH_SOURCE[0]%/*}"
+[ "${source_dir}" = "${BASH_SOURCE[0]}" ] && source_dir="."
+root="$(cd -- "${source_dir}/.." && pwd)"
 cd "${root}"
 
 if [ "$#" -lt 1 ]; then

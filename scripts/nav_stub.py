@@ -141,6 +141,10 @@ def detail(external_id: str, *, updated: bool = False) -> dict[str, object]:
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "JobIndexNavStub/1"
+    # The Worker runtime under test speaks HTTP/1.1. The stdlib default of
+    # HTTP/1.0 answers every request with a close-delimited response, which the
+    # runtime reports as a lost connection instead of a delivered webhook.
+    protocol_version = "HTTP/1.1"
 
     def log_message(self, _format: str, *_args: object) -> None:
         return

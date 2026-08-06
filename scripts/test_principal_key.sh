@@ -25,7 +25,12 @@ JOB_INDEX_PRINCIPAL_FILE="${output_file}" \
 [ "$(stat -c '%a' "${output_file}")" = "600" ]
 grep -q '^JOB_INDEX_PRINCIPAL_ID=principal_test$' "${output_file}"
 grep -Eq '^JOB_INDEX_API_KEY=ji_[A-Za-z0-9_-]{40,}$' "${output_file}"
-! grep -q 'JOB_INDEX_API_KEY\|ji_' "${stdout_file}"
+# Asserted with an explicit branch: errexit does not apply to a `!`-inverted
+# command, so `! grep ...` would report a leaked key by doing nothing.
+if grep -q 'JOB_INDEX_API_KEY\|ji_' "${stdout_file}"; then
+  echo "create-principal.sh leaked the API key to standard output" >&2
+  exit 1
+fi
 grep -q 'principal_test' "${stdout_file}"
 grep -q '"api_key"' "${tmp}/curl.args"
 

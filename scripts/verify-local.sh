@@ -12,6 +12,7 @@ rm -rf "${PERSIST_DIR}"
 python3 scripts/nav_stub.py --port "${NAV_STUB_PORT}" > "${LOG_DIR}/nav-stub.log" 2>&1 &
 stub_pid=$!
 server_pid=""
+# shellcheck disable=SC2329  # invoked indirectly by the EXIT trap below.
 cleanup() {
   if [ -n "${server_pid}" ]; then
     kill "${server_pid}" 2>/dev/null || true
