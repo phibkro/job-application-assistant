@@ -340,39 +340,55 @@ pub mod nav {
         modified_at: String,
     }
 
+    /// A NAV feed-entry detail response.
+    ///
+    /// The identity and lifecycle fields sit at the top level and the advert
+    /// itself is nested under `ad_content`, which is the shape the live feed
+    /// serves. Do not reintroduce a fallback that parses this from an inner
+    /// object: an envelope mismatch has to fail loudly, because the summary
+    /// fallback that catches the error is indistinguishable from healthy
+    /// ingestion in every counter the run reports.
     #[derive(Debug, Deserialize)]
     struct DetailDto {
         uuid: String,
         status: String,
-        #[serde(default)]
-        json: Option<DetailContentDto>,
+        #[serde(rename = "ad_content", default)]
+        ad_content: Option<DetailContentDto>,
     }
 
     #[derive(Debug, Deserialize)]
     struct DetailContentDto {
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         published: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         expires: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         updated: String,
         #[serde(rename = "workLocations", default)]
         work_locations: Vec<WorkLocationDto>,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         title: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         description: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         sourceurl: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         application_url: String,
-        #[serde(rename = "applicationUrl", default)]
+        #[serde(
+            rename = "applicationUrl",
+            default,
+            deserialize_with = "nullable_string"
+        )]
         application_url_camel: String,
-        #[serde(rename = "applicationDue", default)]
+        #[serde(
+            rename = "applicationDue",
+            default,
+            deserialize_with = "nullable_string"
+        )]
         application_due: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         jobtitle: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         link: String,
         #[serde(default)]
         employer: EmployerDto,
@@ -380,18 +396,31 @@ pub mod nav {
 
     #[derive(Debug, Default, Deserialize)]
     struct EmployerDto {
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         name: String,
     }
 
     #[derive(Debug, Deserialize)]
     struct WorkLocationDto {
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         city: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         county: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "nullable_string")]
         municipal: String,
+    }
+
+    /// Treats an explicit `null` exactly like an absent key.
+    ///
+    /// `#[serde(default)]` alone only covers absence, and the live feed sends
+    /// both: a recorded entry had `city`, `address`, and `postalCode` set to
+    /// null. Without this the whole detail fails to parse and every vacancy
+    /// silently degrades to summary data.
+    fn nullable_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Option::<String>::deserialize(deserializer)?.unwrap_or_default())
     }
 
     pub fn parse_feed_page(text: &str) -> Result<FeedPage, ParseError> {
@@ -471,15 +500,16 @@ pub mod nav {
     pub fn parse_active_detail(text: &str, summary: &FeedItem) -> Result<RawListing, ParseError> {
         let value: Value = serde_json::from_str(text)
             .map_err(|error| ParseError::InvalidJson(error.to_string()))?;
-        let detail_value = value.get("ad_content").unwrap_or(&value).clone();
-        let detail: DetailDto = serde_json::from_value(detail_value)
+        let detail: DetailDto = serde_json::from_value(value)
             .map_err(|error| ParseError::InvalidJson(error.to_string()))?;
 
         if !detail.status.eq_ignore_ascii_case("ACTIVE") {
             return Err(ParseError::InactiveDetail);
         }
 
-        let content = detail.json.ok_or(ParseError::MissingField("detail.json"))?;
+        let content = detail
+            .ad_content
+            .ok_or(ParseError::MissingField("detail.ad_content"))?;
         let title = first_non_empty([
             content.title,
             content.jobtitle,
@@ -500,7 +530,7 @@ pub mod nav {
             .or_else(|| summary.municipal.clone())
             .unwrap_or_else(|| "Norway".to_string());
         let description = first_non_empty([
-            content.description,
+            html_to_text(&content.description),
             summary.content_text.clone().unwrap_or_default(),
             "See source listing for details.".to_string(),
         ])
@@ -522,7 +552,13 @@ pub mod nav {
             summary.modified_at.clone(),
         ])
         .ok_or(ParseError::MissingField("published timestamp"))?;
-        let deadline = first_non_empty([content.application_due, content.expires]);
+        // NAV accepts free text here, and real adverts use it: "Snarest"
+        // ("as soon as possible") is common. Only a calendar date may become a
+        // deadline, otherwise the advert's expiry is the honest answer.
+        let deadline = first_non_empty([
+            iso_date_prefix(&content.application_due),
+            iso_date_prefix(&content.expires),
+        ]);
 
         Ok(RawListing {
             source_id: NAV_SOURCE_ID.to_string(),
@@ -536,6 +572,54 @@ pub mod nav {
             published_at,
             deadline,
         })
+    }
+
+    /// Reduces a NAV advert body to plain text.
+    ///
+    /// Live adverts carry HTML. The demo UI escapes what it renders, so the
+    /// markup is not an injection risk, but storing it means every consumer
+    /// of the corpus — search terms, notifications, any future client —
+    /// matches against tag names.
+    fn html_to_text(input: &str) -> String {
+        let mut text = String::with_capacity(input.len());
+        let mut in_tag = false;
+        for character in input.chars() {
+            match character {
+                '<' => in_tag = true,
+                '>' => {
+                    in_tag = false;
+                    text.push(' ');
+                }
+                _ if !in_tag => text.push(character),
+                _ => {}
+            }
+        }
+
+        let text = text
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'");
+
+        text.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+
+    /// Returns the leading `YYYY-MM-DD` of a timestamp, or nothing when the
+    /// value is not a calendar date at all.
+    fn iso_date_prefix(value: &str) -> String {
+        let value = value.trim();
+        let candidate: String = value.chars().take(10).collect();
+        let shaped = candidate.len() == 10
+            && candidate
+                .chars()
+                .enumerate()
+                .all(|(index, character)| match index {
+                    4 | 7 => character == '-',
+                    _ => character.is_ascii_digit(),
+                });
+        if shaped { candidate } else { String::new() }
     }
 
     fn format_location(location: &WorkLocationDto) -> String {
@@ -586,6 +670,9 @@ mod tests {
 
     const NAV_FEED_PAGE: &str = include_str!("../../../fixtures/nav/feed-page.json");
     const NAV_ACTIVE_DETAIL: &str = include_str!("../../../fixtures/nav/detail-active.json");
+    /// Recorded from the live API by `scripts/capture-nav-fixture.sh`, so its
+    /// shape is observed rather than chosen. Refresh it with that script.
+    const NAV_LIVE_DETAIL: &str = include_str!("../../../fixtures/nav/live-detail.json");
 
     fn listing(source_id: &str, external_id: &str, url: &str) -> RawListing {
         RawListing {
@@ -673,6 +760,102 @@ mod tests {
         assert_eq!(listing.employer_name, "Example Technology AS");
         assert_eq!(listing.location, "Oslo");
         assert_eq!(listing.deadline.as_deref(), Some("2026-08-25"));
+        // The advert body arrives as HTML and must reach the corpus as text.
+        assert_eq!(
+            listing.description,
+            "Help customers use technical products."
+        );
+    }
+
+    /// The crafted fixtures assert journey behaviour, which needs controlled
+    /// content. This one asserts that the parser still fits what NAV actually
+    /// serves, which is the failure the crafted fixtures could not see: every
+    /// live detail fetch fell back to the summary while they stayed green.
+    ///
+    /// The assertions deliberately avoid the advert's wording, which changes
+    /// with each capture, and check that real content arrived at all.
+    #[test]
+    fn nav_detail_parser_fits_a_recorded_live_payload() {
+        let page = nav::parse_feed_page(NAV_FEED_PAGE).expect("feed fixture should parse");
+        let listing = nav::parse_active_detail(NAV_LIVE_DETAIL, &page.items[0])
+            .expect("the recorded live payload must parse; re-run scripts/capture-nav-fixture.sh");
+
+        assert!(!listing.title.trim().is_empty(), "title should be present");
+        assert!(
+            !listing.employer_name.trim().is_empty() && listing.employer_name != "Unknown employer",
+            "employer should come from the advert, got {:?}",
+            listing.employer_name
+        );
+        assert!(
+            listing.description.len() > 40
+                && listing.description != "See source listing for details.",
+            "description should be the advert body, got {:?}",
+            listing.description
+        );
+        assert!(
+            !listing.description.contains('<'),
+            "description should be plain text, got {:?}",
+            listing.description
+        );
+        // Not every advert carries its own application URL — one registered
+        // through NAV directly applies via the NAV page — so only the presence
+        // of an absolute URL holds for an arbitrary capture.
+        assert!(
+            listing.application_url.starts_with("https://"),
+            "application URL should be absolute, got {:?}",
+            listing.application_url
+        );
+        assert!(
+            listing.published_at.starts_with("20"),
+            "published timestamp should come from the advert, got {:?}",
+            listing.published_at
+        );
+    }
+
+    /// The envelope the live feed serves. Parsing this from the inner object
+    /// instead loses every detail field, and the summary fallback hides that:
+    /// ingestion still reports success while the corpus fills with
+    /// placeholders. Fail loudly instead.
+    #[test]
+    fn nav_detail_rejects_a_payload_without_the_outer_envelope() {
+        let page = nav::parse_feed_page(NAV_FEED_PAGE).expect("feed fixture should parse");
+        let inner_only = r#"{"description":"Body","jobtitle":"Title"}"#;
+
+        let error = nav::parse_active_detail(inner_only, &page.items[0])
+            .expect_err("a detail payload without uuid/status must not parse");
+
+        assert!(
+            matches!(error, nav::ParseError::InvalidJson(_)),
+            "expected an envelope error, got {error:?}"
+        );
+    }
+
+    /// Real adverts put free text where a date is expected — "Snarest"
+    /// ("as soon as possible") is common — so a deadline is only taken when
+    /// it is genuinely a calendar date.
+    #[test]
+    fn nav_detail_ignores_a_free_text_application_deadline() {
+        let page = nav::parse_feed_page(NAV_FEED_PAGE).expect("feed fixture should parse");
+        let payload = r#"{
+            "uuid": "active-vacancy-1",
+            "status": "ACTIVE",
+            "sistEndret": "2026-08-05T08:00:00Z",
+            "ad_content": {
+                "published": "2026-08-05T07:45:00Z",
+                "expires": "2026-08-26T00:00:00+02:00",
+                "title": "Technical Support Specialist",
+                "description": "<p>Body &amp; more</p>",
+                "applicationUrl": "https://careers.example/jobs/100",
+                "applicationDue": "Snarest",
+                "employer": { "name": "Example Technology AS" }
+            }
+        }"#;
+
+        let listing = nav::parse_active_detail(payload, &page.items[0])
+            .expect("live-shaped detail should parse");
+
+        assert_eq!(listing.deadline.as_deref(), Some("2026-08-26"));
+        assert_eq!(listing.description, "Body & more");
     }
 
     #[test]

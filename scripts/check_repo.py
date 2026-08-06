@@ -49,6 +49,8 @@ REQUIRED = [
     "fixtures/nav/feed-page.json",
     "fixtures/nav/detail-active.json",
     "fixtures/nav/detail-updated.json",
+    "fixtures/nav/live-detail.json",
+    "scripts/capture-nav-fixture.sh",
     "crates/job-index-core/src/lib.rs",
     "crates/job-index-worker/src/lib.rs",
     "scripts/setup.sh",

@@ -109,33 +109,37 @@ def feed_item(
 
 def detail(external_id: str, *, updated: bool = False) -> dict[str, object]:
     changed = " and improve our support documentation" if updated else ""
+    # Envelope, HTML body, and free-text application deadline all mirror what
+    # the live feed serves. The stub exists to catch drift from that shape, so
+    # it may only diverge where a scenario deliberately says so.
     return {
+        "uuid": external_id,
+        "status": "ACTIVE",
+        "sistEndret": "2026-08-05T21:00:00Z" if updated else "2026-08-05T20:00:00Z",
         "ad_content": {
             "uuid": external_id,
-            "status": "ACTIVE",
-            "sistEndret": "2026-08-05T21:00:00Z" if updated else "2026-08-05T20:00:00Z",
-            "json": {
-                "uuid": external_id,
-                "published": "2026-08-05T19:45:00Z",
-                "expires": "2026-08-25T23:59:59Z",
-                "updated": "2026-08-05T21:00:00Z" if updated else "2026-08-05T20:00:00Z",
-                "workLocations": [
-                    {
-                        "country": "NORGE",
-                        "address": "Stub gate 1",
-                        "city": "Oslo",
-                        "postalCode": "0001",
-                        "county": "Oslo",
-                        "municipal": "Oslo",
-                    }
-                ],
-                "title": "Technical Support Specialist",
-                "description": f"Help customers use technical products{changed}.",
-                "applicationUrl": f"https://careers.example/jobs/{external_id}?utm_source=nav-stub",
-                "applicationDue": "2026-08-25",
-                "employer": {"name": "Stub Technology AS"},
-            },
-        }
+            "published": "2026-08-05T19:45:00Z",
+            "expires": "2026-08-25T23:59:59Z",
+            "updated": "2026-08-05T21:00:00Z" if updated else "2026-08-05T20:00:00Z",
+            "workLocations": [
+                {
+                    "country": "NORGE",
+                    "address": "Stub gate 1",
+                    "city": "Oslo",
+                    "postalCode": "0001",
+                    "county": "Oslo",
+                    "municipal": "Oslo",
+                }
+            ],
+            "title": "Technical Support Specialist",
+            "description": (
+                f"<section id=\"arb-main\"><p>Help customers use technical"
+                f" products{changed}.</p></section>"
+            ),
+            "applicationUrl": f"https://careers.example/jobs/{external_id}?utm_source=nav-stub",
+            "applicationDue": "Snarest",
+            "employer": {"name": "Stub Technology AS"},
+        },
     }
 
 
