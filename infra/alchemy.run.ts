@@ -59,6 +59,16 @@ const PRODUCTION = STAGE === "production";
 const TYPESCRIPT = STAGE === "preview";
 
 /**
+ * Where the TypeScript service answers, beside its workers.dev URL.
+ *
+ * A name, not an identity: the operator has said this one is temporary. It is
+ * one string here rather than scattered through docs and smoke scripts so that
+ * changing it later is one edit, and it is stage-scoped so the Rust
+ * deployments keep their own hostnames.
+ */
+const PREVIEW_DOMAINS = ["job-index.phibkro.org"];
+
+/**
  * Production is published in two phases so a cron-enabled version can never
  * run before its credentials exist: the first deploy omits triggers and
  * disables synchronization, the second activates them. scripts/deploy.sh sets
@@ -183,7 +193,10 @@ export default Alchemy.Stack(
           }
         : undefined,
       compatibility: { date: "2026-05-25" },
+      // The workers.dev URL stays on alongside the custom domain: it is what
+      // the smoke checks hit, and it keeps working if DNS is mid-change.
       url: true,
+      domain: TYPESCRIPT ? PREVIEW_DOMAINS : undefined,
       env: {
         DB: database,
         ...environmentVars,

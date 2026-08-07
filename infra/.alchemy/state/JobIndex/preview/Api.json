@@ -20,6 +20,9 @@
       "date": "2026-05-25"
     },
     "url": true,
+    "domain": [
+      "job-index.phibkro.org"
+    ],
     "env": {
       "DB": {
         "databaseId": "4b7d1a99-51d5-466f-8e0b-e10195e49231",
@@ -54,7 +57,7 @@
     "workerId": "job-index-preview",
     "workerName": "job-index-preview",
     "logpush": false,
-    "url": "https://job-index-preview.philib-krogh-d23.workers.dev",
+    "url": "https://job-index.phibkro.org",
     "tags": [
       "alchemy:stack:JobIndex",
       "alchemy:stage:preview",
@@ -63,12 +66,13 @@
     "durableObjectNamespaces": {},
     "accountId": "d2319ba5e93bf509a478951e90496374",
     "domains": [
+      "https://job-index.phibkro.org",
       "https://job-index-preview.philib-krogh-d23.workers.dev"
     ],
     "crons": [],
     "hash": {
       "assets": "82a3d1de945a2d6cc097be84d6af92994d28cc7287f3bf0315afe2f28f10d8af",
-      "bundle": "a2d1e47893673f470789141512ea563ef64bfe466e3627a75115552766215100"
+      "bundle": "0ad12b529905b952dd7be2dbb05c9a48c730c8e2beeb0bb70ffeb202360361a4"
     }
   },
   "bindings": [
