@@ -172,6 +172,20 @@ PYOUT
 database_id="$(read_stack_output databaseId)"
 database_name="$(read_stack_output database)"
 
+# Alchemy no longer applies migrations: the TypeScript service starts from one
+# generated snapshot, and it used to be the Rust stages alone that had ordered
+# migrations to run. Collapsing those stages onto TypeScript therefore removed
+# the only step that gave staging and production a schema — a Worker deployed
+# against an empty database, which is exactly what the environment-safety gate
+# is written to refuse.
+#
+# IF NOT EXISTS throughout, so re-running is safe, and the catalogue seed uses
+# INSERT OR REPLACE so a re-run re-asserts the researched rows rather than
+# duplicating them.
+echo "Applying the generated schema and researched catalogue to ${database_name}..."
+wrangler d1 execute "${database_name}" --remote --file db/schema.sql --yes >/dev/null
+wrangler d1 execute "${database_name}" --remote --file db/catalog-seed.sql --yes >/dev/null
+
 deployment_url="$(read_stack_output url)"
 
 if [ -z "${deployment_url}" ]; then

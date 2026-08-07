@@ -14,11 +14,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "check": "bun run fmt:check && bun run lint && bun run imports:check && bun run typecheck && bun run schema:check && bun run bundle:check && bun run coverage",
+    "check": "bun run fmt:check && bun run lint && bun run imports:check && bun run typecheck && bun run schema:check && bun run catalog:check && bun run bundle:check && bun run coverage",
     "schema": "bun run scripts/ts/schema.ts --emit",
     "schema:check": "bun run scripts/ts/schema.ts",
     "bundle:check": "bun build apps/worker/src/index.ts --target=browser --conditions=workerd --conditions=worker --external \"cloudflare:*\" > /dev/null",
-    "imports:check": "bun run scripts/ts/tracked-imports.ts"
+    "imports:check": "bun run scripts/ts/tracked-imports.ts",
+    "catalog": "bun run scripts/ts/catalog.ts --emit",
+    "catalog:check": "bun run scripts/ts/catalog.ts"
   },
   "dependencies": {
     "effect": "4.0.0-beta.104"

@@ -35,7 +35,8 @@ DB_NAME="job-index-${STAGE}-db"
 # this database is new and nothing is back-filled, so there is no earlier shape
 # to move it from. Incremental migrations resume once a deployment exists whose
 # shape must be preserved. `IF NOT EXISTS` throughout makes re-running safe.
-echo "==> applying the generated schema to ${DB_NAME}"
+echo "==> applying the generated schema and the researched catalogue to ${DB_NAME}"
 wrangler d1 execute "$DB_NAME" --remote --file db/schema.sql --yes >/dev/null
+wrangler d1 execute "$DB_NAME" --remote --file db/catalog-seed.sql --yes >/dev/null
 
 echo "==> done"

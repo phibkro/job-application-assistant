@@ -25,8 +25,9 @@ bun build apps/worker/src/index.ts \
   --conditions=workerd --conditions=worker \
   --external "cloudflare:*"
 
-echo "==> applying the generated schema and seed to the local database"
+echo "==> applying the generated schema and the researched catalogue and seed to the local database"
 wrangler d1 execute job-index-preview --local --config "$CONFIG" --file db/schema.sql >/dev/null
+wrangler d1 execute job-index-preview --local --config "$CONFIG" --file db/catalog-seed.sql >/dev/null
 wrangler d1 execute job-index-preview --local --config "$CONFIG" --file dev/preview-seed.sql >/dev/null
 
 cat <<BANNER

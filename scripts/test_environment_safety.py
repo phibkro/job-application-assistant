@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,23 +39,29 @@ for cron in (
 ):
     assert cron in infra, cron
 
-# Every stage's database gets its schema from somewhere, and the two stages get
-# it from different places on purpose.
+# Every stage's database gets its schema from the same place: one generated
+# snapshot, applied by the deploy script that publishes the Worker.
 #
-# The Rust stages apply the ten ordered migrations in the same step that
-# declares the database, so the Worker is never live against an unmigrated
-# schema. The TypeScript stage must NOT apply them: it starts on a new
-# database with nothing back-filled, and applying both leaves a database
-# matching neither — `CREATE TABLE IF NOT EXISTS` keeps the legacy shape and
-# the generated snapshot's next index fails against it. That is not
-# hypothetical; it is how the first preview deploy failed.
-assert 'migrationsDir: TYPESCRIPT ? undefined : "../migrations"' in infra
+# Alchemy must NOT apply migrations. It used to, for the Rust stages, and that
+# is how the first preview deploy failed — the ten ordered migrations ran
+# against a new database, `CREATE TABLE IF NOT EXISTS` kept the legacy shape,
+# and the generated snapshot's next index failed against it.
+# Comments are not code: the file explains at length why it does not set this,
+# and an assertion that reads prose would be satisfied by the explanation.
+infra_code = re.sub(r"/\*[\s\S]*?\*/", "", infra)
+infra_code = re.sub(r"(^|[^:])//.*$", r"\1", infra_code, flags=re.MULTILINE)
+assert "migrationsDir" not in infra_code, (
+    "Alchemy must not apply migrations; the deploy applies the generated snapshot"
+)
 
-# ...so the TypeScript stage's schema has to come from its own deploy step.
-# Without this the conditional above would be a silent way to deploy against
-# an empty database.
-deploy_preview = (ROOT / "scripts/deploy-preview.sh").read_text()
-assert "db/schema.sql" in deploy_preview
+# ...which makes the deploy scripts the only thing standing between a published
+# Worker and an empty database. Both paths, because collapsing the stages onto
+# TypeScript once removed this for staging and production while leaving preview
+# working, and nothing would have failed until a query ran.
+for script in ("scripts/deploy.sh", "scripts/deploy-preview.sh"):
+    text = (ROOT / script).read_text()
+    assert "db/schema.sql" in text, f"{script} must apply the generated schema"
+    assert "db/catalog-seed.sql" in text, f"{script} must seed the researched catalogue"
 
 justfile = (ROOT / "justfile").read_text()
 for recipe in ["deploy-staging:", "deploy-production:", "admin-key:"]:

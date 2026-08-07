@@ -21,15 +21,9 @@ import * as Redacted from "effect/Redacted";
  * worker-build output, whose entry imports the `.wasm` alongside it, so
  * `just build` (or `worker-build --release`) must run before a deploy.
  *
- * This file still describes the Rust service, deliberately: the TypeScript
- * replacement is being built beside it and has no entry point yet, and RFC
- * 0015's migration keeps the Rust worker serving until each route group is
- * cut over. Two things change at that point, together and not before —
- * `main` points at the bundled TypeScript worker, and `migrationsDir` gives
- * way to the generated `db/schema.sql`, applied to a new database. The corpus
- * is a cache, so nothing is back-filled and the ten ordered migrations below
- * collapse into that one snapshot. Repointing either half early would deploy
- * a Worker against a schema it does not expect.
+ * Every stage runs the TypeScript worker. `main` is the bundled service and
+ * the schema is `db/schema.sql`, applied by the deploy script rather than by
+ * Alchemy — see `scripts/deploy.sh`.
  *
  * Stages map to the service's environments:
  *
@@ -41,22 +35,17 @@ const STAGE = process.env.ALCHEMY_STAGE ?? "staging";
 const PRODUCTION = STAGE === "production";
 
 /**
- * The `preview` stage runs the TypeScript service; every other stage still
- * runs the Rust one.
+ * Every stage runs the TypeScript service. The Rust worker it replaced is
+ * deleted, so there is no longer a second thing to point at.
  *
- * This is what a strangler migration looks like in an infrastructure file:
- * the replacement gets a deployment of its own, with its own database and its
- * own name, so it can be exercised against real Cloudflare without touching
- * what serves today. `staging` and `production` keep pointing at the Rust
- * worker until each route group is cut over — the point of the migration is
- * that the old service keeps working while the new one earns its place.
+ * The conditional that used to live here — `preview` on TypeScript, everything
+ * else on Rust — was the strangler migration in an infrastructure file. It has
+ * served its purpose: the replacement was deployed beside the original,
+ * exercised against real Cloudflare, and only then given the other stages.
  *
- * The preview stage also runs no crons. Ingestion has no TypeScript
- * implementation yet, and a scheduled trigger that fires into a service which
- * cannot serve it would look like a broken deployment rather than an absent
- * feature.
+ * What remains stage-dependent is real: the custom domain belongs to preview,
+ * and ingestion's schedule belongs to stages that should actually collect.
  */
-const TYPESCRIPT = STAGE === "preview";
 
 /**
  * Where the TypeScript service answers, beside its workers.dev URL.
@@ -199,67 +188,65 @@ export default Alchemy.Stack(
       // that matches neither — a `CREATE TABLE IF NOT EXISTS` quietly keeps
       // the legacy shape and the next index fails against it. Found by
       // deploying: "no such column: profileId".
-      migrationsDir: TYPESCRIPT ? undefined : "../migrations",
+      // No migrationsDir: the schema is one generated snapshot
+      // (`db/schema.sql`), applied by the deploy script. Incremental
+      // migrations resume when a deployment exists whose shape must be
+      // preserved.
     });
 
-    // Declared for the TypeScript stage only: the Rust worker sends no mail.
-    const email = TYPESCRIPT
-      ? yield* Cloudflare.SendEmail("Mail", {
-          destinationAddress: MAIL_VERIFIED_DESTINATION,
-          allowedSenderAddresses: [MAIL_FROM],
-        })
-      : undefined;
+    const email = yield* Cloudflare.SendEmail("Mail", {
+      destinationAddress: MAIL_VERIFIED_DESTINATION,
+      allowedSenderAddresses: [MAIL_FROM],
+    });
 
     // One Durable Object per source, admitting one `Ingestion.collect` run
     // at a time for it — see `apps/worker/src/ingestion/SourceLeaseObject.ts`.
-    // Declared for the TypeScript stage only, same reasoning as `email`: the
-    // Rust worker has no TypeScript ingestion to serialize. `className`
+    // `className`
     // names the class `apps/worker/src/index.ts` exports, which is not the
     // same string as the binding key below (`SOURCE_LEASE`, what
     // `apps/worker/src/runtime/Env.ts` reads) — Alchemy diffs this against
     // its own state to compute the Cloudflare migration a first-time DO
     // class requires (`new_sqlite_classes`); there is nothing to hand-write
     // here.
-    const sourceLease = TYPESCRIPT
-      ? Cloudflare.DurableObjectNamespace("SourceLease", { className: "SourceLeaseObject" })
-      : undefined;
+    const sourceLease = Cloudflare.DurableObjectNamespace("SourceLease", {
+      className: "SourceLeaseObject",
+    });
 
     const api = yield* Cloudflare.Worker("Api", {
       name: `job-index-${STAGE}`,
-      // Both are pre-built artifacts, not sources: `just build` produces the
-      // Rust one, `scripts/deploy-preview.sh` bundles the TypeScript one with
+      // A pre-built artifact, not a source: the deploy script bundles it with
       // the same command the local preview uses, so what deploys is what was
       // run locally.
-      main: TYPESCRIPT ? "../.preview/worker.js" : "../crates/job-index-worker/build/index.js",
+      main: "../.preview/worker.js",
       // The interface ships beside the API on one origin. Unmatched paths
       // fall back to the app shell because the interface routes client-side;
       // `/api/*` runs the Worker first so the asset router cannot shadow an
       // endpoint with the shell.
-      assets: TYPESCRIPT
-        ? {
-            directory: "../apps/web/dist",
-            config: {
-              notFoundHandling: "single-page-application",
-              runWorkerFirst: ["/api/*"],
-            },
-          }
-        : undefined,
+      assets: {
+        directory: "../apps/web/dist",
+        config: {
+          notFoundHandling: "single-page-application",
+          runWorkerFirst: ["/api/*"],
+        },
+      },
       compatibility: { date: "2026-05-25" },
       // The workers.dev URL stays on alongside the custom domain: it is what
       // the smoke checks hit, and it keeps working if DNS is mid-change.
       url: true,
-      domain: TYPESCRIPT ? PREVIEW_DOMAINS : undefined,
+      domain: STAGE === "preview" ? PREVIEW_DOMAINS : undefined,
       env: {
         DB: database,
-        ...(email === undefined ? {} : { EMAIL: email }),
-        ...(sourceLease === undefined ? {} : { SOURCE_LEASE: sourceLease }),
+        EMAIL: email,
+        SOURCE_LEASE: sourceLease,
         ...environmentVars,
         // The sender is configuration, not a secret: it appears in the
         // From header of every message this service sends.
-        ...(TYPESCRIPT ? { MAIL_FROM } : {}),
+        MAIL_FROM,
         ...secretBindings(),
       },
-      crons: TYPESCRIPT ? [] : CRONS,
+      // Preview collects nothing on a schedule: it exists to be poked at, and
+      // a cron writing into it while someone reads it makes both confusing.
+      crons: STAGE === "preview" ? [] : CRONS,
       observability: {
         enabled: true,
         logs: { enabled: true, invocationLogs: true },
