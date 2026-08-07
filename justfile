@@ -71,6 +71,10 @@ soak base_url duration="300" interval="30":
 dev:
   ./scripts/dispatch.sh _dev
 
+# Run the TypeScript service locally: API on workerd, interface beside it.
+preview:
+  ./scripts/dispatch.sh _preview
+
 # Deploy the disposable staging environment and run destructive smoke tests.
 deploy:
   ./scripts/dispatch.sh _deploy-staging
@@ -142,6 +146,9 @@ _test: _setup
 
 _migrate-local: _setup
   WRANGLER_CONFIG=wrangler.local.jsonc ./scripts/migrate-local.sh
+
+_preview: _setup
+  ./scripts/preview.sh
 
 _dev: _setup _migrate-local
   wrangler dev --config wrangler.local.jsonc --local --persist-to .wrangler/state

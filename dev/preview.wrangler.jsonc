@@ -1,0 +1,23 @@
+{
+  // Local preview of the TypeScript service: the Worker serving the API, with
+  // the built interface beside it as static assets. Not a deploy target —
+  // infra/alchemy.run.ts owns staging and production, and still points at the
+  // Rust worker until cutover.
+  "name": "job-index-preview",
+  "main": "../.preview/worker.js",
+  "compatibility_date": "2026-05-25",
+  "vars": { "ENVIRONMENT": "local" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "job-index-preview", "database_id": "local" }
+  ],
+  "assets": {
+    "directory": "../apps/web/dist",
+    "binding": "ASSETS",
+    // The interface routes client-side, so a deep link must reach it rather
+    // than 404 on a file that was never written.
+    "not_found_handling": "single-page-application",
+    // ...but the API is the Worker's, and an asset router that answered
+    // /api/* first would shadow every endpoint with the app shell.
+    "run_worker_first": ["/api/*"]
+  }
+}

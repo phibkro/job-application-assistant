@@ -2,6 +2,7 @@
 /target/
 
 # Local databases and runtime state
+/.preview/
 *.db
 *.db-shm
 *.db-wal
