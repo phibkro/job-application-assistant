@@ -11,6 +11,7 @@ import { Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
 import { Policy } from "../services/Policy.ts";
+import { ApplicationMissing } from "@job-index/domain/Failure";
 import { Applications } from "../services/Applications.ts";
 import type { ApplicationStatus, Prepared } from "../services/Applications.ts";
 import { decidePreparation } from "./decide.ts";
@@ -129,13 +130,11 @@ export const layer = Layer.effect(
       application: ApplicationId,
       status: ApplicationStatus,
       notes: string,
-    ): Effect.Effect<void> =>
+    ): Effect.Effect<void, ApplicationMissing> =>
       Effect.gen(function* () {
         const existing = yield* withDb(ApplicationRecords.findByIdForProfile(application, user));
-        // Total by contract: an unknown or foreign application id is a no-op,
-        // not a failure — `setStatus` has no error channel to report one.
         if (existing === undefined) {
-          return;
+          return yield* Effect.fail(new ApplicationMissing({ application }));
         }
         const now = yield* DateTime.now;
         yield* withDb(

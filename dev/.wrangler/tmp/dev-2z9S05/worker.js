@@ -16808,6 +16808,55 @@ var ProfileRecord = class extends Class5("ProfileRecord")({
     __name(this, "ProfileRecord");
   }
 };
+var toJson2 = /* @__PURE__ */ __name((profile3) => JSON.stringify(encodeSync2(Profile)(profile3), null, 2), "toJson2");
+var fromJson = /* @__PURE__ */ __name((json2) => decodeUnknownSync(Profile, { onExcessProperty: "error" })(JSON.parse(json2)), "fromJson");
+var toMarkdown = /* @__PURE__ */ __name((profile3) => {
+  const sections = [];
+  const headline = profile3.headline.trim();
+  const location = profile3.location.trim();
+  const header = [headline !== "" ? `# ${headline}` : "", location].filter((line) => line !== "");
+  if (header.length > 0)
+    sections.push(header.join(`
+`));
+  const summary = profile3.summary.trim();
+  if (summary !== "")
+    sections.push(`## Summary
+
+${summary}`);
+  if (profile3.experience.length > 0) {
+    const entries = profile3.experience.map((entry) => {
+      const highlights = entry.highlights.filter((highlight) => highlight.trim() !== "").map((highlight) => `- ${highlight.trim()}`);
+      return [
+        `### ${entry.title.trim()} \u2014 ${entry.employer.trim()} (${entry.period.trim()})`,
+        ...highlights
+      ].join(`
+`);
+    });
+    sections.push(["## Experience", ...entries].join(`
+
+`));
+  }
+  const skills = profile3.skills.filter((skill) => skill.trim() !== "");
+  if (skills.length > 0)
+    sections.push(`## Skills
+
+${skills.join(", ")}`);
+  const education = profile3.education.filter((entry) => entry.trim() !== "");
+  if (education.length > 0) {
+    sections.push(`## Education
+
+${education.map((entry) => `- ${entry}`).join(`
+`)}`);
+  }
+  const languages = profile3.languages.trim();
+  if (languages !== "")
+    sections.push(`## Languages
+
+${languages}`);
+  return sections.join(`
+
+`);
+}, "toMarkdown");
 var Unauthorized = class extends TaggedError3()("Unauthorized", {
   message: String4
 }, { httpApiStatus: 401 }) {
@@ -16832,6 +16881,11 @@ var UpgradeRequired = class extends TaggedError3()("UpgradeRequired", {
 var ForbiddenByPlatform = class extends TaggedError3()("ForbiddenByPlatform", { platform: String4, policy: String4 }, { httpApiStatus: 403 }) {
   static {
     __name(this, "ForbiddenByPlatform");
+  }
+};
+var InvalidProfileJson = class extends TaggedError3()("InvalidProfileJson", { message: String4 }, { httpApiStatus: 400 }) {
+  static {
+    __name(this, "InvalidProfileJson");
   }
 };
 var CurrentPrincipal = class extends Service()("@job-index/CurrentPrincipal") {
@@ -16901,6 +16955,13 @@ var profile = make29("profile").add(get3("me", "/api/v1/me", {
   }),
   success: Struct({ question: String4 }),
   error: Unauthorized
+}), get3("exportProfile", "/api/v1/me/profile/export", {
+  success: Struct({ json: String4, markdown: String4 }),
+  error: Unauthorized
+}), put("importProfile", "/api/v1/me/profile/import", {
+  payload: Struct({ json: String4 }),
+  success: Profile,
+  error: [Unauthorized, InvalidProfileJson]
 })).middleware(Authenticated);
 var applications = make29("applications").add(post("save", "/api/v1/me/saved", {
   payload: Struct({ jobId: String4, note: optional(String4) }),
@@ -17066,6 +17127,7 @@ var Entitlements = class extends Service()("@job-index/Entitlements") {
   }
 };
 var decodeQuestionKey = decodeUnknownSync(QuestionKey);
+var describeImportFailure = /* @__PURE__ */ __name((error) => error instanceof Error ? error.message : String(error), "describeImportFailure");
 var ALL_CAPABILITIES = [
   "model-drafting",
   "automated-apply",
@@ -17092,6 +17154,19 @@ var layer9 = group(api, "profile", (handlers) => handlers.handle("me", () => gen
     shape: payload.shape ?? { _tag: "Text" }
   });
   return { question: params.question };
+})).handle("exportProfile", () => gen2(function* () {
+  const profiles = yield* Profiles;
+  const principal = yield* CurrentPrincipal;
+  const profile22 = yield* profiles.get(principal.profileId);
+  return { json: toJson2(profile22), markdown: toMarkdown(profile22) };
+})).handle("importProfile", ({ payload }) => gen2(function* () {
+  const profiles = yield* Profiles;
+  const principal = yield* CurrentPrincipal;
+  const profile22 = yield* try_2({
+    try: /* @__PURE__ */ __name(() => fromJson(payload.json), "try"),
+    catch: /* @__PURE__ */ __name((error) => new InvalidProfileJson({ message: describeImportFailure(error) }), "catch")
+  });
+  return yield* profiles.set(principal.profileId, profile22);
 })));
 var Drafting = class extends Service()("@job-index/Drafting") {
   static {

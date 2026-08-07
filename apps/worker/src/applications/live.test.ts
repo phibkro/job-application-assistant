@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { DeliveryPlatform } from "@job-index/domain/Delivery";
@@ -83,6 +84,11 @@ const fullLayer = applicationsIndexLayer.pipe(Layer.provideMerge(dataLayer));
 const run = <A, E>(
   effect: Effect.Effect<A, E, Applications | Entitlements | Policy | Corpus | Database>,
 ): Promise<A> => Effect.runPromise(Effect.orDie(Effect.provide(effect, fullLayer)));
+
+/** For the cases where the failure IS the assertion. */
+const runExit = <A, E>(
+  effect: Effect.Effect<A, E, Applications | Entitlements | Policy | Corpus | Database>,
+): Promise<Exit.Exit<A, E>> => Effect.runPromise(Effect.exit(Effect.provide(effect, fullLayer)));
 
 const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: "nav" as SourceId,
@@ -293,13 +299,14 @@ describe("Applications against a real SQLite engine", () => {
     expect(application).toBeTruthy();
   });
 
-  it("setStatus on an unknown application id is a silent no-op, matching its Effect<void> contract", async () => {
-    await run(
+  it("setStatus on an unknown application id fails, rather than reporting a decision it never recorded", async () => {
+    const exit = await runExit(
       Effect.gen(function* () {
         const applications = yield* Applications;
         yield* applications.setStatus(PROFILE, "nope" as never, "withdrawn", "");
       }),
     );
+    expect(Exit.isFailure(exit)).toBe(true);
   });
 
   it("setStatus never lets one profile move another profile's application", async () => {
@@ -311,11 +318,15 @@ describe("Applications against a real SQLite engine", () => {
         const { savedJobId } = yield* seedSavedJob(PROFILE);
         const applications = yield* Applications;
         const prepared = yield* applications.prepare(PROFILE, savedJobId, "assisted");
-        yield* applications.setStatus(
-          "someone-else" as ProfileId,
-          prepared.application,
-          "withdrawn",
-          "not yours",
+        // Refused, and refused the same way an unknown id is: a caller must not
+        // be able to learn that someone else's application exists.
+        yield* Effect.exit(
+          applications.setStatus(
+            "someone-else" as ProfileId,
+            prepared.application,
+            "withdrawn",
+            "not yours",
+          ),
         );
         const db = yield* Database;
         return yield* db.query<{ status: string }>("SELECT status FROM applications WHERE id = ?", [

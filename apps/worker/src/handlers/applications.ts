@@ -11,25 +11,13 @@ import { Corpus } from "../services/Corpus.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
-import { Applications } from "../services/Applications.ts";
+import { Applications, statusForDecision } from "../services/Applications.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
 import { decodeApplicationId, decodeCanonicalJobId, decodeEnum, decodeSavedJobId } from "./wire.ts";
 
 const decodeGenerator = decodeEnum("template", "model");
 const decodeMethod = decodeEnum("assisted", "automated");
 const decodeDecision = decodeEnum("approve", "rework", "decline");
-
-/**
- * `decide`'s three-way `approve`/`rework`/`decline` and `Applications`'
- * six-state `ApplicationStatus` are different vocabularies for different
- * questions — one is a human reviewing an automated run, the other is the
- * lifecycle of the submission itself — and nothing states how they line up.
- * This mapping is a judgment call, not a spec: approve moves the application
- * to `submitted`, decline withdraws it, and rework sends it back to `ready`
- * for another pass. Flagged in the handoff report.
- */
-const statusOf = (decision: "approve" | "rework" | "decline") =>
-  decision === "approve" ? "submitted" : decision === "decline" ? "withdrawn" : "ready";
 
 export const layer = HttpApiBuilder.group(api, "applications", (handlers) =>
   handlers
@@ -126,24 +114,18 @@ export const layer = HttpApiBuilder.group(api, "applications", (handlers) =>
         };
       }),
     )
-    /**
-     * `Applications.setStatus` returns `Effect.Effect<void>` — no error
-     * channel at all, so it cannot report "no such application", even though
-     * `decide` declares `NotFound` as a possible response. That branch is
-     * currently unreachable from this handler; flagged in the handoff report.
-     */
+    /** A decision on an application that is not this profile's is a 404, not a
+     *  silent success — see `Applications.setStatus`. */
     .handle("decide", ({ params, payload }) =>
       Effect.gen(function* () {
         const applications = yield* Applications;
         const principal = yield* CurrentPrincipal;
         const applicationId = decodeApplicationId(params.id);
         const decision = decodeDecision(payload.decision);
-        const status = statusOf(decision);
-        yield* applications.setStatus(
-          principal.profileId,
-          applicationId,
-          status,
-          payload.notes ?? "",
+        const status = statusForDecision(decision);
+        yield* Effect.mapError(
+          applications.setStatus(principal.profileId, applicationId, status, payload.notes ?? ""),
+          (missing) => new NotFound({ message: `no application with id ${missing.application}` }),
         );
         return { applicationId: params.id, status };
       }),

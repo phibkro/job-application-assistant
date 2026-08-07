@@ -15,6 +15,7 @@ import { Accounts, Profiles } from "../services/Accounts.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
+import { ApplicationMissing } from "@job-index/domain/Failure";
 import { Applications } from "../services/Applications.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
 import { buildHandler } from "./testSupport.ts";
@@ -310,12 +311,6 @@ describe("applications.prepare", () => {
 });
 
 describe("applications.decide", () => {
-  /**
-   * `Applications.setStatus` returns `Effect<void>` — it cannot fail, so
-   * `decide`'s declared `NotFound` is unreachable from this handler today.
-   * This test pins that as an observed fact (every decision 200s) rather
-   * than asserting the 404 the wire declares but the tag cannot produce.
-   */
   it.each([
     ["approve", "submitted"],
     ["decline", "withdrawn"],
@@ -336,6 +331,25 @@ describe("applications.decide", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ applicationId: "app_1", status });
     expect(seen).toEqual({ user: alice, applicationId: "app_1", status, notes: "" });
+  });
+
+  it("404s a decision on an application that is not this profile's", async () => {
+    const { handler } = buildHandler({
+      accounts: authedAs(alice),
+      applications: Layer.succeed(Applications, {
+        prepare: () => Effect.die("unused"),
+        setStatus: (_user, applicationId) =>
+          Effect.fail(new ApplicationMissing({ application: applicationId })),
+      }),
+    });
+    const res = await handler(
+      post("/api/v1/me/applications/app_missing/decision", { decision: "approve" }),
+    );
+    // The branch the wire had always declared and nothing could reach: before
+    // `setStatus` had an error channel, mistyping an id was answered 200 with
+    // a decision nobody recorded.
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ _tag: "NotFound" });
   });
 
   it("fails loud on a decision outside approve/rework/decline", async () => {

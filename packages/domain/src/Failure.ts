@@ -71,6 +71,17 @@ export class ProfileIncomplete extends Data.TaggedError("ProfileIncomplete")<{
   readonly missing: string;
 }> {}
 
+/**
+ * No application with this id belongs to this profile.
+ *
+ * Scoped to the profile deliberately, and therefore indistinguishable from an
+ * id that does not exist at all: telling a caller that someone else's
+ * application is real would answer a question it has no business asking.
+ */
+export class ApplicationMissing extends Data.TaggedError("ApplicationMissing")<{
+  readonly application: string;
+}> {}
+
 export class DraftMissing extends Data.TaggedError("DraftMissing")<{
   readonly savedJob: string;
 }> {}
