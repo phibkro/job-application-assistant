@@ -62,6 +62,7 @@ const defaultDrafting = Layer.succeed(Drafting, {
 const defaultApplications = Layer.succeed(Applications, {
   prepare: unstubbed("Applications", "prepare"),
   setStatus: unstubbed("Applications", "setStatus"),
+  history: unstubbed("Applications", "history"),
 });
 
 const defaultEntitlements = Layer.succeed(Entitlements, {
@@ -72,6 +73,7 @@ const defaultEntitlements = Layer.succeed(Entitlements, {
 const defaultSavedJobs = Layer.succeed(SavedJobs, {
   save: unstubbed("SavedJobs", "save"),
   resolve: unstubbed("SavedJobs", "resolve"),
+  list: unstubbed("SavedJobs", "list"),
 });
 
 const defaultJudgements = Layer.succeed(Judgements, {

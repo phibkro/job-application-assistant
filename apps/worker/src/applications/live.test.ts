@@ -8,6 +8,7 @@ import { DeliveryPlatform } from "@job-index/domain/Delivery";
 import { Subscription } from "@job-index/domain/Subscription";
 import { PlatformPolicyRecord, SavedJob } from "@job-index/domain/Applications";
 import type { PolicyTag } from "@job-index/domain/Applications";
+import { snapshotOf } from "@job-index/domain/Job";
 import type { RawListing } from "@job-index/domain/Job";
 import type {
   CanonicalJobId,
@@ -26,10 +27,12 @@ import { Profiles } from "../services/Accounts.ts";
 import { Applications } from "../services/Applications.ts";
 import type { Entitlements } from "../services/Entitlements.ts";
 import { Policy } from "../services/Policy.ts";
+import { SavedJobs as SavedJobsService } from "../services/SavedJobs.ts";
 import { layer as corpusLayer, normalize } from "../corpus/index.ts";
 import { layer as draftingLayer } from "../drafting/index.ts";
 import { layer as applicationsIndexLayer } from "./index.ts";
 import * as SavedJobs from "./savedJobs.ts";
+import * as ApplicationRecords from "./applicationRecords.ts";
 import * as PlatformPolicies from "./platformPolicies.ts";
 
 /**
@@ -81,14 +84,14 @@ const fullLayer = applicationsIndexLayer.pipe(Layer.provideMerge(dataLayer));
  * and its declared error union should surface as a loud test failure if it
  * does not, not a type error at the call site.
  */
-const run = <A, E>(
-  effect: Effect.Effect<A, E, Applications | Entitlements | Policy | Corpus | Database>,
-): Promise<A> => Effect.runPromise(Effect.orDie(Effect.provide(effect, fullLayer)));
+type Requirements = Applications | Entitlements | Policy | Corpus | Database | SavedJobsService;
+
+const run = <A, E>(effect: Effect.Effect<A, E, Requirements>): Promise<A> =>
+  Effect.runPromise(Effect.orDie(Effect.provide(effect, fullLayer)));
 
 /** For the cases where the failure IS the assertion. */
-const runExit = <A, E>(
-  effect: Effect.Effect<A, E, Applications | Entitlements | Policy | Corpus | Database>,
-): Promise<Exit.Exit<A, E>> => Effect.runPromise(Effect.exit(Effect.provide(effect, fullLayer)));
+const runExit = <A, E>(effect: Effect.Effect<A, E, Requirements>): Promise<Exit.Exit<A, E>> =>
+  Effect.runPromise(Effect.exit(Effect.provide(effect, fullLayer)));
 
 const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: "nav" as SourceId,
@@ -106,12 +109,14 @@ const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
 const PROFILE = "profile-1" as ProfileId;
 const PLATFORM = "webcruiter" as PlatformId;
 
-/** Seeds one canonical job, one bookmark of it, and returns both ids. */
+/** Seeds one canonical job, one bookmark of it (with a real `jobSnapshot`), and returns both ids. */
 const seedSavedJob = (profile: ProfileId, listingOverrides: Partial<RawListing> = {}) =>
   Effect.gen(function* () {
     const corpus = yield* Corpus;
     const listing = normalize(raw(listingOverrides));
     yield* corpus.observe(listing);
+    const job = yield* corpus.get(listing.canonicalJobId);
+    if (job === undefined) return yield* Effect.die("seedSavedJob: observe did not persist");
     const now = yield* DateTime.now;
     const savedJobId = crypto.randomUUID() as SavedJobId;
     yield* SavedJobs.insert(
@@ -119,6 +124,7 @@ const seedSavedJob = (profile: ProfileId, listingOverrides: Partial<RawListing> 
         id: savedJobId,
         profileId: profile,
         canonicalJobId: listing.canonicalJobId,
+        jobSnapshot: snapshotOf(job),
         note: "",
         createdAt: now,
       }),
@@ -407,5 +413,61 @@ describe("Applications against a real SQLite engine", () => {
         yield* policy.requireAutomatable(canonicalJobId);
       }),
     );
+  });
+
+  it("a saved job's snapshot survives the corpus row it points at being edited afterward", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const corpus = yield* Corpus;
+        const savedJobs = yield* SavedJobsService;
+
+        yield* corpus.observe(normalize(raw({ description: "Bakes bread the traditional way." })));
+        const job = yield* corpus.get(normalize(raw()).canonicalJobId);
+        if (job === undefined) return yield* Effect.die("seed failed");
+        const savedJobId = yield* savedJobs.save(PROFILE, job, "");
+
+        // Same title/employer/location — same `canonicalJobId` — but a
+        // changed description: `UpdatedCanonical`, not a new vacancy.
+        yield* corpus.observe(
+          normalize(raw({ description: "Now runs an industrial oven around the clock." })),
+        );
+
+        const beforeEdit = yield* savedJobs.resolve(PROFILE, savedJobId);
+        const afterEdit = yield* corpus.get(job.id);
+        return { beforeEdit, afterEdit };
+      }),
+    );
+    expect(result.beforeEdit?.description).toBe("Bakes bread the traditional way.");
+    expect(result.afterEdit?.description).toBe("Now runs an industrial oven around the clock.");
+  });
+
+  it("prepare inherits the saved job's frozen snapshot rather than reading the corpus again — an edit after saving does not change what gets applied to", async () => {
+    const { snapshotDescription } = await run(
+      Effect.gen(function* () {
+        yield* seedDeliveryPlatform("webcruiter.no");
+        yield* seedPolicy("Allowed");
+        yield* seedSubscription({ _tag: "Premium", until: "2099-01-01" });
+
+        const corpus = yield* Corpus;
+        const savedJobs = yield* SavedJobsService;
+        yield* corpus.observe(normalize(raw({ description: "Bakes bread the traditional way." })));
+        const job = yield* corpus.get(normalize(raw()).canonicalJobId);
+        if (job === undefined) return yield* Effect.die("seed failed");
+        const savedJobId = yield* savedJobs.save(PROFILE, job, "");
+
+        // The corpus edits the same vacancy before the person ever applies.
+        yield* corpus.observe(
+          normalize(raw({ description: "Now runs an industrial oven around the clock." })),
+        );
+
+        const applications = yield* Applications;
+        const prepared = yield* applications.prepare(PROFILE, savedJobId, "assisted");
+
+        const stored = yield* ApplicationRecords.findByIdForProfile(prepared.application, PROFILE);
+        return { snapshotDescription: stored?.jobSnapshot.description };
+      }),
+    );
+    // Not the edited advert the corpus now holds — the one the person saved.
+    expect(snapshotDescription).toBe("Bakes bread the traditional way.");
   });
 });

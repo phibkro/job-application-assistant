@@ -2,7 +2,8 @@ import * as Effect from "effect/Effect";
 import { Judgement } from "@job-index/domain/Freshness";
 import type { CanonicalJobId, ProfileId } from "@job-index/domain/Ids";
 import { Database } from "../../services/Database.ts";
-import { columnsOf, decodeRows, encodeVariant, insertStatement } from "../Sql.ts";
+import type { Write } from "../../services/Database.ts";
+import { columnsOf, decodeRows, deleteStatement, encodeVariant, insertStatement } from "../Sql.ts";
 
 const TABLE = "judgements";
 
@@ -33,6 +34,17 @@ export const findByProfile = (
     );
     return yield* decodeRows<Judgement>(Judgement as never)(rows);
   });
+
+/**
+ * Erasure support. `Judgement.reason` is `Model.Sensitive` free text a
+ * person typed — squarely the kind of thing the erasure right is about —
+ * and every row is scoped to `profileId`. The same reasoning `Submissions`
+ * gives applies here: "feeds match-tuning" is an argument for an anonymised,
+ * aggregate signal this slot does not build, not for keeping the identified
+ * row past an erasure request.
+ */
+export const deleteByProfileWrite = (profileId: ProfileId): Write =>
+  deleteStatement(TABLE, { profileId });
 
 export const findByJob = (
   profileId: ProfileId,

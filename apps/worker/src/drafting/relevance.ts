@@ -1,11 +1,11 @@
-import type { CanonicalJob } from "@job-index/domain/Job";
+import type { JobSnapshot } from "@job-index/domain/Job";
 import type { Experience } from "@job-index/domain/Profile";
 
 /**
  * The advert's searchable text, so every scorer reads the exact same
  * haystack rather than each recomputing its own idea of "the advert".
  */
-export const advertText = (job: CanonicalJob): string =>
+export const advertText = (job: JobSnapshot): string =>
   `${job.title} ${job.description} ${job.employerName}`;
 
 /**

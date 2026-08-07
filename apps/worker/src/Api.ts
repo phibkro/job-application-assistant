@@ -222,13 +222,20 @@ const profile = HttpApiGroup.make("profile")
       error: Unauthorized,
     }),
     /**
-     * The CV, portable: JSON for re-import, Markdown for a person to read.
-     * Both are complete renderings of the same `Profile` `me` already
-     * returns — this exists because neither format is available from `me`
-     * today, not because the data differs.
+     * The whole of an account's data, portable: the CV as JSON (for
+     * re-import) and Markdown (for a person to read), plus — `history` — the
+     * saved jobs and applications the operator's ruling makes account-
+     * registered personal data in their own right, in the same two formats.
+     * `history` has no import counterpart: it is what `save`/`prepare`
+     * produced, not a document a person maintains and re-uploads (see
+     * `Applications.ts`'s `historyToJson`).
      */
     HttpApiEndpoint.get("exportProfile", "/api/v1/me/profile/export", {
-      success: Schema.Struct({ json: Schema.String, markdown: Schema.String }),
+      success: Schema.Struct({
+        json: Schema.String,
+        markdown: Schema.String,
+        history: Schema.Struct({ json: Schema.String, markdown: Schema.String }),
+      }),
       error: Unauthorized,
     }),
     /**

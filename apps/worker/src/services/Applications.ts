@@ -1,5 +1,6 @@
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
+import type { ApplicationRecord } from "@job-index/domain/Applications";
 import type { ApplicationId, SavedJobId, UserId } from "@job-index/domain/Ids";
 import type { Documents } from "./Drafting.ts";
 import type {
@@ -78,5 +79,8 @@ export class Applications extends Context.Service<
       status: ApplicationStatus,
       notes: string,
     ) => Effect.Effect<void, ApplicationMissing>;
+
+    /** Every application this profile has prepared, for their own history/export. */
+    readonly history: (user: UserId) => Effect.Effect<ReadonlyArray<ApplicationRecord>>;
   }
 >()("@job-index/Applications") {}

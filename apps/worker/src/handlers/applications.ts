@@ -31,7 +31,11 @@ export const layer = HttpApiBuilder.group(api, "applications", (handlers) =>
         if (job === undefined) {
           return yield* Effect.fail(new NotFound({ message: `no job with id ${payload.jobId}` }));
         }
-        const savedJobId = yield* savedJobs.save(principal.profileId, jobId, payload.note ?? "");
+        // `save` takes the whole job, not just its id: this is the one
+        // moment the advert gets snapshotted (`SavedJobs`'s docstring), and
+        // the job is already in hand from the existence check above — no
+        // second corpus read is needed to take the copy.
+        const savedJobId = yield* savedJobs.save(principal.profileId, job, payload.note ?? "");
         return { savedJobId };
       }),
     )
@@ -46,22 +50,19 @@ export const layer = HttpApiBuilder.group(api, "applications", (handlers) =>
     .handle("draft", ({ params, payload }) =>
       Effect.gen(function* () {
         const savedJobs = yield* SavedJobs;
-        const corpus = yield* Corpus;
         const profiles = yield* Profiles;
         const entitlements = yield* Entitlements;
         const drafting = yield* Drafting;
         const principal = yield* CurrentPrincipal;
 
         const savedJobId = decodeSavedJobId(params.id);
-        const jobId = yield* savedJobs.resolve(principal.profileId, savedJobId);
-        if (jobId === undefined) {
+        // The saved job's own frozen `jobSnapshot`, not a fresh `Corpus.get`
+        // — drafting a preview and preparing the actual application now
+        // read the same historical advert, so the two can never disagree
+        // about what was applied to, and a corpus prune cannot 404 this.
+        const snapshot = yield* savedJobs.resolve(principal.profileId, savedJobId);
+        if (snapshot === undefined) {
           return yield* Effect.fail(new NotFound({ message: `no saved job with id ${params.id}` }));
-        }
-        const job = yield* corpus.get(jobId);
-        if (job === undefined) {
-          return yield* Effect.fail(
-            new NotFound({ message: `saved job ${params.id} has no live listing` }),
-          );
         }
 
         const generator = decodeGenerator(payload.generator, "template");
@@ -77,7 +78,7 @@ export const layer = HttpApiBuilder.group(api, "applications", (handlers) =>
 
         const profile = yield* profiles.get(principal.profileId);
         const documents = yield* drafting
-          .compose(profile, job)
+          .compose(profile, snapshot)
           .pipe(
             Effect.catchTag("ProfileIncomplete", (e: ProfileIncomplete) =>
               Effect.fail(new NotFound({ message: `profile is missing: ${e.missing}` })),

@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import { Subscription } from "@job-index/domain/Subscription";
 import type { ProfileId } from "@job-index/domain/Ids";
 import { Database } from "../../services/Database.ts";
+import type { Write } from "../../services/Database.ts";
 import { columnsOf, decodeRow, deleteStatement, encodeVariant, insertStatement } from "../Sql.ts";
 
 const TABLE = "subscriptions";
@@ -34,3 +35,13 @@ export const findByProfile = (
       ? undefined
       : yield* decodeRow<Subscription>(Subscription as never)(rows[0]);
   });
+
+/**
+ * Erasure support. `providerRef` is `Model.Sensitive` — a billing-provider
+ * (Stripe) reference — which is exactly the kind of field this erasure
+ * right exists for. Erasing our row does not touch the provider's own
+ * billing/tax records, which are the provider's system of record under its
+ * own retention obligations; this table is only our pointer into it.
+ */
+export const deleteByProfileWrite = (profileId: ProfileId): Write =>
+  deleteStatement(TABLE, { profileId });
