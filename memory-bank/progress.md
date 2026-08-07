@@ -2,64 +2,58 @@
 
 ## Complete
 
-- AGPL-3.0-or-later licensing and network-source documentation.
+- AGPL-3.0-or-later licensing, later relicensed to proprietary (see RFC
+  0005/0008 amendments and `LICENSE`).
 - Cybernetic ADLC, RFC process, policy, quality gates, and memory bank.
-- Rust/Cloudflare Worker/D1 vertical slice with deterministic canonicalization,
-  provenance, exact deduplication, replay idempotency, and rollback probe.
-- Nix-based setup, fix, lint, check, test, verify, dev, and deployment workflow.
-- Runtime-independent NAV parser and official Fetch adapter.
-- Public and private NAV credential setup plus protected admin credential setup.
-- D1 source cursor, conditional headers, lifecycle convergence, and source metrics.
-- D1 collector lease, bounded multi-page backfill, retry policy, failure ledger,
-  recovery controls, and structured telemetry.
-- Incremental structured saved searches and match-transition ledger.
-- Explicit local, test, staging, and production Wrangler configurations.
-- Dependency-free NAV contract stub and executable adversarial adapter tests.
-- Actual HTTP lease contention test through the real Worker.
-- Separate destructive staging and non-destructive production smoke suites.
-- Production credential/source-offer gates and `/api/about` source link.
+- Rust/Cloudflare Worker/D1 vertical slice (WS-0001 through WS-0011):
+  canonicalization, provenance, deduplication, replay idempotency, live NAV
+  ingestion, incremental saved searches, principals, versioned API, webhook
+  outbox, and production qualification gates. **Retired** as of RFC 0015's
+  cutover — the historical record lives in `work/`, `evidence/`, and the RFCs
+  themselves, not in this file.
+- RFC 0015 strangler migration (WS-0012): `packages/domain/` reproduces
+  canonical identity in Effect Schema; `apps/worker/src/Api.ts` declares and
+  serves every route group the Rust worker used to; `apps/web/` is the
+  interface; the Rust crates, its ordered migrations, and every script that
+  only built/tested/smoked it are deleted.
+- Generated D1 schema snapshot (`db/schema.sql`) checked for drift against
+  the domain models by `bun run schema:check`, replacing the deleted
+  migration-integrity checks.
+- Local preview (`just preview`) serving the whole stack — API, interface,
+  and a seeded local D1 — for real-journey verification without a deploy.
 
-## WS-0002 through WS-0004 remaining acceptance evidence
+## Known gaps left by the cutover
 
-- Run Rust formatting, Clippy, unit tests, Wasm build, local D1 smoke, and bundle
-  validation on the Nix machine.
-- Deploy staging and prove bounded progress to NAV tail with private credentials.
-- Record redacted source state, lag, cursor, corpus counts, and structured logs.
-- Independent G5 review of feed usage, closure, checkpoint, lease, and retry semantics.
+These existed only in the retired Rust worker and have not been ported. Each
+is a real product decision, not an oversight to silently patch:
 
-## WS-0005 implementation
+- **Administrative surface.** API-key principals (quotas, revocation, audit
+  log), owned saved-search webhook subscriptions and delivery, and corpus
+  maintenance (audit/dry-run reconcile/purge) have no TypeScript
+  implementation. `ADMIN_SYNC_TOKEN` is still required by production deploy
+  gates and `infra/alchemy.run.ts`'s secret bindings, but no TypeScript route
+  currently checks it.
+- **Production qualification.** The 50,000-job query-plan regression probe
+  and the local restore drill were written against the Rust worker's schema
+  and are deleted with it; nothing currently proves the TypeScript service's
+  indexes hold at scale or that a backup restores cleanly.
+- **Source catalog seeding.** `apps/worker/src/catalog`'s `source_catalog`
+  table has no generator; the Rust pipeline (`probe_sources.py` →
+  `import_source_index.py` → a migration file) targeted a schema and file
+  format that no longer exist.
+- **OpenAPI contract.** `openapi/job-index-v1.json` was hand-maintained for
+  the Rust routes and is deleted rather than left describing a service that
+  no longer runs them; nothing currently generates its replacement from
+  `Api.ts`.
+- **Staging/production cutover.** `infra/alchemy.run.ts` still deploys the
+  Rust worker for those two stages; repointing them at the TypeScript worker
+  is a deliberately separate decision, held by another writer.
 
-- Four explicit environment templates and resource identities.
-- Staging-default and explicit-production deployment commands.
-- Non-destructive production smoke and AGPL corresponding-source requirement.
-- Local NAV stub success/failure scenarios integrated into `just verify`.
-- Workspace library tests and environment-safety regression checks.
+## Remaining WS-0012 acceptance evidence
 
-## Remaining WS-0005 acceptance
-
-- `just fix && just verify` on the pinned Nix environment.
-- Staging deployment evidence under `.deploy/staging.json`.
-- Production dry-run/review and later deployment evidence under `.deploy/production.json`.
-- Independent review that production cannot execute destructive smoke operations.
-
-## WS-0006 through WS-0011 implementation
-
-- Bounded corpus audit and dry-run/apply reconciliation with maintenance records.
-- Versioned `/api/v1` jobs, changes, sources, owned searches, and deliveries.
-- SHA-256 API-key principals, quotas, revocation, request identifiers, and audit log.
-- Principal-owned saved searches with update, delete, reset, evaluation, and isolation.
-- Transactional webhook outbox with HMAC-SHA256 signing, bounded delivery, retry,
-  dead state, inspection, administrator recovery, and bounded delivered-event retention.
-- Staggered production schedules isolate NAV ingestion, saved-search evaluation, and webhook delivery.
-- Maintenance rejects malformed requests and records failed reconciliation runs.
-- 50,000-job query-plan test, local backup/restore drill, bounded soak runner,
-  machine-readable SLOs, OpenAPI contract, and production release checklist.
-
-## Remaining production qualification evidence
-
-- Run `just fix && just verify` with the pinned Nix/Rust/Worker/D1 environment.
-- Deploy staging and complete the seven-day soak.
-- Complete a live D1 Time Travel or export/restore drill.
-- Rotate NAV, administrator, and API-principal credentials against staging.
-- Deploy production and retain non-destructive smoke evidence.
-- Obtain independent G5 review and human acceptance.
+- Phase 1 slots (persistence, corpus, acquisition, accounts, drafting,
+  delivery, applications, agenda, entitlements, handlers, interface, agent
+  session) continuing per `work/WS-0012-r1-typescript-migration-plan.md`.
+- Decide and execute the gaps above, or explicitly accept them as deferred.
+- Repoint `infra/alchemy.run.ts`'s staging/production stages once the above
+  is resolved; that is Phase 3 cutover, not this deletion pass.

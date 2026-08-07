@@ -1,5 +1,11 @@
 # Qualify the first production release
 
+> **Historical, partially superseded.** Written for the Rust worker's
+> WS-0011 qualification gates (`just fix`/`just qualification`/
+> `query_plan_test.py`/`restore_drill.py`), all retired by RFC 0015's
+> cutover with no TypeScript port yet — see `memory-bank/progress.md`'s
+> "Known gaps". The Cloudflare plan baseline below still applies to either
+> implementation.
 
 ## Cloudflare plan baseline
 

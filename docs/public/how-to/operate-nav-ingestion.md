@@ -1,5 +1,12 @@
 # Operate NAV ingestion
 
+> **Historical.** These manual `/api/sources/nav/*` operator routes
+> (status/sync/pause/resume/failures/retry/restart/lease-release) existed
+> only in the Rust worker retired by RFC 0015's cutover. The TypeScript
+> service's ingestion (`apps/worker/src/ingestion`) currently runs only from
+> the Worker's `scheduled` handler, with no manual operator surface; see
+> `memory-bank/progress.md` for the current gap list.
+
 ## Inspect state
 
 ```sh

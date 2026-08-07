@@ -1,5 +1,9 @@
 # Manage API principals
 
+> **Historical.** Principal (API-key) administration existed only in the
+> Rust worker retired by RFC 0015's cutover. The TypeScript service has no
+> principal system; see `memory-bank/progress.md` for the current gap list.
+
 Generate and register a principal against local, staging, or production:
 
 ```sh

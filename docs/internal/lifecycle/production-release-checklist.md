@@ -1,20 +1,21 @@
 # Production release checklist
 
-- [ ] `just fix`, `just verify`, `just audit`, and `just qualification` pass from a clean checkout.
+> Written against the retired Rust worker's WS-0011 qualification gates.
+> Items struck through below have no TypeScript equivalent yet (see
+> `memory-bank/progress.md`'s "Known gaps") and must be re-established or
+> explicitly waived before this checklist is trusted again.
+
+- [ ] `bun run check` and `just verify` pass from a clean checkout.
 - [ ] Production account plan and current Workers/D1 limits reviewed against observed staging usage.
 - [ ] Pinned Wrangler version and compatibility date reviewed against current Cloudflare releases.
-- [ ] `Cargo.lock` is generated, reviewed, and included in the corresponding-source release.
-- [ ] Migration plan and additive-schema review complete.
+- [ ] `db/schema.sql` matches the domain models (`bun run schema:check`).
 - [ ] Staging deployment evidence attached.
 - [ ] Seven-day soak satisfies `ops/slo.json`.
-- [ ] Query-plan report uses the expected indexes at realistic corpus size.
-- [ ] D1 restore/Time Travel drill completed and timed.
-- [ ] NAV, administrator, and API-principal credentials rotated successfully.
-- [ ] Demo routes return 403 in production.
-- [ ] Owned routes reject missing and cross-principal credentials.
-- [ ] Maintenance defaults to dry run and repair results are audited.
-- [ ] Scheduled saved-search sweep advances due cursors without a client request.
-- [ ] Webhook signature, at-least-once deduplication, retry, dead state, and replay behavior verified.
-- [ ] Delivered outbox retention purge is dry-run reviewed and bounded.
-- [ ] Independent security review accepts the R3 authentication, ownership, SSRF, and production-mutation boundaries.
+- [ ] ~~Query-plan report uses the expected indexes at realistic corpus size.~~ Gap: no TypeScript port of `query_plan_test.py`.
+- [ ] ~~D1 restore/Time Travel drill completed and timed.~~ Gap: no TypeScript port of `restore_drill.py`.
+- [ ] NAV and administrator credentials rotated successfully.
+- [ ] ~~Owned routes reject missing and cross-principal credentials.~~ Gap: no principal/API-key administration exists.
+- [ ] ~~Maintenance defaults to dry run and repair results are audited.~~ Gap: no maintenance surface exists.
+- [ ] ~~Webhook signature, at-least-once deduplication, retry, dead state, and replay behavior verified.~~ Gap: no webhook outbox exists.
+- [ ] Independent security review accepts the current authentication and production-mutation boundaries.
 - [ ] Independent G5 review accepts the release.

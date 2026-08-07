@@ -1,5 +1,14 @@
 # Job Index API v1
 
+> **Historical.** This documents the versioned API the retired Rust worker
+> shipped (RFC 0010/WS-0007 through RFC 0013/WS-0010: principals, owned
+> saved searches, and webhook delivery). The current TypeScript worker's
+> `/api/v1/jobs` and `/api/v1/sources/catalog` routes are compatible in
+> spirit but not in every field; owned searches, principals, and webhook
+> delivery have no TypeScript implementation (see
+> `memory-bank/progress.md`). `apps/worker/src/Api.ts` is the authoritative
+> current contract.
+
 The production API uses bounded cursor pagination. Public corpus reads do not require an API key. Owned saved-search and delivery routes require `X-API-Key`.
 
 ## Public reads
@@ -50,7 +59,10 @@ GET    /api/v1/searches/{id}/deliveries?cursor=<outbox_id>&limit=50
 Production webhook URLs must use HTTPS. Payloads are signed with `X-Job-Index-Signature: sha256=<HMAC>` when a subscription secret is configured.
 Delivery pages default to 50 rows and are capped at 100. `next_cursor` is the final outbox ID in a full page.
 
-The machine-readable contract is [openapi/job-index-v1.json](../../../openapi/job-index-v1.json).
+The hand-maintained machine-readable contract this section once linked
+(`openapi/job-index-v1.json`) is deleted along with the Rust worker it
+described; see `apps/worker/src/Api.ts` for the current, generative
+contract.
 
 
 ## Administrator operations

@@ -1,6 +1,10 @@
 # Tutorial: run the first incremental-search demonstration
 
-> Status: design placeholder. Commands will be finalized when product code is scaffolded and Cloudflare tool versions are pinned.
+> Status: design placeholder — historical. This was written before any
+> implementation existed and describes a Rust/Wasm toolchain that was
+> retired by RFC 0015 without this plan ever having been executed as
+> written. For a tutorial that matches what actually runs today, see
+> [`run-first-demo.md`](run-first-demo.md).
 
 In this tutorial you will apply migrations to D1, load two overlapping snapshots, create a saved search, process a changed snapshot, and confirm that replaying it performs no additional work.
 

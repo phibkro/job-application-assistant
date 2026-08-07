@@ -1,6 +1,11 @@
 # HTTP API reference
 
-> Status: proposed MVP interface.
+> Status: proposed MVP interface — historical. This predates the implemented
+> API entirely (routes like `POST /api/collect` were never built as
+> written). The current contract is declared in `apps/worker/src/Api.ts`
+> (an Effect `HttpApi` declaration); `docs/public/reference/api-v1.md`
+> documents the versioned production routes the Rust worker shipped, which
+> only partially overlap with `Api.ts`'s current TypeScript routes.
 
 ## `POST /api/collect`
 
@@ -24,4 +29,7 @@ Evaluates jobs changed after the search's stored corpus sequence and returns add
 
 ## Stability
 
-This interface is not yet implemented or versioned. OpenAPI becomes authoritative when the Rust service is scaffolded.
+This interface was never implemented as written. `apps/worker/src/Api.ts` is
+now the authoritative, generative source of the contract — see its doc
+comment for why a hand-kept OpenAPI document is no longer how this service
+publishes its API.

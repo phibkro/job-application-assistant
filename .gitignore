@@ -1,6 +1,3 @@
-# Rust
-/target/
-
 # Local databases and runtime state
 node_modules/
 /.preview/
@@ -32,7 +29,6 @@ dev/.wrangler/
 /node_modules/
 /.wrangler/
 /.artifacts/
-/crates/job-index-worker/build/
 .tools/
 
 # Idempotent deployment state generated from the source template
