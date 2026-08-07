@@ -69,6 +69,23 @@ const TYPESCRIPT = STAGE === "preview";
 const PREVIEW_DOMAINS = ["job-index.phibkro.org"];
 
 /**
+ * Where verification and sign-in mail comes from, and — for now — the only
+ * place it may go.
+ *
+ * Sending to arbitrary recipients requires the Workers Paid plan; sending to a
+ * verified destination is free on every plan. Naming the destination here is
+ * what makes that limit visible in the infrastructure rather than discovered
+ * by a stranger whose sign-up silently failed. Proven by sending through the
+ * binding on the edge before it was declared: Cloudflare accepted a message
+ * from this sender to this destination on the current plan.
+ *
+ * Remove `destinationAddress` when the plan allows strangers. Nothing else
+ * changes — `apps/worker/src/email/` already speaks to the binding.
+ */
+const MAIL_FROM = "noreply@phibkro.org";
+const MAIL_VERIFIED_DESTINATION = "philib.krogh@gmail.com";
+
+/**
  * Production is published in two phases so a cron-enabled version can never
  * run before its credentials exist: the first deploy omits triggers and
  * disables synchronization, the second activates them. scripts/deploy.sh sets
@@ -86,6 +103,17 @@ const ACTIVATE_SCHEDULES = process.env.JOB_INDEX_ACTIVATE_SCHEDULES === "1";
  * production preflight in scripts/deploy.sh is what refuses to ship without
  * them; this file does not second-guess that gate.
  */
+/**
+ * `BROWSER_RENDERING_TOKEN` is deliberately absent.
+ *
+ * The Rust worker reached Browser Run over its REST API, which needs an
+ * account id and a token. A Worker does not: the runtime binding requires no
+ * credential at all ("No API token is needed when using the Workers binding",
+ * Cloudflare's own docs), and the TypeScript service will take that path. The
+ * Rust code degrades to a plain fetch when the secret is missing, so removing
+ * it costs that deployment a capability it was never configured for rather
+ * than breaking it.
+ */
 const secretBindings = () => {
   const bindings: Record<string, Redacted.Redacted<string>> = {};
   for (const name of [
@@ -94,7 +122,6 @@ const secretBindings = () => {
     "LINKEDIN_CLIENT_ID",
     "LINKEDIN_CLIENT_SECRET",
     "CLOUDFLARE_ACCOUNT_ID",
-    "BROWSER_RENDERING_TOKEN",
     // Telemetry goes out over OTLP, so the vendor is a URL and a header
     // rather than an SDK — see apps/worker/src/runtime/Telemetry.ts. Absent
     // values leave the exporter off; the service runs either way.
@@ -172,6 +199,14 @@ export default Alchemy.Stack(
       migrationsDir: TYPESCRIPT ? undefined : "../migrations",
     });
 
+    // Declared for the TypeScript stage only: the Rust worker sends no mail.
+    const email = TYPESCRIPT
+      ? yield* Cloudflare.SendEmail("Mail", {
+          destinationAddress: MAIL_VERIFIED_DESTINATION,
+          allowedSenderAddresses: [MAIL_FROM],
+        })
+      : undefined;
+
     const api = yield* Cloudflare.Worker("Api", {
       name: `job-index-${STAGE}`,
       // Both are pre-built artifacts, not sources: `just build` produces the
@@ -199,7 +234,11 @@ export default Alchemy.Stack(
       domain: TYPESCRIPT ? PREVIEW_DOMAINS : undefined,
       env: {
         DB: database,
+        ...(email === undefined ? {} : { EMAIL: email }),
         ...environmentVars,
+        // The sender is configuration, not a secret: it appears in the
+        // From header of every message this service sends.
+        ...(TYPESCRIPT ? { MAIL_FROM } : {}),
         ...secretBindings(),
       },
       crons: TYPESCRIPT ? [] : CRONS,

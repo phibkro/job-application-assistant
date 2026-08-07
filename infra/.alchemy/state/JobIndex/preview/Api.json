@@ -32,6 +32,14 @@
         "migrationsHashes": {},
         "importHashes": {}
       },
+      "EMAIL": {
+        "kind": "Cloudflare.SendEmail",
+        "name": "Mail",
+        "destinationAddress": "philib.krogh@gmail.com",
+        "allowedSenderAddresses": [
+          "noreply@phibkro.org"
+        ]
+      },
       "ENVIRONMENT": "preview",
       "ALLOW_DEMO_MUTATIONS": "true",
       "ALLOW_NAV_SYNC_WITHOUT_TOKEN": "true",
@@ -41,7 +49,8 @@
       "NAV_MAX_PAGES_PER_RUN": "4",
       "NAV_MAX_OBSERVATIONS_PER_RUN": "600",
       "NAV_MAX_DURATION_MS": "20000",
-      "NAV_LEASE_TTL_MS": "90000"
+      "NAV_LEASE_TTL_MS": "90000",
+      "MAIL_FROM": "noreply@phibkro.org"
     },
     "crons": [],
     "observability": {
@@ -84,6 +93,21 @@
             "type": "d1",
             "databaseId": "4b7d1a99-51d5-466f-8e0b-e10195e49231",
             "name": "DB"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "EMAIL",
+      "data": {
+        "bindings": [
+          {
+            "type": "send_email",
+            "name": "EMAIL",
+            "destinationAddress": "philib.krogh@gmail.com",
+            "allowedSenderAddresses": [
+              "noreply@phibkro.org"
+            ]
           }
         ]
       }
@@ -204,6 +228,18 @@
             "type": "plain_text",
             "name": "NAV_LEASE_TTL_MS",
             "text": "90000"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "MAIL_FROM",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "MAIL_FROM",
+            "text": "noreply@phibkro.org"
           }
         ]
       }
