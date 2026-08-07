@@ -14,9 +14,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "check": "bun run fmt:check && bun run lint && bun run typecheck && bun run schema:check && bun run coverage",
+    "check": "bun run fmt:check && bun run lint && bun run typecheck && bun run schema:check && bun run bundle:check && bun run coverage",
     "schema": "bun run scripts/ts/schema.ts --emit",
-    "schema:check": "bun run scripts/ts/schema.ts"
+    "schema:check": "bun run scripts/ts/schema.ts",
+    "bundle:check": "bun build apps/worker/src/index.ts --target=browser --conditions=workerd --conditions=worker > /dev/null"
   },
   "dependencies": {
     "effect": "4.0.0-beta.104",
