@@ -3,8 +3,11 @@ import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { QuestionKey } from "@job-index/domain/Answer";
 import { fromJson, toJson, toMarkdown } from "@job-index/domain/Profile";
+import { historyToJson, historyToMarkdown } from "@job-index/domain/Applications";
 import { api, CurrentPrincipal, InvalidProfileJson } from "../Api.ts";
+import { Applications } from "../services/Applications.ts";
 import { Profiles } from "../services/Accounts.ts";
+import { SavedJobs } from "../services/SavedJobs.ts";
 import { Entitlements, type Capability } from "../services/Entitlements.ts";
 
 const decodeQuestionKey = Schema.decodeUnknownSync(QuestionKey);
@@ -66,9 +69,20 @@ export const layer = HttpApiBuilder.group(api, "profile", (handlers) =>
     .handle("exportProfile", () =>
       Effect.gen(function* () {
         const profiles = yield* Profiles;
+        const savedJobs = yield* SavedJobs;
+        const applications = yield* Applications;
         const principal = yield* CurrentPrincipal;
         const profile = yield* profiles.get(principal.profileId);
-        return { json: toJson(profile), markdown: toMarkdown(profile) };
+        const saved = yield* savedJobs.list(principal.profileId);
+        const prepared = yield* applications.history(principal.profileId);
+        return {
+          json: toJson(profile),
+          markdown: toMarkdown(profile),
+          history: {
+            json: historyToJson(saved, prepared),
+            markdown: historyToMarkdown(saved, prepared),
+          },
+        };
       }),
     )
     .handle("importProfile", ({ payload }) =>

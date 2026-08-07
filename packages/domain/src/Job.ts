@@ -63,6 +63,62 @@ export const CanonicalJob = Schema.Struct({
 export type CanonicalJob = typeof CanonicalJob.Type;
 
 /**
+ * The vacancy as it stood at the moment a person saved or applied to it —
+ * the frozen counterpart to `CanonicalJob`, which moves.
+ *
+ * `CanonicalJob` is the corpus's live view: an advert is edited in place
+ * (`UpdatedCanonical`) and, once the corpus gains its prune sweep, can be
+ * deleted outright after a year. Neither should be able to reach back and
+ * change what a person's saved-job or application history says they saw —
+ * that history is a historical fact, not a view onto the corpus row. Taking
+ * a copy at the moment of saving is what makes that true by construction
+ * rather than by nobody having pruned yet.
+ *
+ * Deliberately not every `CanonicalJob` field:
+ * - `title`, `employerName`, `location`, `applicationUrl`, `publishedAt`,
+ *   `deadline` are what a person needs to recognise and act on this entry a
+ *   year later — the minimum the operator's brief asked for.
+ * - `description` is also carried, not trimmed for size: `Drafting.compose`
+ *   ranks a profile's experience and matches skills against the advert's
+ *   text (`drafting/relevance.ts`'s `advertText`), and that ranking is what
+ *   `Applications.prepare` uses to compose the actual CV and letter. Without
+ *   it, an application could never be (re-)drafted once the corpus row it
+ *   used to point at is gone — which is exactly the failure this type
+ *   exists to prevent. A typical advert is a few hundred words; keeping it
+ *   costs kilobytes per saved job, not a scaling problem for one person's
+ *   history.
+ * - `id`, `canonicalKey`, `sequence`, `changedAt`, `sources`, `status` are
+ *   NOT carried: those describe the corpus's own bookkeeping (dedup key,
+ *   change-stream position, provenance, whether the corpus still considers
+ *   it open) — facts about the row, not about the vacancy as the person
+ *   read it, and meaningless once that row is pruned. `canonicalJobId`
+ *   stays on `SavedJob`/`ApplicationRecord` themselves, separately, for
+ *   whatever can still usefully look the live row up (e.g. `Policy`) while
+ *   it exists.
+ */
+export const JobSnapshot = Schema.Struct({
+  title: Schema.String,
+  employerName: Schema.String,
+  location: Schema.String,
+  description: Schema.String,
+  applicationUrl: Schema.String,
+  publishedAt: Schema.String,
+  deadline: Schema.optional(Schema.String),
+});
+export type JobSnapshot = typeof JobSnapshot.Type;
+
+/** The frozen slice of a `CanonicalJob` a save or an application takes at the moment it acts. */
+export const snapshotOf = (job: CanonicalJob): JobSnapshot => ({
+  title: job.title,
+  employerName: job.employerName,
+  location: job.location,
+  description: job.description,
+  applicationUrl: job.applicationUrl,
+  publishedAt: job.publishedAt,
+  deadline: job.deadline,
+});
+
+/**
  * What an observation did to the corpus. Named rather than counted, because
  * "canonical_changes: 2" cannot answer which two.
  */

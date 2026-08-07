@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import { Freshness } from "@job-index/domain/Freshness";
 import type { ProfileId } from "@job-index/domain/Ids";
 import { Database } from "../../services/Database.ts";
+import type { Write } from "../../services/Database.ts";
 import { columnsOf, decodeRow, deleteStatement, encodeVariant, insertStatement } from "../Sql.ts";
 
 const TABLE = "freshness";
@@ -34,3 +35,12 @@ export const findByProfile = (
       ? undefined
       : yield* decodeRow<Freshness>(Freshness as never)(rows[0]);
   });
+
+/**
+ * Erasure support. A purged profile has no further use for its high-water
+ * mark, and the row is scoped to `profileId` by its own primary key —
+ * erasing it is unambiguous, not a judgement call the way `Submissions`'
+ * and `Judgements`' history was.
+ */
+export const deleteByProfileWrite = (profileId: ProfileId): Write =>
+  deleteStatement(TABLE, { profileId });

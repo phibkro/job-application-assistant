@@ -8,7 +8,8 @@ import {
   ProfileIncomplete,
 } from "@job-index/domain/Failure";
 import type { Credential } from "@job-index/domain/Access";
-import type { CanonicalJob } from "@job-index/domain/Job";
+import { snapshotOf } from "@job-index/domain/Job";
+import type { CanonicalJob, JobSnapshot } from "@job-index/domain/Job";
 import type { Profile } from "@job-index/domain/Profile";
 import type { CanonicalJobId, PrincipalId, ProfileId, Sequence } from "@job-index/domain/Ids";
 import { Accounts, Profiles } from "../services/Accounts.ts";
@@ -52,6 +53,8 @@ const job: CanonicalJob = {
   sources: [],
 };
 
+const jobSnapshot: JobSnapshot = snapshotOf(job);
+
 const blankProfile: Profile = {
   headline: "",
   summary: "",
@@ -94,11 +97,15 @@ describe("applications.save", () => {
         closeAbsent: () => Effect.die("unused"),
       }),
       savedJobs: Layer.succeed(SavedJobs, {
-        save: (profile, jobId, note) => {
-          seen = { profile, jobId, note };
+        save: (profile, savedJob, note) => {
+          // `save` now takes the whole job, not just its id — captures the
+          // id back out so the assertion below stays about the wire
+          // contract (which job id was saved), not the new argument shape.
+          seen = { profile, jobId: savedJob.id, note };
           return Effect.succeed("saved_1" as never);
         },
         resolve: () => Effect.die("unused"),
+        list: () => Effect.die("unused"),
       }),
     });
     const res = await handler(post("/api/v1/me/saved", { jobId: "cj_1", note: "looks good" }));
@@ -108,10 +115,11 @@ describe("applications.save", () => {
   });
 });
 
-const withResolve = (jobId: string | undefined) =>
+const withResolve = (snapshot: JobSnapshot | undefined) =>
   Layer.succeed(SavedJobs, {
     save: () => Effect.die("unused"),
-    resolve: () => Effect.succeed(jobId as never),
+    resolve: () => Effect.succeed(snapshot),
+    list: () => Effect.die("unused"),
   });
 
 describe("applications.draft", () => {
@@ -124,37 +132,18 @@ describe("applications.draft", () => {
     expect(await res.json()).toMatchObject({ _tag: "NotFound" });
   });
 
-  it("404s when the saved job resolves but the live listing is gone", async () => {
-    const { handler } = buildHandler({
-      accounts: authedAs(alice),
-      savedJobs: withResolve("cj_1"),
-      corpus: Layer.succeed(Corpus, {
-        observe: () => Effect.die("unused"),
-        get: () => Effect.succeed(undefined),
-        changedSince: () => Effect.die("unused"),
-        search: () => Effect.die("unused"),
-        fresh: () => Effect.die("unused"),
-        markOffered: () => Effect.die("unused"),
-        closeAbsent: () => Effect.die("unused"),
-      }),
-    });
-    const res = await handler(post("/api/v1/me/saved/saved_1/draft", {}));
-    expect(await res.json()).toMatchObject({ _tag: "NotFound" });
-  });
+  // There used to be a case here for "the saved job resolves but the live
+  // listing is gone" — `draft` called `Corpus.get` after `resolve` and could
+  // 404 on a bookmark whose corpus row had moved on. That branch cannot
+  // exist anymore: `resolve` now answers with the saved job's own frozen
+  // snapshot, which is present whenever the saved job is, so there is
+  // nothing left to be missing (the operator's decision this change makes
+  // structural — see `Applications.ts`'s `SavedJob` docstring).
 
   it("UpgradeRequired when the model generator is requested without the entitlement", async () => {
     const { handler } = buildHandler({
       accounts: authedAs(alice),
-      savedJobs: withResolve("cj_1"),
-      corpus: Layer.succeed(Corpus, {
-        observe: () => Effect.die("unused"),
-        get: () => Effect.succeed(job),
-        changedSince: () => Effect.die("unused"),
-        search: () => Effect.die("unused"),
-        fresh: () => Effect.die("unused"),
-        markOffered: () => Effect.die("unused"),
-        closeAbsent: () => Effect.die("unused"),
-      }),
+      savedJobs: withResolve(jobSnapshot),
       entitlements: Layer.succeed(Entitlements, {
         has: () => Effect.die("unused"),
         require: () => Effect.fail(new EntitlementRequired({ capability: "model-drafting" })),
@@ -170,16 +159,7 @@ describe("applications.draft", () => {
   it("maps Drafting's ProfileIncomplete onto NotFound — the closest fit, not a clean one", async () => {
     const { handler } = buildHandler({
       accounts: authedAs(alice),
-      savedJobs: withResolve("cj_1"),
-      corpus: Layer.succeed(Corpus, {
-        observe: () => Effect.die("unused"),
-        get: () => Effect.succeed(job),
-        changedSince: () => Effect.die("unused"),
-        search: () => Effect.die("unused"),
-        fresh: () => Effect.die("unused"),
-        markOffered: () => Effect.die("unused"),
-        closeAbsent: () => Effect.die("unused"),
-      }),
+      savedJobs: withResolve(jobSnapshot),
       profiles: Layer.succeed(Profiles, {
         get: () => Effect.succeed(blankProfile),
         set: () => Effect.die("unused"),
@@ -198,16 +178,7 @@ describe("applications.draft", () => {
   it("returns Drafting's Documents unchanged on the happy path", async () => {
     const { handler } = buildHandler({
       accounts: authedAs(alice),
-      savedJobs: withResolve("cj_1"),
-      corpus: Layer.succeed(Corpus, {
-        observe: () => Effect.die("unused"),
-        get: () => Effect.succeed(job),
-        changedSince: () => Effect.die("unused"),
-        search: () => Effect.die("unused"),
-        fresh: () => Effect.die("unused"),
-        markOffered: () => Effect.die("unused"),
-        closeAbsent: () => Effect.die("unused"),
-      }),
+      savedJobs: withResolve(jobSnapshot),
       profiles: Layer.succeed(Profiles, {
         get: () => Effect.succeed(blankProfile),
         set: () => Effect.die("unused"),
@@ -227,7 +198,11 @@ describe("applications.draft", () => {
 });
 
 const applicationsFake = (prepare: Applications["Service"]["prepare"]) =>
-  Layer.succeed(Applications, { prepare, setStatus: () => Effect.die("unused") });
+  Layer.succeed(Applications, {
+    prepare,
+    setStatus: () => Effect.die("unused"),
+    history: () => Effect.die("unused"),
+  });
 
 describe("applications.prepare", () => {
   it("maps DraftMissing onto NotFound", async () => {
@@ -325,6 +300,7 @@ describe("applications.decide", () => {
           seen = { user, applicationId, status: s, notes };
           return Effect.void;
         },
+        history: () => Effect.die("unused"),
       }),
     });
     const res = await handler(post("/api/v1/me/applications/app_1/decision", { decision }));
@@ -340,6 +316,7 @@ describe("applications.decide", () => {
         prepare: () => Effect.die("unused"),
         setStatus: (_user, applicationId) =>
           Effect.fail(new ApplicationMissing({ application: applicationId })),
+        history: () => Effect.die("unused"),
       }),
     });
     const res = await handler(
@@ -358,6 +335,7 @@ describe("applications.decide", () => {
       applications: Layer.succeed(Applications, {
         prepare: () => Effect.die("unused"),
         setStatus: () => Effect.die("should not be reached"),
+        history: () => Effect.die("unused"),
       }),
     });
     const res = await handler(

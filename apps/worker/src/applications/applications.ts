@@ -5,7 +5,6 @@ import * as Option from "effect/Option";
 import { ApplicationRecord } from "@job-index/domain/Applications";
 import { DraftMissing, PolicyProhibited } from "@job-index/domain/Failure";
 import type { ApplicationId, UserId } from "@job-index/domain/Ids";
-import { Corpus } from "../services/Corpus.ts";
 import { Database } from "../services/Database.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
@@ -43,7 +42,6 @@ export const layer = Layer.effect(
   Applications,
   Effect.gen(function* () {
     const database = yield* Database;
-    const corpus = yield* Corpus;
     const profiles = yield* Profiles;
     const drafting = yield* Drafting;
     const entitlements = yield* Entitlements;
@@ -60,16 +58,15 @@ export const layer = Layer.effect(
           return yield* Effect.fail(new DraftMissing({ savedJob }));
         }
 
-        const job = yield* corpus.get(saved.canonicalJobId);
-        if (job === undefined) {
-          // The corpus is a rebuildable cache; a bookmark can outlive the
-          // vacancy it pointed at. Nothing to draft from either way.
-          return yield* Effect.fail(new DraftMissing({ savedJob }));
-        }
-
+        // Drafted from the saved job's own frozen `jobSnapshot`, not a fresh
+        // `Corpus.get` — the operator's decision that the vacancy someone
+        // applied to is a historical fact. This is also what removes the
+        // "bookmark outlived the vacancy" failure the corpus's one-year
+        // prune would otherwise reopen here: a valid `SavedJob` row always
+        // carries its own advert, so there is nothing left to be missing.
         const profile = yield* profiles.get(saved.profileId);
         const documents = yield* drafting
-          .compose(profile, job)
+          .compose(profile, saved.jobSnapshot)
           .pipe(
             Effect.catchTag("ProfileIncomplete", () => Effect.fail(new DraftMissing({ savedJob }))),
           );
@@ -102,9 +99,13 @@ export const layer = Layer.effect(
           profileId: user,
           savedJobId: savedJob,
           canonicalJobId: saved.canonicalJobId,
+          // Inherited from the `SavedJob`, not re-derived: one snapshot per
+          // vacancy per person, taken at save time (see `Applications.ts`'s
+          // `ApplicationRecord` docstring).
+          jobSnapshot: saved.jobSnapshot,
           method: decision.method,
           status: "ready",
-          applicationUrl: job.applicationUrl,
+          applicationUrl: saved.jobSnapshot.applicationUrl,
           cv: documents.cv,
           letter: documents.letter,
           generator: documents.generator,
@@ -119,7 +120,7 @@ export const layer = Layer.effect(
           application: application.id,
           method: decision.method,
           documents,
-          applicationUrl: job.applicationUrl,
+          applicationUrl: application.applicationUrl,
           downgradeReason: decision.downgradeReason,
         };
         return prepared;
@@ -144,6 +145,7 @@ export const layer = Layer.effect(
               profileId: existing.profileId,
               savedJobId: existing.savedJobId,
               canonicalJobId: existing.canonicalJobId,
+              jobSnapshot: existing.jobSnapshot,
               method: existing.method,
               status,
               applicationUrl: existing.applicationUrl,
@@ -159,6 +161,8 @@ export const layer = Layer.effect(
         );
       });
 
-    return Applications.of({ prepare, setStatus });
+    const history = (user: UserId) => withDb(ApplicationRecords.findByProfile(user));
+
+    return Applications.of({ prepare, setStatus, history });
   }),
 );

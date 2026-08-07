@@ -98,6 +98,7 @@ const columnTypes: Record<string, string> = {
   sources: "TEXT NOT NULL DEFAULT '[]'",
   cv: "TEXT NOT NULL",
   erasure: "TEXT NOT NULL",
+  jobSnapshot: "TEXT NOT NULL",
   // Booleans stored as 0/1, per Model.BooleanSqlite.
   automationProhibited: "INTEGER NOT NULL DEFAULT 0 CHECK (automationProhibited IN (0,1))",
   humanIntervened: "INTEGER NOT NULL DEFAULT 0 CHECK (humanIntervened IN (0,1))",

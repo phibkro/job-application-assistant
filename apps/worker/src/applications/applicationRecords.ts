@@ -2,9 +2,12 @@ import * as Effect from "effect/Effect";
 import { ApplicationRecord } from "@job-index/domain/Applications";
 import type { ApplicationId, ProfileId } from "@job-index/domain/Ids";
 import { Database } from "../services/Database.ts";
+import type { Write } from "../services/Database.ts";
 import {
   columnsOf,
   decodeRow,
+  decodeRows,
+  deleteStatement,
   encodeVariant,
   insertStatement,
   updateStatement,
@@ -51,3 +54,25 @@ export const findByIdForProfile = (
       ? undefined
       : yield* decodeRow<ApplicationRecord>(ApplicationRecord as never)(rows[0]);
   });
+
+/** Every application a profile has prepared, newest first — the read behind `Applications.history` and its export. */
+export const findByProfile = (
+  profileId: ProfileId,
+): Effect.Effect<ReadonlyArray<ApplicationRecord>, never, Database> =>
+  Effect.gen(function* () {
+    const db = yield* Database;
+    const rows = yield* db.query<unknown>(
+      `SELECT * FROM ${TABLE} WHERE profileId = ? ORDER BY createdAt DESC`,
+      [profileId],
+    );
+    return yield* decodeRows<ApplicationRecord>(ApplicationRecord as never)(rows);
+  });
+
+/** Erasure support: every application belonging to a profile, in one statement. */
+/**
+ * The statement, not its execution, so a caller that must erase several
+ * tables together can batch them. The table name stays in the repository
+ * that owns it.
+ */
+export const deleteByProfileWrite = (profileId: ProfileId): Write =>
+  deleteStatement(TABLE, { profileId });

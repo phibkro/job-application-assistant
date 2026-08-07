@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import { ApplicationRecord, SavedJob } from "@job-index/domain/Applications";
 import type { Credential } from "@job-index/domain/Access";
+import type { JobSnapshot } from "@job-index/domain/Job";
 import type { Profile } from "@job-index/domain/Profile";
 import type { PrincipalId, ProfileId } from "@job-index/domain/Ids";
 import { Accounts, Profiles } from "../services/Accounts.ts";
+import { Applications } from "../services/Applications.ts";
 import { Entitlements } from "../services/Entitlements.ts";
+import { SavedJobs } from "../services/SavedJobs.ts";
 import { buildHandler } from "./testSupport.ts";
 
 const alice = "alice" as ProfileId;
@@ -112,8 +118,42 @@ describe("profile (authenticated)", () => {
     expect(seenAsked).toEqual({ label: "notice-period", shape: { _tag: "Text" } });
   });
 
-  it("exportProfile returns both a JSON and a Markdown rendering of the stored profile", async () => {
+  it("exportProfile returns a JSON and Markdown rendering of the profile, plus the saved-job and application history", async () => {
     const profile: Profile = { ...blankProfile, headline: "Baker", skills: ["sourdough"] };
+    const now = DateTime.nowUnsafe();
+    const snapshot: JobSnapshot = {
+      title: "Baker",
+      employerName: "Bakery AS",
+      location: "Oslo",
+      description: "Bakes bread.",
+      applicationUrl: "https://jobs.example.invalid/1",
+      publishedAt: "2026-01-01T00:00:00Z",
+    };
+    const saved = new SavedJob({
+      id: "sj_1" as never,
+      profileId: alice,
+      canonicalJobId: "cj_1" as never,
+      jobSnapshot: snapshot,
+      note: "",
+      createdAt: now,
+    });
+    const application = new ApplicationRecord({
+      id: "app_1" as never,
+      profileId: alice,
+      savedJobId: "sj_1" as never,
+      canonicalJobId: "cj_1" as never,
+      jobSnapshot: snapshot,
+      method: "assisted",
+      status: "ready",
+      applicationUrl: snapshot.applicationUrl,
+      cv: "CV",
+      letter: "Letter",
+      generator: "template",
+      downgradeReason: Option.none(),
+      notes: "",
+      createdAt: now,
+      updatedAt: now,
+    });
     const { handler } = buildHandler({
       accounts: authedAs(alice),
       profiles: Layer.succeed(Profiles, {
@@ -123,6 +163,16 @@ describe("profile (authenticated)", () => {
         answer: () => Effect.die("unused"),
         unanswered: () => Effect.die("unused"),
       }),
+      savedJobs: Layer.succeed(SavedJobs, {
+        save: () => Effect.die("unused"),
+        resolve: () => Effect.die("unused"),
+        list: () => Effect.succeed([saved]),
+      }),
+      applications: Layer.succeed(Applications, {
+        prepare: () => Effect.die("unused"),
+        setStatus: () => Effect.die("unused"),
+        history: () => Effect.succeed([application]),
+      }),
     });
     const res = await handler(
       new Request("http://localhost/api/v1/me/profile/export", { headers: authHeaders }),
@@ -131,6 +181,11 @@ describe("profile (authenticated)", () => {
     const body = await res.json();
     expect(JSON.parse(body.json)).toEqual(profile);
     expect(body.markdown).toContain("# Baker");
+    const history = JSON.parse(body.history.json);
+    expect(history.savedJobs).toHaveLength(1);
+    expect(history.applications).toHaveLength(1);
+    expect(body.history.markdown).toContain("### Baker — Bakery AS");
+    expect(body.history.markdown).toContain("## Applications");
     expect(body.markdown).toContain("sourdough");
   });
 

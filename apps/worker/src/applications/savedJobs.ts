@@ -1,8 +1,16 @@
 import * as Effect from "effect/Effect";
 import { SavedJob } from "@job-index/domain/Applications";
-import type { SavedJobId } from "@job-index/domain/Ids";
+import type { ProfileId, SavedJobId } from "@job-index/domain/Ids";
 import { Database } from "../services/Database.ts";
-import { columnsOf, decodeRow, encodeVariant, insertStatement } from "../db/Sql.ts";
+import type { Write } from "../services/Database.ts";
+import {
+  columnsOf,
+  decodeRow,
+  decodeRows,
+  deleteStatement,
+  encodeVariant,
+  insertStatement,
+} from "../db/Sql.ts";
 
 /**
  * The bookmark `Applications.prepare`'s `savedJob: SavedJobId` argument
@@ -30,3 +38,25 @@ export const findById = (id: SavedJobId): Effect.Effect<SavedJob | undefined, ne
       ? undefined
       : yield* decodeRow<SavedJob>(SavedJob as never)(rows[0]);
   });
+
+/** Every saved job a profile has, newest first — the read behind `SavedJobs.list` and its export. */
+export const findByProfile = (
+  profileId: ProfileId,
+): Effect.Effect<ReadonlyArray<SavedJob>, never, Database> =>
+  Effect.gen(function* () {
+    const db = yield* Database;
+    const rows = yield* db.query<unknown>(
+      `SELECT * FROM ${TABLE} WHERE profileId = ? ORDER BY createdAt DESC`,
+      [profileId],
+    );
+    return yield* decodeRows<SavedJob>(SavedJob as never)(rows);
+  });
+
+/** Erasure support: every saved job belonging to a profile, in one statement. */
+/**
+ * The statement, not its execution, so a caller that must erase several
+ * tables together can batch them. The table name stays in the repository
+ * that owns it.
+ */
+export const deleteByProfileWrite = (profileId: ProfileId): Write =>
+  deleteStatement(TABLE, { profileId });

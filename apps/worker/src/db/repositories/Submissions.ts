@@ -2,7 +2,15 @@ import * as Effect from "effect/Effect";
 import { Submission } from "@job-index/domain/Delivery";
 import type { ProfileId, SubmissionId } from "@job-index/domain/Ids";
 import { Database } from "../../services/Database.ts";
-import { columnsOf, decodeRow, decodeRows, encodeVariant, insertStatement } from "../Sql.ts";
+import type { Write } from "../../services/Database.ts";
+import {
+  columnsOf,
+  decodeRow,
+  decodeRows,
+  deleteStatement,
+  encodeVariant,
+  insertStatement,
+} from "../Sql.ts";
 
 const TABLE = "submissions";
 
@@ -50,3 +58,21 @@ export const findByProfile = (
     );
     return yield* decodeRows<Submission>(Submission as never)(rows);
   });
+
+/**
+ * Erasure support. Append-only does not mean exempt from erasure: the
+ * operator's ruling ("data registered to the account goes when the account
+ * is erased") settles what this table's own docstring had deferred to
+ * whoever owns erasure policy. A row here is one delivery *attempt*, tagged
+ * with `profileId` throughout — title, employer, and the CV/letter text are
+ * carried on `applications`, not here, but `applicationUrl` plus a timestamp
+ * plus a platform is still enough to place a specific person at a specific
+ * employer's application form, which is exactly what erasure exists to
+ * remove. Nothing here builds an anonymised, aggregate replacement for the
+ * platform-readiness signal this table also feeds — that would need its own
+ * design (a `profileId`-stripped row is not automatically unlinkable, and an
+ * anonymisation that is actually re-identifiable is worse than deletion) —
+ * so the honest default, until that is designed and reviewed, is: erase.
+ */
+export const deleteByProfileWrite = (profileId: ProfileId): Write =>
+  deleteStatement(TABLE, { profileId });

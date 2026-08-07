@@ -1,4 +1,4 @@
-import type { CanonicalJob } from "@job-index/domain/Job";
+import type { JobSnapshot } from "@job-index/domain/Job";
 import type { Profile } from "@job-index/domain/Profile";
 import { advertText, rankExperience } from "./relevance.ts";
 
@@ -22,7 +22,7 @@ const matchedSkills = (skills: ReadonlyArray<string>, advert: string): ReadonlyA
  * to this vacancy, and names overlap only where `matchedSkills` finds it —
  * see there for the guarantee this function exists to uphold.
  */
-export const composeLetter = (profile: Profile, job: CanonicalJob): string => {
+export const composeLetter = (profile: Profile, job: JobSnapshot): string => {
   const advert = advertText(job);
   const best = rankExperience(profile.experience, advert)[0];
 
