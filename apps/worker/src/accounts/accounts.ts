@@ -1,3 +1,4 @@
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -45,7 +46,8 @@ const findValidSession = (
     // own; re-verify the match with a comparison that does not leak timing.
     if (!timingSafeEqual(row.tokenHash, presentedHash)) return Option.none();
     if (row.revokedAt !== null) return Option.none();
-    if (row.expiresAt <= Date.now()) return Option.none();
+    const now = yield* DateTime.now;
+    if (row.expiresAt <= DateTime.toEpochMillis(now)) return Option.none();
     return Option.some(row);
   });
 
@@ -143,9 +145,9 @@ export const layer = Layer.effect(
 
     const requestErasure = (profile: ProfileId): Effect.Effect<void> =>
       Effect.gen(function* () {
-        const now = new Date();
-        const nowIso = now.toISOString();
-        const purgeAfter = new Date(now.getTime() + ERASURE_GRACE_PERIOD_MS).toISOString();
+        const now = yield* DateTime.now;
+        const nowIso = DateTime.formatIso(now);
+        const purgeAfter = DateTime.formatIso(DateTime.addDuration(now, ERASURE_GRACE_PERIOD_MS));
         yield* writeErasureRequested(db, profile, nowIso, purgeAfter, nowIso);
       });
 

@@ -6,6 +6,7 @@ import { snapshotOf } from "@job-index/domain/Job";
 import type { CanonicalJob } from "@job-index/domain/Job";
 import type { ProfileId, SavedJobId } from "@job-index/domain/Ids";
 import { Database } from "../services/Database.ts";
+import { Ids } from "../services/Ids.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
 import * as SavedJobRows from "./savedJobs.ts";
 
@@ -26,13 +27,14 @@ export const layer = Layer.effect(
   SavedJobs,
   Effect.gen(function* () {
     const database = yield* Database;
+    const ids = yield* Ids;
     const withDatabase = <A>(effect: Effect.Effect<A, never, Database>): Effect.Effect<A> =>
       Effect.provideService(effect, Database, database);
 
     const save = (profile: ProfileId, job: CanonicalJob, note: string): Effect.Effect<SavedJobId> =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;
-        const id = crypto.randomUUID() as SavedJobId;
+        const id = (yield* ids.next) as SavedJobId;
         yield* withDatabase(
           SavedJobRows.insert(
             new SavedJob({

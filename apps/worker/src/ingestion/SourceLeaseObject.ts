@@ -38,6 +38,16 @@ export class SourceLeaseObject extends DurableObject {
    * alarm is what reclaims the lease. One deadline, set once when the lease
    * is granted, fired at most once, compared against nothing by anyone
    * outside this object.
+   *
+   * `Date.now()` is read directly, not through `Clock`/`DateTime`: this
+   * class is the Durable Object itself, the one place in this slot that
+   * genuinely *is* the platform edge (same category as `apps/worker/src/
+   * runtime/**`, which is why the lint rule exempts this exact file rather
+   * than the whole `ingestion/` directory). Nothing here is a decision an
+   * `Effect` program makes and a test needs to fix — `setAlarm` is a
+   * Cloudflare API called with a platform timestamp, and `Ingestion.collect`
+   * (the actual decision-making caller) already gets its own clock through
+   * `DateTime.now`.
    */
   async acquire(owner: string, recoverAfterMs: number): Promise<LeaseOutcome> {
     const active = await this.ctx.storage.get<ActiveRun>(ACTIVE_KEY);

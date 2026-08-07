@@ -1,3 +1,4 @@
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { EntitlementRequired } from "@job-index/domain/Failure";
@@ -24,7 +25,11 @@ export const layer = Layer.effect(
       Effect.gen(function* () {
         const subscription = yield* withDb(SubscriptionsRepo.findByProfile(user));
         const tier = subscription === undefined ? { _tag: "Free" as const } : subscription.tier;
-        return permits(effectiveTier(tier, new Date()), capability);
+        // `effectiveTier` is a total function of its arguments (see
+        // `decide.ts`) — `now` is read once, here, through `Clock`, so a test
+        // can fix it and assert the exact instant a subscription lapses.
+        const now = yield* DateTime.now;
+        return permits(effectiveTier(tier, DateTime.toDate(now)), capability);
       });
 
     const require: Effect.Success<typeof Entitlements>["require"] = (user, capability) =>

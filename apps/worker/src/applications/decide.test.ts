@@ -74,4 +74,14 @@ describe("effectiveTier", () => {
   it("free stays free", () => {
     expect(effectiveTier({ _tag: "Free" }, new Date("2026-01-01"))).toEqual({ _tag: "Free" });
   });
+
+  it("the instant `until` reads: still premium; the instant after: lapsed", () => {
+    // The boundary itself, not just "well before" vs "well after" — this is
+    // the test `entitlements.ts` reading `new Date()` ambiently made
+    // unwritable: `effectiveTier` takes `now`, so the exact expiry instant is
+    // fixable and assertable.
+    const until: Tier = { _tag: "Premium", until: "2026-06-15T12:00:00.000Z" };
+    expect(effectiveTier(until, new Date("2026-06-15T12:00:00.000Z"))).toEqual(until);
+    expect(effectiveTier(until, new Date("2026-06-15T12:00:00.001Z"))).toEqual({ _tag: "Free" });
+  });
 });

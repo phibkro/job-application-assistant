@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import { Acquisition } from "../services/Acquisition.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { Database } from "../services/Database.ts";
+import { Ids } from "../services/Ids.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
 import { SourceLease } from "../services/SourceLease.ts";
 import { Ingestion } from "../services/Ingestion.ts";
@@ -25,8 +26,9 @@ export const layer = Layer.effect(
     const corpus = yield* Corpus;
     const sourceCatalog = yield* SourceCatalog;
     const sourceLease = yield* SourceLease;
+    const ids = yield* Ids;
     return Ingestion.of({
-      collect: makeCollect({ database, acquisition, corpus, sourceCatalog, sourceLease }),
+      collect: makeCollect({ database, acquisition, corpus, sourceCatalog, sourceLease, ids }),
     });
   }),
 );

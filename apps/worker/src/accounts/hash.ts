@@ -6,6 +6,15 @@ import * as Effect from "effect/Effect";
  * Both use Web Crypto (`crypto.subtle`, `crypto.getRandomValues`), which
  * exists identically in Workers and in Bun — no dependency, no polyfill, and
  * the same code path runs in tests and in production.
+ *
+ * `crypto.subtle` reads no ambient state the way `Date.now()` or
+ * `crypto.randomUUID()` do: `digest(algorithm, bytes)` is a pure function of
+ * its two arguments, same input always same output, so a test never needs to
+ * fix or fake it — `sha256Hex`'s own inline test below asserts the digest
+ * directly rather than substituting a stub. That is why this module keeps the
+ * ambient `crypto` global (the lint rule scoped by directory allows it here
+ * specifically) while `Ids`/`Clock` sites elsewhere route through a service:
+ * this is a digest, not a capability.
  */
 
 /**
