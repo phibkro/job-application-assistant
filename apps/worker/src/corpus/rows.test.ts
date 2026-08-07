@@ -62,6 +62,7 @@ const occurrenceArb: fc.Arbitrary<OccurrenceRecord> = fc.record({
   sourceId: fc.string({ minLength: 1 }).map((s) => s as SourceId),
   externalId: fc.string(),
   contentFingerprint: fc.string(),
+  active: fc.boolean(),
   firstSeenAt: fc.string(),
   lastSeenAt: fc.string(),
 });

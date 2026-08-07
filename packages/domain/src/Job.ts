@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import * as Model from "effect/unstable/schema/Model";
 import { CanonicalJobId, OccurrenceId, Sequence, SourceId } from "./Ids.ts";
 
 /** A vacancy as a source published it, before identity is derived. */
@@ -74,3 +75,59 @@ export const ObservationOutcome = Schema.Union([
   Schema.TaggedStruct("Unchanged", {}),
 ]);
 export type ObservationOutcome = typeof ObservationOutcome.Type;
+
+/**
+ * The stored `canonical_jobs` row.
+ *
+ * `CanonicalJob` above is the value callers pass around; this is the row.
+ * They differ deliberately: the row carries the deduplication key no caller
+ * should see, and it flattens the `status` union into two columns because
+ * SQLite has no union type. The mapping between them is written once, in the
+ * corpus slot's `rows.ts`, which derives its row type from this model rather
+ * than restating the column list.
+ */
+export class CanonicalJobRecord extends Model.Class<CanonicalJobRecord>("CanonicalJobRecord")({
+  id: CanonicalJobId,
+  canonicalKey: Schema.String,
+  title: Schema.String,
+  employerName: Schema.String,
+  location: Schema.String,
+  description: Schema.String,
+  applicationUrl: Schema.String,
+  publishedAt: Schema.String,
+  deadline: Model.FieldOption(Schema.String),
+  statusTag: Schema.Literals(["Active", "Closed"]),
+  statusClosedAt: Model.FieldOption(Schema.String),
+  /**
+   * Assigned by the corpus, not the database. A saved search asks what
+   * changed after the sequence it last saw, so it must be monotonic across
+   * the whole corpus rather than per row.
+   */
+  sequence: Sequence,
+  changedAt: Schema.String,
+  /** JSON array of `SourceId`: provenance, which no single column can hold. */
+  sources: Model.JsonFromString(Schema.Array(SourceId)),
+}) {}
+
+/**
+ * The stored `occurrences` row: one source's advert for one canonical vacancy.
+ *
+ * Retained per source after deduplication because provenance is the point —
+ * which platform carried this vacancy is exactly what the corpus exists to
+ * answer, and a merge that discards it cannot answer it later.
+ */
+export class OccurrenceRecord extends Model.Class<OccurrenceRecord>("OccurrenceRecord")({
+  id: OccurrenceId,
+  canonicalJobId: CanonicalJobId,
+  sourceId: SourceId,
+  externalId: Schema.String,
+  contentFingerprint: Schema.String,
+  /**
+   * False once the source stops advertising it. Closure of the canonical is
+   * the absence of *all* active occurrences, so absence has to be recorded
+   * per occurrence: a vacancy still advertised elsewhere is not closed.
+   */
+  active: Model.BooleanSqlite,
+  firstSeenAt: Schema.String,
+  lastSeenAt: Schema.String,
+}) {}

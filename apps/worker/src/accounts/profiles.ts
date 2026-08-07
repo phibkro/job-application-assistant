@@ -10,22 +10,16 @@ import { Database } from "../services/Database.ts";
 import { emptyProfile, readProfileRow, toDomainProfile, writeProfile } from "./profileRow.ts";
 
 /**
- * CONTRACT GAP — read before touching this file.
+ * The gap this slot reported is closed: `Profiles.answer` now carries the
+ * `label` and `shape` the form asked with, so a new question is recorded as it
+ * was actually posed rather than defaulted to short free text. `origin` stays
+ * `"stated"` here, and correctly — a person answering through this API is,
+ * definitionally, stating it; a `"learned"` answer arrives from the agent
+ * session instead, which is a different caller.
  *
- * `Profiles.answer(profile, question, value)` (Accounts.ts) takes only a
- * value, but `Answer` (Answer.ts) is a `Model.Class` whose `insert` variant
- * also requires `label`, `shape`, and `origin` — none of which the method
- * signature has anywhere to receive them from. There is no `Question`
- * catalogue in this codebase (in any slot) that this file could look them up
- * in either.
- *
- * DEFAULT TAKEN so the method is still implementable: a brand-new question is
- * recorded with `shape: Text`, `label` equal to the raw question key, and
- * `origin: "stated"` (a person answering through this API is, definitionally,
- * stating it). An already-known question keeps its recorded label/shape and
- * only `value`/`updatedAt` change. This is a placeholder, not a claim that
- * every answer is short free text — closing the gap needs either a richer
- * `answer` signature or a question catalogue slot to look shape/label up in.
+ * An already-known question keeps its recorded label and shape: the form that
+ * asked first defined it, and a later form's phrasing of the same question is
+ * not a reason to rewrite history.
  */
 interface AnswerRow {
   readonly profileId: string;
@@ -37,8 +31,6 @@ interface AnswerRow {
   readonly createdAt: string;
   readonly updatedAt: string;
 }
-
-const DEFAULT_SHAPE: AnswerShape = { _tag: "Text" };
 
 type DatabaseService = Database["Service"];
 
@@ -59,6 +51,7 @@ const upsertAnswer = (
   profile: ProfileId,
   question: QuestionKey,
   value: string,
+  asked: { readonly label: string; readonly shape: AnswerShape },
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
     const existing = yield* findAnswerRow(db, profile, question);
@@ -66,7 +59,7 @@ const upsertAnswer = (
     if (existing === undefined) {
       yield* db.run(
         "-- accounts:insertAnswer\nINSERT INTO answers (profileId, question, label, shape, value, origin, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [profile, question, question, JSON.stringify(DEFAULT_SHAPE), value, "stated", now, now],
+        [profile, question, asked.label, JSON.stringify(asked.shape), value, "stated", now, now],
       );
     } else {
       yield* db.run(
@@ -119,7 +112,8 @@ export const layer = Layer.effect(
       profile: ProfileId,
       question: QuestionKey,
       value: string,
-    ): Effect.Effect<void> => db.transaction(upsertAnswer(db, profile, question, value));
+      asked: { readonly label: string; readonly shape: AnswerShape },
+    ): Effect.Effect<void> => db.transaction(upsertAnswer(db, profile, question, value, asked));
 
     const unanswered = (
       profile: ProfileId,

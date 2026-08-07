@@ -8,12 +8,15 @@ import * as Sessions from "./Sessions.ts";
 
 const now = DateTime.nowUnsafe();
 
+// The token hash follows the id, because `sessions.tokenHash` is UNIQUE:
+// two live sessions sharing one token would authenticate the wrong person,
+// so a fixture that reuses a hash is describing a state the schema forbids.
 const session = (id: string, revokedAt: OptionMod.Option<string> = OptionMod.none()) =>
   new Session({
     id,
     principalId: "principal-1" as never,
     profileId: "profile-1" as never,
-    tokenHash: "hash",
+    tokenHash: `hash-${id}`,
     expiresAt: Date.now() + 3_600_000,
     createdAt: now,
     revokedAt,

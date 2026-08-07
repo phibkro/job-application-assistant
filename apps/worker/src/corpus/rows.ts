@@ -1,43 +1,29 @@
+import type {
+  CanonicalJobRecord,
+  OccurrenceRecord as OccurrenceModel,
+} from "@job-index/domain/Job";
 import type { CanonicalJob } from "@job-index/domain/Job";
 import type { CanonicalJobId, OccurrenceId, SourceId, Sequence } from "@job-index/domain/Ids";
+import { CANONICAL_JOB_FIELDS, OCCURRENCE_FIELDS } from "./sql.ts";
 
 /**
- * The flat shape `canonical_jobs` rows take over `Database.query`/`run`.
+ * The flat shapes rows take over `Database.query`/`run`.
+ *
+ * Read off the domain models' *encoded* side rather than restated: that is
+ * precisely what a `Model.Class` encodes to, and it is the same declaration
+ * `db/schema.sql` is generated from. A column added to the model appears here
+ * without an edit, and a row shape that disagrees with the table is no longer
+ * expressible.
  *
  * `Database` promises nothing about how a query is built — "the only module
  * that knows SQL" — so somewhere the object shape a `CanonicalJob` needs and
- * the flat row shape SQLite hands back must be reconciled. This is that one
- * place, kept pure and separate from anything that touches `Database` itself
- * so it is testable with plain objects.
+ * the flat row SQLite hands back must be reconciled. This is that one place,
+ * kept pure and separate from anything that touches `Database` itself.
  */
-export interface CanonicalJobRow {
-  readonly id: string;
-  readonly canonicalKey: string;
-  readonly title: string;
-  readonly employerName: string;
-  readonly location: string;
-  readonly description: string;
-  readonly applicationUrl: string;
-  readonly publishedAt: string;
-  readonly deadline: string | null;
-  readonly statusTag: "Active" | "Closed";
-  readonly statusClosedAt: string | null;
-  readonly sequence: number;
-  readonly changedAt: string;
-  /** JSON-encoded `ReadonlyArray<SourceId>` — SQLite has no array column type. */
-  readonly sources: string;
-}
+export type CanonicalJobRow = typeof CanonicalJobRecord.select.Encoded;
 
 /** One source's advert against one canonical job, with its own lifecycle. */
-export interface OccurrenceRow {
-  readonly id: string;
-  readonly canonicalJobId: string;
-  readonly sourceId: string;
-  readonly externalId: string;
-  readonly contentFingerprint: string;
-  readonly firstSeenAt: string;
-  readonly lastSeenAt: string;
-}
+export type OccurrenceRow = typeof OccurrenceModel.select.Encoded;
 
 export const canonicalJobFromRow = (row: CanonicalJobRow): CanonicalJob => ({
   id: row.id as CanonicalJobId,
@@ -81,6 +67,8 @@ export interface OccurrenceRecord {
   readonly sourceId: SourceId;
   readonly externalId: string;
   readonly contentFingerprint: string;
+  /** Whether the source still advertises it; see `OccurrenceModel.active`. */
+  readonly active: boolean;
   readonly firstSeenAt: string;
   readonly lastSeenAt: string;
 }
@@ -91,6 +79,7 @@ export const occurrenceFromRow = (row: OccurrenceRow): OccurrenceRecord => ({
   sourceId: row.sourceId as SourceId,
   externalId: row.externalId,
   contentFingerprint: row.contentFingerprint,
+  active: row.active === 1,
   firstSeenAt: row.firstSeenAt,
   lastSeenAt: row.lastSeenAt,
 });
@@ -101,66 +90,40 @@ export const rowFromOccurrence = (record: OccurrenceRecord): OccurrenceRow => ({
   sourceId: record.sourceId,
   externalId: record.externalId,
   contentFingerprint: record.contentFingerprint,
+  active: record.active ? 1 : 0,
   firstSeenAt: record.firstSeenAt,
   lastSeenAt: record.lastSeenAt,
 });
 
 /**
- * Positional bindings, ordered to match `sql.ts`'s placeholders exactly.
- * Kept next to the row shape they serialise rather than beside the SQL, so a
- * field added to `CanonicalJobRow` and a field added to its binding order
- * cannot drift silently out of sync with each other.
+ * Positional bindings, ordered by the same field lists `sql.ts` builds its
+ * placeholders from. Hand-written binding arrays were the other half of the
+ * drift this slot could suffer: a column added to the statement and forgotten
+ * here shifted every value after it, silently. Now there is one order.
  */
-export const insertCanonicalJobBindings = (row: CanonicalJobRow): ReadonlyArray<unknown> => [
-  row.id,
-  row.canonicalKey,
-  row.title,
-  row.employerName,
-  row.location,
-  row.description,
-  row.applicationUrl,
-  row.publishedAt,
-  row.deadline,
-  row.statusTag,
-  row.statusClosedAt,
-  row.sequence,
-  row.changedAt,
-  row.sources,
+const bindingsFor = (
+  row: Record<string, unknown>,
+  fields: ReadonlyArray<string>,
+): ReadonlyArray<unknown> => fields.map((field) => row[field]);
+
+/** `key` last, matching `UPDATE ... WHERE key = ?`. */
+const updateBindingsFor = (
+  row: Record<string, unknown>,
+  fields: ReadonlyArray<string>,
+  key: string,
+): ReadonlyArray<unknown> => [
+  ...fields.filter((field) => field !== key).map((field) => row[field]),
+  row[key],
 ];
 
-export const updateCanonicalJobBindings = (row: CanonicalJobRow): ReadonlyArray<unknown> => [
-  row.canonicalKey,
-  row.title,
-  row.employerName,
-  row.location,
-  row.description,
-  row.applicationUrl,
-  row.publishedAt,
-  row.deadline,
-  row.statusTag,
-  row.statusClosedAt,
-  row.sequence,
-  row.changedAt,
-  row.sources,
-  row.id,
-];
+export const insertCanonicalJobBindings = (row: CanonicalJobRow): ReadonlyArray<unknown> =>
+  bindingsFor(row, CANONICAL_JOB_FIELDS);
 
-export const insertOccurrenceBindings = (row: OccurrenceRow): ReadonlyArray<unknown> => [
-  row.id,
-  row.canonicalJobId,
-  row.sourceId,
-  row.externalId,
-  row.contentFingerprint,
-  row.firstSeenAt,
-  row.lastSeenAt,
-];
+export const updateCanonicalJobBindings = (row: CanonicalJobRow): ReadonlyArray<unknown> =>
+  updateBindingsFor(row, CANONICAL_JOB_FIELDS, "id");
 
-export const updateOccurrenceBindings = (row: OccurrenceRow): ReadonlyArray<unknown> => [
-  row.canonicalJobId,
-  row.sourceId,
-  row.externalId,
-  row.contentFingerprint,
-  row.firstSeenAt,
-  row.lastSeenAt,
-  row.id,
-];
+export const insertOccurrenceBindings = (row: OccurrenceRow): ReadonlyArray<unknown> =>
+  bindingsFor(row, OCCURRENCE_FIELDS);
+
+export const updateOccurrenceBindings = (row: OccurrenceRow): ReadonlyArray<unknown> =>
+  updateBindingsFor(row, OCCURRENCE_FIELDS, "id");

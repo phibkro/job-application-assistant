@@ -4,6 +4,7 @@ import { Corpus } from "../services/Corpus.ts";
 import { Database } from "../services/Database.ts";
 import { makeChangedSince, makeGet } from "./queries.ts";
 import { makeObserve } from "./observe.ts";
+import { makeCloseAbsent } from "./close.ts";
 import { makeFresh, makeMarkOffered } from "./freshness.ts";
 
 export {
@@ -31,6 +32,7 @@ export const layer = Layer.effect(
       changedSince: makeChangedSince(database),
       fresh: makeFresh(database),
       markOffered: makeMarkOffered(database),
+      closeAbsent: makeCloseAbsent(database),
     });
   }),
 );

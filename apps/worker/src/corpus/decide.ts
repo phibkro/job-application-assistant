@@ -48,6 +48,10 @@ const occurrenceRecordFor = (
   sourceId: listing.listing.sourceId,
   externalId: listing.listing.externalId,
   contentFingerprint: listing.contentFingerprint,
+  // Every call to `observe` is a positive sighting, so an occurrence seen
+  // again is active again — a source re-advertising something it had dropped
+  // is exactly the case `ReopenedCanonical` below reports.
+  active: true,
   firstSeenAt: existingOccurrence?.firstSeenAt ?? now,
   lastSeenAt: now,
 });
@@ -178,3 +182,33 @@ export const decideObservation = (
     writeOccurrence,
   };
 };
+
+/**
+ * Which of a source's active occurrences the run did not see.
+ *
+ * The pure half of `closeAbsent`. Absence is a set difference and nothing
+ * more, so it belongs here rather than in SQL: expressed as `NOT IN (?, ?,
+ * ...)` it would need one placeholder per advert seen, and it would be
+ * untestable without a database.
+ */
+export const absentOccurrences = (
+  active: ReadonlyArray<OccurrenceRecord>,
+  seenExternalIds: ReadonlyArray<string>,
+): ReadonlyArray<OccurrenceRecord> => {
+  const seen = new Set(seenExternalIds);
+  return active.filter((occurrence) => !seen.has(occurrence.externalId));
+};
+
+/**
+ * The canonical job as it reads once its last advert is gone.
+ *
+ * `sequence` advances because a closure is a change a saved search must see:
+ * a vacancy that closed is news to anyone tracking it, and the change stream
+ * is ordered by sequence alone.
+ */
+export const closeCanonical = (job: CanonicalJob, sequence: number, now: string): CanonicalJob => ({
+  ...job,
+  status: { _tag: "Closed", closedAt: now },
+  sequence: sequence as Sequence,
+  changedAt: now,
+});

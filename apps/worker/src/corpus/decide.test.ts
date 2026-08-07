@@ -142,6 +142,7 @@ describe("decideObservation", () => {
       sourceId: "nav" as SourceId,
       externalId: "1",
       contentFingerprint: listing.contentFingerprint,
+      active: false,
       firstSeenAt: "2026-01-01T00:00:00Z",
       lastSeenAt: "2026-01-05T00:00:00Z",
     };

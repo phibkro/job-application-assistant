@@ -2,7 +2,7 @@ import type * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
 import type { Credential } from "@job-index/domain/Access";
 import type { Profile } from "@job-index/domain/Profile";
-import type { Answer, QuestionKey } from "@job-index/domain/Answer";
+import type { Answer, AnswerShape, QuestionKey } from "@job-index/domain/Answer";
 import type { ProfileId } from "@job-index/domain/Ids";
 
 /**
@@ -34,10 +34,20 @@ export class Profiles extends Context.Service<
     readonly get: (profile: ProfileId) => Effect.Effect<Profile>;
     readonly set: (profile: ProfileId, value: Profile) => Effect.Effect<Profile>;
     readonly answers: (profile: ProfileId) => Effect.Effect<ReadonlyArray<Answer>>;
+    /**
+     * Records an answer.
+     *
+     * Carries the label and shape because `Answer` requires them and there is
+     * no catalogue to look them up in: the questions come from whatever form a
+     * platform happens to ask. Without them an implementation has to invent
+     * both, which is how a free-text question quietly becomes a text field
+     * forever — the drafting slot reported exactly that.
+     */
     readonly answer: (
       profile: ProfileId,
       question: QuestionKey,
       value: string,
+      asked: { readonly label: string; readonly shape: AnswerShape },
     ) => Effect.Effect<void>;
     /** Questions a form asked that this profile cannot yet answer. */
     readonly unanswered: (

@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { ProfileId } from "@job-index/domain/Ids";
 import { QuestionKey } from "@job-index/domain/Answer";
+import type { AnswerShape } from "@job-index/domain/Answer";
 import type { Profile } from "@job-index/domain/Profile";
 import { Profiles } from "../services/Accounts.ts";
 import { layer } from "./profiles.ts";
@@ -63,12 +64,17 @@ describe("get / set", () => {
   });
 });
 
+/** How a form posed the question: its visible label and the control it used. */
+const posed = (label: string, shape: AnswerShape = { _tag: "Text" }) => ({ label, shape });
+
 describe("answer / answers", () => {
   it("records a new answer and lists it back", async () => {
     const state = emptyState();
     await run(
       state,
-      withProfiles((profiles) => profiles.answer(profileId, question("years-experience"), "5")),
+      withProfiles((profiles) =>
+        profiles.answer(profileId, question("years-experience"), "5", posed("Years of experience")),
+      ),
     );
 
     const answers = await run(
@@ -84,11 +90,15 @@ describe("answer / answers", () => {
     const state = emptyState();
     await run(
       state,
-      withProfiles((profiles) => profiles.answer(profileId, question("years-experience"), "5")),
+      withProfiles((profiles) =>
+        profiles.answer(profileId, question("years-experience"), "5", posed("Years of experience")),
+      ),
     );
     await run(
       state,
-      withProfiles((profiles) => profiles.answer(profileId, question("years-experience"), "6")),
+      withProfiles((profiles) =>
+        profiles.answer(profileId, question("years-experience"), "6", posed("Years of experience")),
+      ),
     );
 
     const answers = await run(
@@ -106,7 +116,7 @@ describe("unanswered", () => {
     await run(
       state,
       withProfiles((profiles) =>
-        profiles.answer(profileId, question("headline"), "Support engineer"),
+        profiles.answer(profileId, question("headline"), "Support engineer", posed("Headline")),
       ),
     );
 

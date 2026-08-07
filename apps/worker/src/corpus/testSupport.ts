@@ -2,6 +2,9 @@ import * as Effect from "effect/Effect";
 import type { DatabaseShape } from "./databaseShape.ts";
 import type { CanonicalJobRow, OccurrenceRow } from "./rows.ts";
 import {
+  CANONICAL_JOB_FIELDS,
+  COUNT_ACTIVE_OCCURRENCES,
+  DEACTIVATE_OCCURRENCE,
   INSERT_CANONICAL_JOB,
   INSERT_FRESHNESS,
   INSERT_OCCURRENCE,
@@ -9,6 +12,8 @@ import {
   SELECT_CANONICAL_JOBS_CHANGED_SINCE,
   SELECT_FRESH_CANONICAL_JOBS,
   SELECT_FRESHNESS_BY_PROFILE,
+  OCCURRENCE_FIELDS,
+  SELECT_ACTIVE_OCCURRENCES_BY_SOURCE,
   SELECT_NEXT_SEQUENCE,
   SELECT_OCCURRENCE_BY_ID,
   UPDATE_CANONICAL_JOB,
@@ -22,30 +27,9 @@ interface FreshnessRow {
   readonly updatedAt: string;
 }
 
-const CANONICAL_JOB_FIELDS_AFTER_ID = [
-  "canonicalKey",
-  "title",
-  "employerName",
-  "location",
-  "description",
-  "applicationUrl",
-  "publishedAt",
-  "deadline",
-  "statusTag",
-  "statusClosedAt",
-  "sequence",
-  "changedAt",
-  "sources",
-] as const;
+const CANONICAL_JOB_FIELDS_AFTER_ID = CANONICAL_JOB_FIELDS.filter((field) => field !== "id");
 
-const OCCURRENCE_FIELDS_AFTER_ID = [
-  "canonicalJobId",
-  "sourceId",
-  "externalId",
-  "contentFingerprint",
-  "firstSeenAt",
-  "lastSeenAt",
-] as const;
+const OCCURRENCE_FIELDS_AFTER_ID = OCCURRENCE_FIELDS.filter((field) => field !== "id");
 
 /**
  * `INSERT_*` puts `id` first; `UPDATE_*` puts it last (`WHERE id = ?`) — see
@@ -120,6 +104,17 @@ export const makeTestDatabase = (): DatabaseShape => {
             .toSorted((a, b) => b.sequence - a.sequence)
             .slice(0, limit) as unknown as ReadonlyArray<A>;
         }
+        case SELECT_ACTIVE_OCCURRENCES_BY_SOURCE: {
+          return Array.from(occurrences.values()).filter(
+            (row) => row.sourceId === bindings[0] && row.active === 1,
+          ) as unknown as ReadonlyArray<A>;
+        }
+        case COUNT_ACTIVE_OCCURRENCES: {
+          const activeCount = Array.from(occurrences.values()).filter(
+            (row) => row.canonicalJobId === bindings[0] && row.active === 1,
+          ).length;
+          return [{ activeCount }] as unknown as ReadonlyArray<A>;
+        }
         case SELECT_FRESHNESS_BY_PROFILE: {
           const row = freshness.get(bindings[0] as string);
           return (row === undefined ? [] : [row]) as unknown as ReadonlyArray<A>;
@@ -158,6 +153,13 @@ export const makeTestDatabase = (): DatabaseShape => {
         case UPDATE_OCCURRENCE: {
           const row = rowFromBindings<OccurrenceRow>(OCCURRENCE_FIELDS_AFTER_ID, false, bindings);
           occurrences.set(row.id, row);
+          return;
+        }
+        case DEACTIVATE_OCCURRENCE: {
+          const existing = occurrences.get(bindings[0] as string);
+          if (existing !== undefined) {
+            occurrences.set(existing.id, { ...existing, active: 0 });
+          }
           return;
         }
         case INSERT_FRESHNESS: {
