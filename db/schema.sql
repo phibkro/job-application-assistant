@@ -212,3 +212,39 @@ CREATE TABLE IF NOT EXISTS platform_policies (
   updatedAt TEXT NOT NULL,
   PRIMARY KEY (platformId)
 );
+
+CREATE TABLE IF NOT EXISTS source_state (
+  platformId TEXT NOT NULL,
+  cursor TEXT NOT NULL,
+  seenExternalIds TEXT NOT NULL DEFAULT '[]',
+  resolvedSourceId TEXT,
+  leaseOwner TEXT,
+  leaseExpiresAt INTEGER,
+  updatedAt TEXT NOT NULL,
+  PRIMARY KEY (platformId)
+);
+
+CREATE TABLE IF NOT EXISTS ingestion_runs (
+  platformId TEXT NOT NULL,
+  startedAt TEXT NOT NULL,
+  pages INTEGER NOT NULL,
+  observations INTEGER NOT NULL,
+  canonicalChanges INTEGER NOT NULL,
+  cursorBefore TEXT NOT NULL,
+  cursorAfter TEXT NOT NULL,
+  highestSequence INTEGER NOT NULL,
+  stoppedReason TEXT NOT NULL,
+  durationMs INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_runs_platformId_startedAt ON ingestion_runs (platformId, startedAt);
+
+CREATE TABLE IF NOT EXISTS ingestion_failures (
+  platformId TEXT NOT NULL,
+  occurredAt TEXT NOT NULL,
+  failureTag TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  cursor TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_failures_platformId_occurredAt ON ingestion_failures (platformId, occurredAt);

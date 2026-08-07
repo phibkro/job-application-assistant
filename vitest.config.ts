@@ -51,7 +51,7 @@ export default defineConfig({
        * including them would report a denominator that no test could ever move
        * and hide the modules that genuinely lack tests.
        */
-      include: ["packages/domain/src/decide/**", "packages/adapters/**/src/**", "apps/worker/src/{corpus,accounts,drafting,applications,agenda,db,handlers,runtime}/**"],
+      include: ["packages/domain/src/decide/**", "packages/adapters/**/src/**", "apps/worker/src/{corpus,accounts,drafting,applications,agenda,db,handlers,runtime,ingestion}/**"],
       /**
        * A floor, not a target. Coverage says which lines ran, never whether
        * the assertion meant anything — so this exists to catch whole modules

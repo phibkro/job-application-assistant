@@ -30,6 +30,8 @@ describe("layerSqlite", () => {
       "canonical_jobs",
       "delivery_platforms",
       "freshness",
+      "ingestion_failures",
+      "ingestion_runs",
       "judgements",
       "occurrences",
       "platform_policies",
@@ -38,6 +40,7 @@ describe("layerSqlite", () => {
       "saved_jobs",
       "sessions",
       "source_catalog",
+      "source_state",
       "submissions",
       "subscriptions",
     ]);
