@@ -1,22 +1,21 @@
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
-import { AsyncData } from "foldkit";
+import { AsyncData, Command } from "foldkit";
 import type { Update } from "foldkit";
 import { evo } from "foldkit/struct";
 import * as Applications from "./Applications.ts";
 import * as Commands from "./Commands.ts";
+import { GotProfileMessage } from "./Message.ts";
 import type { Message } from "./Message.ts";
 import {
   ApplyStageDecided,
   ApplyStageDrafted,
   ApplyStagePrepared,
   ApplyStageSaved,
-  type ExperienceForm,
   type Model,
   PageBrowse,
   PageFeed,
   PageProfile,
-  type ProfileForm,
   type Problem,
   RequestFailed,
   RequestIdle,
@@ -25,28 +24,11 @@ import {
   SessionAuthenticated,
   initialModel,
 } from "./Model.ts";
-import * as ProfileFormCodec from "./ProfileFormCodec.ts";
+import * as ProfileSubmodel from "./profile/index.ts";
+import { settle } from "./Settle.ts";
 
 export type UpdateReturn = Update.Return<Model, Message>;
 const withReturnType = Match.withReturnType<UpdateReturn>();
-
-/** After a request that was already showing data fails, keep the data on
- *  screen (`Stale`) instead of replacing it with a bare error — the same
- *  stale-while-revalidate shape `AsyncData` was built for, applied on the
- *  failure side. A first-ever failure (`Idle`/`Loading`) has no data to
- *  keep, so it becomes a plain `Failure`. */
-const settle = <A>(
-  current: AsyncData.AsyncData<A, Problem>,
-  error: Problem,
-): AsyncData.AsyncData<A, Problem> =>
-  AsyncData.match(current, {
-    onIdle: () => AsyncData.Failure({ error }),
-    onLoading: () => AsyncData.Failure({ error }),
-    onRefreshing: (data) => AsyncData.Stale({ error, data }),
-    onFailure: () => AsyncData.Failure({ error }),
-    onStale: ({ data }) => AsyncData.Stale({ error, data }),
-    onSuccess: (data) => AsyncData.Stale({ error, data }),
-  });
 
 /** Starts loading a cache field only if nothing has asked for it yet.
  *  Re-navigating to a page that already has data (or is already loading)
@@ -81,9 +63,23 @@ export const update = (model: Model, message: Message): UpdateReturn =>
               const [feedResults, cmds] = ensureLoaded(withPage.feedResults, Commands.FetchFeed());
               return [evo(withPage, { feedResults: () => feedResults }), cmds];
             },
+            // Not `ensureLoaded`: that helper writes an `AsyncData` field
+            // directly, but `profile` is a Submodel now, and the one
+            // legitimate way to transition its Model is through its own
+            // `update` — the `Requested` arm is where "start loading" is
+            // actually defined, so this only decides *whether* to fire it.
             Profile: () => {
-              const [profile, cmds] = ensureLoaded(withPage.profile, Commands.FetchProfile());
-              return [evo(withPage, { profile: () => profile }), cmds];
+              if (!AsyncData.isIdle(withPage.profile.profile)) return [withPage, []];
+              const [nextProfile, profileCommands] = ProfileSubmodel.update(
+                withPage.profile,
+                ProfileSubmodel.Requested(),
+              );
+              return [
+                evo(withPage, { profile: () => nextProfile }),
+                Command.mapMessages(profileCommands, (childMessage) =>
+                  GotProfileMessage({ message: childMessage }),
+                ),
+              ];
             },
           }),
         );
@@ -105,13 +101,15 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       // Signing out drops every cache that could hold the previous
       // identity's data — an Anonymous session showing someone else's
       // profile from cache is exactly the bad state this union should not
-      // allow to linger.
+      // allow to linger. `profile` resets via the Submodel's own `init`,
+      // not by reaching into its fields: the root has no business knowing
+      // what "empty" looks like inside another Model's shape, only that
+      // its own `init` is the definition of empty.
       SessionCleared: () => [
         evo(model, {
           session: () => SessionAnonymous(),
           sessionTokenInput: () => "",
-          profile: () => AsyncData.Idle(),
-          profileForm: () => Option.none(),
+          profile: () => ProfileSubmodel.init(),
           feedResults: () => AsyncData.Idle(),
           applications: () => [],
         }),
@@ -207,105 +205,22 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       // stays visible, which is the correct outcome to show.
       FeedDismissFailed: () => [model, []],
 
-      // PROFILE
-
-      ProfileRequested: () => [
-        evo(model, { profile: () => AsyncData.Loading() }),
-        [Commands.FetchProfile()],
-      ],
-
-      ProfileFetchSucceeded: ({ response }) => [
-        evo(model, {
-          profile: () => AsyncData.Success({ data: response }),
-          profileForm: () => Option.some(ProfileFormCodec.fromProfile(response.profile)),
-        }),
-        [],
-      ],
-      ProfileFetchFailed: ({ problem }) => [evo(model, { profile: (r) => settle(r, problem) }), []],
-
-      ProfileHeadlineChanged: ({ value }) => [
-        editProfileForm(model, (f) => evo(f, { headline: () => value })),
-        [],
-      ],
-      ProfileSummaryChanged: ({ value }) => [
-        editProfileForm(model, (f) => evo(f, { summary: () => value })),
-        [],
-      ],
-      ProfileLocationChanged: ({ value }) => [
-        editProfileForm(model, (f) => evo(f, { location: () => value })),
-        [],
-      ],
-      ProfileLanguagesChanged: ({ value }) => [
-        editProfileForm(model, (f) => evo(f, { languages: () => value })),
-        [],
-      ],
-      ProfileSkillsTextChanged: ({ value }) => [
-        editProfileForm(model, (f) => evo(f, { skillsText: () => value })),
-        [],
-      ],
-      ProfileEducationTextChanged: ({ value }) => [
-        editProfileForm(model, (f) => evo(f, { educationText: () => value })),
-        [],
-      ],
-
-      ProfileExperienceAdded: () => [
-        editProfileForm(model, (f) =>
-          evo(f, { experience: (xs) => [...xs, ProfileFormCodec.emptyExperience] }),
-        ),
-        [],
-      ],
-      ProfileExperienceRemoved: ({ index }) => [
-        editProfileForm(model, (f) =>
-          evo(f, { experience: (xs) => xs.filter((_, i) => i !== index) }),
-        ),
-        [],
-      ],
-      ProfileExperienceTitleChanged: ({ index, value }) => [
-        editExperience(model, index, (entry) => evo(entry, { title: () => value })),
-        [],
-      ],
-      ProfileExperienceEmployerChanged: ({ index, value }) => [
-        editExperience(model, index, (entry) => evo(entry, { employer: () => value })),
-        [],
-      ],
-      ProfileExperiencePeriodChanged: ({ index, value }) => [
-        editExperience(model, index, (entry) => evo(entry, { period: () => value })),
-        [],
-      ],
-      ProfileExperienceHighlightsTextChanged: ({ index, value }) => [
-        editExperience(model, index, (entry) => evo(entry, { highlightsText: () => value })),
-        [],
-      ],
-
-      ProfileSaveClicked: () =>
-        Option.match(model.profileForm, {
-          onNone: () => [model, []] as UpdateReturn,
-          onSome: (form) =>
-            [
-              evo(model, { profileSaving: () => RequestPending() }),
-              [
-                Commands.SaveProfile({
-                  profile: ProfileFormCodec.toProfile(form),
-                  capabilities: Option.match(AsyncData.getData(model.profile), {
-                    onNone: () => [],
-                    onSome: (response) => response.capabilities,
-                  }),
-                }),
-              ],
-            ] as UpdateReturn,
-        }),
-      ProfileSaveSucceeded: ({ response }) => [
-        evo(model, {
-          profile: () => AsyncData.Success({ data: response }),
-          profileForm: () => Option.some(ProfileFormCodec.fromProfile(response.profile)),
-          profileSaving: () => RequestIdle(),
-        }),
-        [],
-      ],
-      ProfileSaveFailed: ({ problem }) => [
-        evo(model, { profileSaving: () => RequestFailed({ problem }) }),
-        [],
-      ],
+      // PROFILE — the entire cluster lives in the Submodel (see
+      // `profile/`); the root only forwards the wrapped Message to its
+      // `update` and lifts the Commands it hands back into its own
+      // Message universe.
+      GotProfileMessage: ({ message: profileMessage }) => {
+        const [nextProfile, profileCommands] = ProfileSubmodel.update(
+          model.profile,
+          profileMessage,
+        );
+        return [
+          evo(model, { profile: () => nextProfile }),
+          Command.mapMessages(profileCommands, (childMessage) =>
+            GotProfileMessage({ message: childMessage }),
+          ),
+        ];
+      },
 
       // APPLY LOOP
 
@@ -430,20 +345,6 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         [],
       ],
       DecisionFailed: ({ jobId, problem }) => [applyFailed(model, jobId, problem), []],
-    }),
-  );
-
-const editProfileForm = (model: Model, transform: (form: ProfileForm) => ProfileForm): Model =>
-  evo(model, { profileForm: (form) => Option.map(form, transform) });
-
-const editExperience = (
-  model: Model,
-  index: number,
-  transform: (entry: ExperienceForm) => ExperienceForm,
-): Model =>
-  editProfileForm(model, (form) =>
-    evo(form, {
-      experience: (xs) => xs.map((entry, i) => (i === index ? transform(entry) : entry)),
     }),
   );
 

@@ -7,7 +7,12 @@ import { Profile } from "@job-index/domain/Profile";
 import { makeClient } from "./Client.ts";
 import { Decision } from "./Message.ts";
 import * as Msg from "./Message.ts";
-import { NetworkError, Problem } from "./Model.ts";
+// `./profile/Message.ts` directly, not the `profile/` barrel: the barrel
+// also re-exports `update.ts`, which imports this very module — going
+// through it here would close a circular import. `Model.ts` has the same
+// story with `profile/Model.ts` (see its own comment).
+import * as ProfileMessage from "./profile/Message.ts";
+import { NetworkError, Problem } from "./RequestStatus.ts";
 import * as Session from "./Session.ts";
 
 /**
@@ -119,15 +124,15 @@ export const DismissFeedItem = Command.define("DismissFeedItem", {
 });
 
 export const FetchProfile = Command.define("FetchProfile", {
-  messages: [Msg.ProfileFetchSucceeded, Msg.ProfileFetchFailed],
+  messages: [ProfileMessage.FetchSucceeded, ProfileMessage.FetchFailed],
   execute: withHttp(
     Effect.gen(function* () {
       const client = yield* makeClient(currentToken());
       const response = yield* client.profile.me();
-      return Msg.ProfileFetchSucceeded({ response });
+      return ProfileMessage.FetchSucceeded({ response });
     }).pipe(
       Effect.catch((error) =>
-        Effect.succeed(Msg.ProfileFetchFailed({ problem: toProblem(error) })),
+        Effect.succeed(ProfileMessage.FetchFailed({ problem: toProblem(error) })),
       ),
     ),
   ),
@@ -139,16 +144,16 @@ export const SaveProfile = Command.define("SaveProfile", {
   // change what an account is entitled to, so there is nothing new to ask
   // the server for.
   args: { profile: Profile, capabilities: S.Array(S.String) },
-  messages: [Msg.ProfileSaveSucceeded, Msg.ProfileSaveFailed],
+  messages: [ProfileMessage.SaveSucceeded, ProfileMessage.SaveFailed],
   execute: ({ profile, capabilities }) =>
     withHttp(
       Effect.gen(function* () {
         const client = yield* makeClient(currentToken());
         const saved = yield* client.profile.setProfile({ payload: profile });
-        return Msg.ProfileSaveSucceeded({ response: { profile: saved, capabilities } });
+        return ProfileMessage.SaveSucceeded({ response: { profile: saved, capabilities } });
       }).pipe(
         Effect.catch((error) =>
-          Effect.succeed(Msg.ProfileSaveFailed({ problem: toProblem(error) })),
+          Effect.succeed(ProfileMessage.SaveFailed({ problem: toProblem(error) })),
         ),
       ),
     ),

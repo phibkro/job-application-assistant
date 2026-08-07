@@ -1,7 +1,8 @@
 import * as S from "effect/Schema";
 import { m } from "foldkit/message";
 import { CanonicalJob } from "@job-index/domain/Job";
-import { JobPage, MeResponse, Page, Problem } from "./Model.ts";
+import { JobPage, Page, Problem } from "./Model.ts";
+import * as ProfileMessage from "./profile/Message.ts";
 
 /**
  * The application's Message union.
@@ -55,37 +56,10 @@ export const FeedDismissClicked = m("FeedDismissClicked", {
 export const FeedDismissSucceeded = m("FeedDismissSucceeded", { jobId: S.String });
 export const FeedDismissFailed = m("FeedDismissFailed", { jobId: S.String, problem: Problem });
 
-// Profile
-export const ProfileRequested = m("ProfileRequested");
-export const ProfileFetchSucceeded = m("ProfileFetchSucceeded", { response: MeResponse });
-export const ProfileFetchFailed = m("ProfileFetchFailed", { problem: Problem });
-export const ProfileHeadlineChanged = m("ProfileHeadlineChanged", { value: S.String });
-export const ProfileSummaryChanged = m("ProfileSummaryChanged", { value: S.String });
-export const ProfileLocationChanged = m("ProfileLocationChanged", { value: S.String });
-export const ProfileLanguagesChanged = m("ProfileLanguagesChanged", { value: S.String });
-export const ProfileSkillsTextChanged = m("ProfileSkillsTextChanged", { value: S.String });
-export const ProfileEducationTextChanged = m("ProfileEducationTextChanged", { value: S.String });
-export const ProfileExperienceAdded = m("ProfileExperienceAdded");
-export const ProfileExperienceRemoved = m("ProfileExperienceRemoved", { index: S.Number });
-export const ProfileExperienceTitleChanged = m("ProfileExperienceTitleChanged", {
-  index: S.Number,
-  value: S.String,
-});
-export const ProfileExperienceEmployerChanged = m("ProfileExperienceEmployerChanged", {
-  index: S.Number,
-  value: S.String,
-});
-export const ProfileExperiencePeriodChanged = m("ProfileExperiencePeriodChanged", {
-  index: S.Number,
-  value: S.String,
-});
-export const ProfileExperienceHighlightsTextChanged = m("ProfileExperienceHighlightsTextChanged", {
-  index: S.Number,
-  value: S.String,
-});
-export const ProfileSaveClicked = m("ProfileSaveClicked");
-export const ProfileSaveSucceeded = m("ProfileSaveSucceeded", { response: MeResponse });
-export const ProfileSaveFailed = m("ProfileSaveFailed", { problem: Problem });
+// Profile — the entire cluster (was 18 tags: field edits, experience-entry
+// edits, and the fetch/save request lifecycle) lives behind the profile
+// Submodel now (see `profile/`). The root only forwards to it.
+export const GotProfileMessage = m("GotProfileMessage", { message: ProfileMessage.Message });
 
 // Apply loop
 export const SaveJobClicked = m("SaveJobClicked", { jobId: S.String });
@@ -152,24 +126,7 @@ export const Message = S.Union([
   FeedDismissClicked,
   FeedDismissSucceeded,
   FeedDismissFailed,
-  ProfileRequested,
-  ProfileFetchSucceeded,
-  ProfileFetchFailed,
-  ProfileHeadlineChanged,
-  ProfileSummaryChanged,
-  ProfileLocationChanged,
-  ProfileLanguagesChanged,
-  ProfileSkillsTextChanged,
-  ProfileEducationTextChanged,
-  ProfileExperienceAdded,
-  ProfileExperienceRemoved,
-  ProfileExperienceTitleChanged,
-  ProfileExperienceEmployerChanged,
-  ProfileExperiencePeriodChanged,
-  ProfileExperienceHighlightsTextChanged,
-  ProfileSaveClicked,
-  ProfileSaveSucceeded,
-  ProfileSaveFailed,
+  GotProfileMessage,
   SaveJobClicked,
   SaveJobSucceeded,
   SaveJobFailed,
