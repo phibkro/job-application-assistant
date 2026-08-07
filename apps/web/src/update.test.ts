@@ -1,27 +1,31 @@
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import { describe, expect, it } from "vitest";
+import { Navigation, Url } from "foldkit";
 import { CanonicalJob } from "@job-index/domain/Job";
 import {
   BrowseJobsFailed,
   BrowseJobsSucceeded,
   BrowseNextPageRequested,
+  BrowseSearchSubmitted,
   BrowseTermChanged,
   DecisionRequested,
   DecisionSucceeded,
   DraftSucceeded,
   FeedDismissSucceeded,
   FeedSucceeded,
-  Navigated,
   PrepareSucceeded,
   SaveJobClicked,
   SaveJobSucceeded,
   SessionCleared,
   SessionTokenInputChanged,
   SessionTokenSubmitted,
+  UrlChanged,
+  UrlRequested,
 } from "./Message.ts";
-import { NotFound, initialModel, PageBrowse, PageFeed, PageJobDetail } from "./Model.ts";
+import { NotFound, initialModel, PageNotFound } from "./Model.ts";
 import type { Model } from "./Model.ts";
+import { RouteBrowse, RouteFeed, RouteJobDetail, RouteNotFound, RouteProfile } from "./Route.ts";
 import { update } from "./update.ts";
 
 /**
@@ -52,9 +56,12 @@ const job = S.decodeUnknownSync(CanonicalJob)({
 
 const page = { data: [job], meta: { limit: 20, nextCursor: null as string | null } };
 
-describe("Navigated", () => {
+describe("UrlChanged", () => {
   it("triggers exactly one FetchJobs Command the first time Browse loads", () => {
-    const [model, commands] = update(initialModel, Navigated({ to: PageBrowse() }));
+    const [model, commands] = update(
+      initialModel,
+      UrlChanged({ route: RouteBrowse({ term: "", location: "", status: "" }) }),
+    );
     expect(model.page._tag).toBe("Browse");
     expect(model.browseResults._tag).toBe("Loading");
     expect(commands.map((c) => c.name)).toEqual(["FetchJobs"]);
@@ -62,19 +69,90 @@ describe("Navigated", () => {
 
   it("does not refetch a page that already has data", () => {
     const loaded: Model = { ...initialModel, browseResults: { _tag: "Success", data: page } };
-    const [model, commands] = update(loaded, Navigated({ to: PageBrowse() }));
+    const [model, commands] = update(
+      loaded,
+      UrlChanged({ route: RouteBrowse({ term: "", location: "", status: "" }) }),
+    );
     expect(model.browseResults).toEqual(loaded.browseResults);
     expect(commands).toEqual([]);
   });
 
-  it("always refetches the job on JobDetail navigation, keyed by the new id", () => {
+  it("carries the route's query into browseQuery, so a deep search link loads filtered", () => {
     const [model, commands] = update(
       initialModel,
-      Navigated({ to: PageJobDetail({ jobId: "job-2" }) }),
+      UrlChanged({ route: RouteBrowse({ term: "engineer", location: "Oslo", status: "" }) }),
+    );
+    expect(model.browseQuery).toEqual({ term: "engineer", location: "Oslo", status: "" });
+    expect(commands[0]?.args).toMatchObject({ term: "engineer", location: "Oslo" });
+  });
+
+  // The case that has to be got right: nothing upstream necessarily fetched
+  // this job, so a deep link cannot lean on `ensureLoaded`'s "already have
+  // it" guard the way every other route here does.
+  it("a deep link straight to JobDetail loads that job, not assuming a prior screen already did", () => {
+    const [model, commands] = update(
+      initialModel,
+      UrlChanged({ route: RouteJobDetail({ jobId: "job-2" }) }),
     );
     expect(model.page).toEqual({ _tag: "JobDetail", jobId: "job-2" });
     expect(model.jobDetail._tag).toBe("Loading");
     expect(commands.map((c) => c.name)).toEqual(["FetchJob"]);
+    expect(commands[0]?.args).toMatchObject({ jobId: "job-2" });
+  });
+
+  it("always refetches the job on JobDetail navigation, keyed by the new id", () => {
+    const atJobOne: Model = {
+      ...initialModel,
+      page: { _tag: "JobDetail", jobId: "job-1" },
+      jobDetail: { _tag: "Success", data: job },
+    };
+    const [model, commands] = update(
+      atJobOne,
+      UrlChanged({ route: RouteJobDetail({ jobId: "job-2" }) }),
+    );
+    expect(model.page).toEqual({ _tag: "JobDetail", jobId: "job-2" });
+    expect(model.jobDetail._tag).toBe("Loading");
+    expect(commands.map((c) => c.name)).toEqual(["FetchJob"]);
+  });
+
+  it("routes into Profile and asks the Submodel to load, going through its own boundary", () => {
+    const [model, commands] = update(initialModel, UrlChanged({ route: RouteProfile() }));
+    expect(model.page).toEqual({ _tag: "Profile" });
+    expect(model.profile.profile._tag).toBe("Loading");
+    expect(commands.map((c) => c.name)).toEqual(["FetchProfile"]);
+  });
+
+  it("an unmatched path becomes PageNotFound, not a silent fallback to Browse", () => {
+    const [model, commands] = update(
+      initialModel,
+      UrlChanged({ route: RouteNotFound({ path: "/nope" }) }),
+    );
+    expect(model.page).toEqual(PageNotFound({ path: "/nope" }));
+    expect(commands).toEqual([]);
+  });
+});
+
+describe("UrlRequested", () => {
+  const internalUrl = Option.getOrThrow(Url.fromString("https://job-index.example/jobs/job-9"));
+
+  it("an internal request pushes the URL rather than touching the Model", () => {
+    const [model, commands] = update(
+      initialModel,
+      UrlRequested({ request: Navigation.Internal({ url: internalUrl }) }),
+    );
+    expect(model).toBe(initialModel);
+    expect(commands.map((c) => c.name)).toEqual(["PushUrl"]);
+    expect(commands[0]?.args).toMatchObject({ href: "https://job-index.example/jobs/job-9" });
+  });
+
+  it("an external request loads it as a full navigation", () => {
+    const [model, commands] = update(
+      initialModel,
+      UrlRequested({ request: Navigation.External({ href: "https://elsewhere.example/apply" }) }),
+    );
+    expect(model).toBe(initialModel);
+    expect(commands.map((c) => c.name)).toEqual(["LoadUrl"]);
+    expect(commands[0]?.args).toMatchObject({ href: "https://elsewhere.example/apply" });
   });
 });
 
@@ -123,6 +201,16 @@ describe("Browse", () => {
     expect(model.browseResults).toEqual({ _tag: "Refreshing", data: withCursor });
     expect(commands.map((c) => c.name)).toEqual(["FetchJobs"]);
     expect(commands[0]?.args).toMatchObject({ cursor: Option.some("cursor-2") });
+  });
+
+  it("a submitted search pushes the address bar alongside the fetch, so it can be shared", () => {
+    const withTerm: Model = {
+      ...initialModel,
+      browseQuery: { term: "engineer", location: "", status: "Active" },
+    };
+    const [, commands] = update(withTerm, BrowseSearchSubmitted());
+    expect(commands.map((c) => c.name)).toEqual(["FetchJobs", "PushUrl"]);
+    expect(commands[1]?.args).toMatchObject({ href: "/?term=engineer&status=Active" });
   });
 });
 
@@ -338,7 +426,7 @@ describe("feed", () => {
 
   it("does not refetch the feed once it has loaded", () => {
     const loaded: Model = { ...initialModel, feedResults: { _tag: "Success", data: page } };
-    const [, commands] = update(loaded, Navigated({ to: PageFeed() }));
+    const [, commands] = update(loaded, UrlChanged({ route: RouteFeed() }));
     expect(commands).toEqual([]);
   });
 

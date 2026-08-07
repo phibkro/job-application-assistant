@@ -7,15 +7,15 @@ import {
   BrowseSearchSubmitted,
   BrowseStatusChanged,
   BrowseTermChanged,
-  Navigated,
 } from "../Message.ts";
 import type { Message } from "../Message.ts";
-import { PageJobDetail } from "../Model.ts";
 import type { Model } from "../Model.ts";
+import * as Route from "../Route.ts";
 import {
   button,
   card,
   inputField,
+  linkButton,
   pageClass,
   renderProblem,
   sectionHeading,
@@ -41,11 +41,11 @@ const jobListItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
           ),
         ],
       ),
-      button(
+      linkButton(
         {
           label: "View",
           variant: "secondary",
-          onClick: Navigated({ to: PageJobDetail({ jobId: job.id }) }),
+          href: Route.href(Route.RouteJobDetail({ jobId: job.id })),
         },
         h,
       ),

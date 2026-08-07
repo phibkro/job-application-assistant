@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
-import { Command, Http } from "foldkit";
+import { Command, Http, Navigation } from "foldkit";
 import { Profile } from "@job-index/domain/Profile";
 import { makeClient } from "./Client.ts";
 import { Decision } from "./Message.ts";
@@ -250,6 +250,24 @@ export const DecideApplication = Command.define("DecideApplication", {
         ),
       ),
     ),
+});
+
+/** Pushing (rather than replacing) is always correct here: every call site
+ *  is a real navigation the person should be able to back out of — a link
+ *  click or a submitted search — never a same-screen correction. */
+export const PushUrl = Command.define("PushUrl", {
+  args: { href: S.String },
+  messages: [Msg.UrlPushed],
+  execute: ({ href }) => Navigation.pushUrl(href).pipe(Effect.as(Msg.UrlPushed())),
+});
+
+/** For a `UrlRequest.External`: a full page navigation, so `UrlPushed`
+ *  never actually reaches `update` before the page unloads. Still needs a
+ *  result Message to satisfy the Command contract. */
+export const LoadUrl = Command.define("LoadUrl", {
+  args: { href: S.String },
+  messages: [Msg.UrlPushed],
+  execute: ({ href }) => Navigation.load(href).pipe(Effect.as(Msg.UrlPushed())),
 });
 
 export const PersistSessionToken = Command.define("PersistSessionToken", {

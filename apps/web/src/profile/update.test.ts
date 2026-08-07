@@ -9,7 +9,7 @@ import { update } from "./update.ts";
 /**
  * The profile cluster's own `update`, tested against its own small Model —
  * the localization the Submodel split is for. `SessionCleared`'s "reset via
- * `init`" behaviour and the `Navigated`-to-Profile fetch gate are root
+ * `init`" behaviour and the `UrlChanged`-to-Profile fetch gate are root
  * orchestration and stay covered in `update.test.ts` instead: this file
  * only owns what the Submodel itself decides.
  */

@@ -86,6 +86,22 @@ export const button = <M>(
     h,
   );
 
+/** A real link styled to match `button`, for navigation rather than an
+ *  action — a plain `<a href>` so the runtime's own link-click listener
+ *  turns a click into a `UrlRequested` and every native link behavior
+ *  (new tab, copy link, no reload) keeps working. */
+export const linkButton = <M>(
+  config: Readonly<{ label: string; href: string; variant?: ButtonVariant }>,
+  h: HtmlBuilder<M>,
+): Html =>
+  h.a(
+    [
+      h.Href(config.href),
+      h.Class(clsx(buttonBaseClass, buttonVariantClass[config.variant ?? "primary"])),
+    ],
+    [config.label],
+  );
+
 // ---- FORM FIELDS ----------------------------------------------------------
 // One shared look for every labelled control: the label sits above the
 // control (via the component's own `attributes.label`, which carries the
@@ -200,6 +216,19 @@ export const selectField = <M>(
         ),
     },
     h,
+  );
+
+// ---- NOT FOUND ----------------------------------------------------------
+
+/** A stale or mistyped path — not an API `Problem`, so it gets its own
+ *  small screen rather than `renderProblem`'s vocabulary. */
+export const notFoundView = <M>(path: string, h: HtmlBuilder<M>): Html =>
+  h.div(
+    [h.Class(pageClass)],
+    [
+      sectionHeading("Page not found", h),
+      h.p([h.Class("text-sm text-gray-500")], [`No screen matches "${path}".`]),
+    ],
   );
 
 // ---- PROBLEMS ---------------------------------------------------------

@@ -1,22 +1,23 @@
 import clsx from "clsx";
 import type { HtmlBuilder, Html } from "foldkit/html";
-import {
-  Navigated,
-  SessionCleared,
-  SessionTokenInputChanged,
-  SessionTokenSubmitted,
-} from "../Message.ts";
+import { SessionCleared, SessionTokenInputChanged, SessionTokenSubmitted } from "../Message.ts";
 import type { Message } from "../Message.ts";
-import { PageBrowse, PageFeed, PageProfile } from "../Model.ts";
 import type { Model, Page } from "../Model.ts";
+import * as Route from "../Route.ts";
 import { button, inputField, srOnlyLabelClass } from "./Shared.ts";
 
 // The page header: root-only, unlike everything in `Shared.ts`. Both
-// components dispatch the root `Message` directly (`Navigated`,
-// `SessionCleared`, ...), which is exactly the concrete-Message-universe
-// dependency `Shared.ts`'s helpers were split off from — keeping it here
-// instead is what makes `Shared.ts` reusable by the profile Submodel's own
-// view without dragging its own `Message` import along.
+// components dispatch the root `Message` directly (`SessionCleared`, ...),
+// which is exactly the concrete-Message-universe dependency `Shared.ts`'s
+// helpers were split off from — keeping it here instead is what makes
+// `Shared.ts` reusable by the profile Submodel's own view without dragging
+// its own `Message` import along.
+//
+// Real `<a href>`s, not buttons with an `OnClick`: the runtime's own
+// link-click listener is what turns a click into a `UrlRequested`, so a tab
+// only has to carry the URL it goes to, not a Message that reimplements
+// what clicking a link already means (open in a new tab, copy the link,
+// no full reload).
 
 const navLinkClass = (isActive: boolean): string =>
   clsx(
@@ -32,24 +33,27 @@ export const nav = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.nav(
     [h.Class("flex items-center gap-1")],
     [
-      h.button(
+      h.a(
         [
           h.Class(navLinkClass(isCurrentPage(model.page, "Browse"))),
-          h.OnClick(Navigated({ to: PageBrowse() })),
+          // Carries whatever's currently in the search boxes, mirroring
+          // the results already on screen — not the last *submitted*
+          // query, which could be stale relative to a mid-typed edit.
+          h.Href(Route.href(Route.RouteBrowse(model.browseQuery))),
         ],
         ["Browse"],
       ),
-      h.button(
+      h.a(
         [
           h.Class(navLinkClass(isCurrentPage(model.page, "Feed"))),
-          h.OnClick(Navigated({ to: PageFeed() })),
+          h.Href(Route.href(Route.RouteFeed())),
         ],
         ["Fresh feed"],
       ),
-      h.button(
+      h.a(
         [
           h.Class(navLinkClass(isCurrentPage(model.page, "Profile"))),
-          h.OnClick(Navigated({ to: PageProfile() })),
+          h.Href(Route.href(Route.RouteProfile())),
         ],
         ["Profile"],
       ),
