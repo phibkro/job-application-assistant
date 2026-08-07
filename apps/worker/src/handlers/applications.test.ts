@@ -16,7 +16,7 @@ import { Corpus } from "../services/Corpus.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
 import { Applications } from "../services/Applications.ts";
-import { SavedJobs } from "./ports.ts";
+import { SavedJobs } from "../services/SavedJobs.ts";
 import { buildHandler } from "./testSupport.ts";
 
 const alice = "alice" as ProfileId;

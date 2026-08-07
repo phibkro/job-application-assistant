@@ -8,6 +8,7 @@ import * as Context from "effect/Context";
 import type { PrincipalId, ProfileId } from "@job-index/domain/Ids";
 import { CanonicalJob } from "@job-index/domain/Job";
 import { CatalogEntry } from "@job-index/domain/Source";
+import { AnswerShape } from "@job-index/domain/Answer";
 import { Profile } from "@job-index/domain/Profile";
 
 /**
@@ -24,24 +25,55 @@ import { Profile } from "@job-index/domain/Profile";
  * review. That is the personal-data boundary made structural.
  */
 
-/** Errors carried across the wire, mirroring the domain's failure taxonomy. */
-export class Unauthorized extends Schema.TaggedError<Unauthorized>()("Unauthorized", {
-  message: Schema.String,
-}) {}
+/**
+ * Errors carried across the wire, mirroring the domain's failure taxonomy.
+ *
+ * Each carries its status explicitly. Without the annotation every declared
+ * error serialises as 500, whatever its name says — so an unauthenticated
+ * request and a crashed handler were indistinguishable to any client that
+ * reads the status line, which is most of them. The handlers slot found this
+ * by running real requests through the real router, and pinned the wrong
+ * behaviour in a test rather than assuming the right one; those tests now
+ * assert these codes.
+ *
+ * Written as the `httpApiStatus` annotation rather than through
+ * `HttpApiSchema.status(...)`: that helper is a schema transformer, and a
+ * `TaggedError`'s third argument is an annotations object, so the helper does
+ * not compose with a class declaration. The key is the one the framework
+ * resolves (`resolveAt("httpApiStatus")`) and the one its own built-in errors
+ * carry.
+ */
+export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
+  "Unauthorized",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 401 },
+) {}
 
-export class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
-  message: Schema.String,
-}) {}
+export class NotFound extends Schema.TaggedError<NotFound>()(
+  "NotFound",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
 
 /** Returned when the account's tier lacks the capability. Distinct from Forbidden. */
-export class UpgradeRequired extends Schema.TaggedError<UpgradeRequired>()("UpgradeRequired", {
-  capability: Schema.String,
-}) {}
+/** 402, not 426: the account must pay, not change protocol. */
+export class UpgradeRequired extends Schema.TaggedError<UpgradeRequired>()(
+  "UpgradeRequired",
+  {
+    capability: Schema.String,
+  },
+  { httpApiStatus: 402 },
+) {}
 
 /** Returned when the platform's terms forbid it, whatever the account has paid. */
 export class ForbiddenByPlatform extends Schema.TaggedError<ForbiddenByPlatform>()(
   "ForbiddenByPlatform",
   { platform: Schema.String, policy: Schema.String },
+  { httpApiStatus: 403 },
 ) {}
 
 /**
@@ -157,9 +189,21 @@ const profile = HttpApiGroup.make("profile")
       success: Profile,
       error: Unauthorized,
     }),
+    /**
+     * `shape` travels with the answer because nothing else can carry it: the
+     * questions come from whatever form a platform asks, and there is no
+     * catalogue to look one up in. Optional, because a person answering
+     * directly is answering free text — but a learned answer from an observed
+     * form knows what control it came from, and without a field to say so
+     * every date and choice becomes a text box forever.
+     */
     HttpApiEndpoint.put("setAnswer", "/api/v1/me/answers/:question", {
       params: { question: Schema.String },
-      payload: Schema.Struct({ value: Schema.String, label: Schema.optional(Schema.String) }),
+      payload: Schema.Struct({
+        value: Schema.String,
+        label: Schema.optional(Schema.String),
+        shape: Schema.optional(AnswerShape),
+      }),
       success: Schema.Struct({ question: Schema.String }),
       error: Unauthorized,
     }),

@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { api, CurrentPrincipal } from "../Api.ts";
 import { Corpus } from "../services/Corpus.ts";
-import { Judgements } from "./ports.ts";
+import { Judgements } from "../services/Judgements.ts";
 import { decodeCanonicalJobId, decodeEnum, decodeLimit, nextCursorOf } from "./wire.ts";
 
 /**

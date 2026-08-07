@@ -35,9 +35,7 @@ describe("the Authenticated middleware", () => {
   it("rejects a request with no Authorization header", async () => {
     const { handler } = buildHandler({ accounts: accountsFake() });
     const res = await handler(new Request("http://localhost/api/v1/me/feed"));
-    // See the file-level comment: this should be 401, and is 500 today
-    // because `Api.ts`'s `Unauthorized` carries no status annotation.
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ _tag: "Unauthorized" });
   });
 
@@ -50,9 +48,7 @@ describe("the Authenticated middleware", () => {
         headers: { Authorization: "Bearer nope" },
       }),
     );
-    // See the file-level comment: this should be 401, and is 500 today
-    // because `Api.ts`'s `Unauthorized` carries no status annotation.
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ _tag: "Unauthorized" });
   });
 
@@ -69,9 +65,7 @@ describe("the Authenticated middleware", () => {
         headers: { Authorization: "Bearer erased-account-token" },
       }),
     );
-    // See the file-level comment: this should be 401, and is 500 today
-    // because `Api.ts`'s `Unauthorized` carries no status annotation.
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ _tag: "Unauthorized" });
   });
 

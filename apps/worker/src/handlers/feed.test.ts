@@ -6,7 +6,7 @@ import type { CanonicalJob } from "@job-index/domain/Job";
 import type { CanonicalJobId, PrincipalId, ProfileId, Sequence } from "@job-index/domain/Ids";
 import { Accounts } from "../services/Accounts.ts";
 import { Corpus } from "../services/Corpus.ts";
-import { Judgements } from "./ports.ts";
+import { Judgements } from "../services/Judgements.ts";
 import { buildHandler } from "./testSupport.ts";
 
 const alice = "alice" as ProfileId;

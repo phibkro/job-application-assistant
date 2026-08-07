@@ -12,7 +12,7 @@ import { Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
 import { Applications } from "../services/Applications.ts";
-import { SavedJobs } from "./ports.ts";
+import { SavedJobs } from "../services/SavedJobs.ts";
 import { decodeApplicationId, decodeCanonicalJobId, decodeEnum, decodeSavedJobId } from "./wire.ts";
 
 const decodeGenerator = decodeEnum("template", "model");

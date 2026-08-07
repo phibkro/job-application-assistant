@@ -5,7 +5,7 @@ import type { CanonicalJob } from "@job-index/domain/Job";
 import type { CanonicalJobId, PlatformId, Sequence } from "@job-index/domain/Ids";
 import type { CatalogEntry } from "@job-index/domain/Source";
 import { Corpus } from "../services/Corpus.ts";
-import { SourceCatalog } from "./ports.ts";
+import { SourceCatalog } from "../services/SourceCatalog.ts";
 import { buildHandler } from "./testSupport.ts";
 
 const job = (overrides: Partial<CanonicalJob> = {}): CanonicalJob => ({

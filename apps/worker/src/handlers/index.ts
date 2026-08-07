@@ -9,7 +9,7 @@ import { layer as applicationsLayer } from "./applications.ts";
  *
  * Not a composition root: nothing here supplies `Corpus`, `Accounts`,
  * `Drafting`, `Applications`, `Entitlements`, or the three gap ports in
- * `ports.ts` — that wiring, and deciding what backs the ports, is the
+ * the service tags — that wiring, and deciding what backs them, is the
  * integrator's step. This just names what each group needs `HttpApiBuilder`
  * to be handed.
  */
@@ -18,5 +18,3 @@ export const corpus = corpusLayer;
 export const feed = feedLayer;
 export const profile = profileLayer;
 export const applications = applicationsLayer;
-
-export * from "./ports.ts";

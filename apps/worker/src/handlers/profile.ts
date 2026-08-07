@@ -41,12 +41,10 @@ export const layer = HttpApiBuilder.group(api, "profile", (handlers) =>
       }),
     )
     /**
-     * `Profiles.answer` requires `asked: { label, shape }`; the wire payload
-     * carries only `value` and an optional `label` (see `Api.ts`), with no
-     * way to say whether the answer is free text, a number, a date, or a
-     * choice. `AnswerShape` drives how a form gets filled from this answer
-     * later, so defaulting it to `Text` is a real loss of information the
-     * wire endpoint has no field to recover — flagged in the handoff report.
+     * A caller that knows how the question was asked says so; a person typing
+     * an answer directly does not, and free text is what they are giving.
+     * The label falls back to the question key for the same reason — better a
+     * machine-readable stand-in than an invented sentence.
      */
     .handle("setAnswer", ({ params, payload }) =>
       Effect.gen(function* () {
@@ -55,7 +53,7 @@ export const layer = HttpApiBuilder.group(api, "profile", (handlers) =>
         const question = decodeQuestionKey(params.question);
         yield* profiles.answer(principal.profileId, question, payload.value, {
           label: payload.label ?? params.question,
-          shape: { _tag: "Text" },
+          shape: payload.shape ?? { _tag: "Text" },
         });
         return { question: params.question };
       }),

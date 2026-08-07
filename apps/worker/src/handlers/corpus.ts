@@ -3,7 +3,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import type { AcquisitionTier } from "@job-index/domain/Source";
 import { api, NotFound } from "../Api.ts";
 import { Corpus } from "../services/Corpus.ts";
-import { SourceCatalog } from "./ports.ts";
+import { SourceCatalog } from "../services/SourceCatalog.ts";
 import { decodeCanonicalJobId, decodeCursor, decodeLimit, nextCursorOf } from "./wire.ts";
 
 /**
