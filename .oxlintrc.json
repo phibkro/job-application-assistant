@@ -30,62 +30,31 @@
   "overrides": [
     {
       "files": [
-        "apps/worker/src/**",
-        "packages/adapters/**"
+        "packages/domain/**/*.ts"
       ],
       "rules": {
-        "no-restricted-globals": [
+        "effect/no-ambient-authority": [
           "error",
           {
-            "name": "Date",
-            "message": "Ambient clock read. Use `yield* DateTime.now` (effect/DateTime) inside an Effect, not `new Date()`/`Date.now()` — see apps/worker/src/corpus/observe.ts."
-          },
-          {
-            "name": "crypto",
-            "message": "Ambient id/random read. Use the `Ids` service (apps/worker/src/services/Ids.ts), not `crypto.randomUUID()` directly."
-          },
-          {
-            "name": "fetch",
-            "message": "Ambient network call. Take `HttpClient` (effect/unstable/http/HttpClient) as a constructor argument, not the global `fetch` — see packages/adapters/nav/src/index.ts."
+            "technology": "effect-v4",
+            "role": "pure-library",
+            "platform": "portable"
           }
         ]
       }
     },
     {
       "files": [
-        "apps/worker/src/runtime/**",
-        "apps/worker/src/ingestion/SourceLeaseObject.ts"
+        "apps/worker/src/**/*.ts",
+        "packages/adapters/**/*.ts"
       ],
       "rules": {
-        "no-restricted-globals": "off"
-      }
-    },
-    {
-      "files": [
-        "apps/worker/src/accounts/hash.ts"
-      ],
-      "rules": {
-        "no-restricted-globals": [
-          "error",
-          { "name": "Date", "message": "Ambient clock read. Use `yield* DateTime.now`." },
-          { "name": "fetch", "message": "Ambient network call. Take `HttpClient` instead." }
-        ]
-      }
-    },
-    {
-      "files": [
-        "apps/worker/src/**/decide.ts"
-      ],
-      "rules": {
-        "no-restricted-globals": [
+        "effect/no-ambient-authority": [
           "error",
           {
-            "name": "crypto",
-            "message": "Ambient id/random read. Use the `Ids` service, not `crypto.randomUUID()` directly."
-          },
-          {
-            "name": "fetch",
-            "message": "Ambient network call. Take `HttpClient` as a constructor argument instead."
+            "technology": "effect-v4",
+            "role": "service",
+            "platform": "portable"
           }
         ]
       }
@@ -95,8 +64,35 @@
         "**/*.test.ts"
       ],
       "rules": {
-        "no-restricted-globals": "off"
+        "effect/no-ambient-authority": "off"
       }
+    },
+    {
+      "files": [
+        "apps/worker/src/runtime/**/*.ts",
+        "apps/worker/src/index.ts",
+        "apps/worker/src/ingestion/SourceLeaseObject.ts",
+        "apps/worker/src/accounts/hash.ts",
+        "apps/worker/src/db/{FakeD1,Sqlite}.ts",
+        "apps/worker/src/testSupport/**/*.ts"
+      ],
+      "rules": {
+        "effect/no-ambient-authority": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/web/**/*.ts"
+      ],
+      "rules": {
+        "effect/no-ambient-authority": "off"
+      }
+    }
+  ],
+  "jsPlugins": [
+    {
+      "name": "effect",
+      "specifier": "@phibkro/oxlint-effect-plugin"
     }
   ]
 }

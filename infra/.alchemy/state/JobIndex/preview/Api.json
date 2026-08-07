@@ -40,6 +40,11 @@
           "noreply@phibkro.org"
         ]
       },
+      "SOURCE_LEASE": {
+        "kind": "Cloudflare.DurableObjectNamespace",
+        "name": "SourceLease",
+        "className": "SourceLeaseObject"
+      },
       "ENVIRONMENT": "preview",
       "ALLOW_DEMO_MUTATIONS": "true",
       "ALLOW_NAV_SYNC_WITHOUT_TOKEN": "true",
@@ -49,7 +54,7 @@
       "NAV_MAX_PAGES_PER_RUN": "4",
       "NAV_MAX_OBSERVATIONS_PER_RUN": "600",
       "NAV_MAX_DURATION_MS": "20000",
-      "NAV_LEASE_TTL_MS": "90000",
+      "NAV_LEASE_RECOVERY_MS": "90000",
       "MAIL_FROM": "noreply@phibkro.org"
     },
     "crons": [],
@@ -70,9 +75,12 @@
     "tags": [
       "alchemy:stack:JobIndex",
       "alchemy:stage:preview",
-      "alchemy:id:Api"
+      "alchemy:id:Api",
+      "alchemy:do:SOURCE_LEASE:SourceLeaseObject"
     ],
-    "durableObjectNamespaces": {},
+    "durableObjectNamespaces": {
+      "SourceLeaseObject": "bc2db0bc50d84de78d301a34add39422"
+    },
     "accountId": "d2319ba5e93bf509a478951e90496374",
     "domains": [
       "https://job-index.phibkro.org",
@@ -80,8 +88,8 @@
     ],
     "crons": [],
     "hash": {
-      "assets": "82a3d1de945a2d6cc097be84d6af92994d28cc7287f3bf0315afe2f28f10d8af",
-      "bundle": "0ad12b529905b952dd7be2dbb05c9a48c730c8e2beeb0bb70ffeb202360361a4"
+      "assets": "9eaf5ead31dc7120208ed9b9ed5d7ddcb1025251874d7b4d9444e76743cae598",
+      "bundle": "2f48de4e98a85e0d8b37c06d1387dee8066516070d159e07aca99b335f15c9e1"
     }
   },
   "bindings": [
@@ -108,6 +116,18 @@
             "allowedSenderAddresses": [
               "noreply@phibkro.org"
             ]
+          }
+        ]
+      }
+    },
+    {
+      "sid": "SOURCE_LEASE",
+      "data": {
+        "bindings": [
+          {
+            "type": "durable_object_namespace",
+            "name": "SOURCE_LEASE",
+            "className": "SourceLeaseObject"
           }
         ]
       }
@@ -221,12 +241,12 @@
       }
     },
     {
-      "sid": "NAV_LEASE_TTL_MS",
+      "sid": "NAV_LEASE_RECOVERY_MS",
       "data": {
         "bindings": [
           {
             "type": "plain_text",
-            "name": "NAV_LEASE_TTL_MS",
+            "name": "NAV_LEASE_RECOVERY_MS",
             "text": "90000"
           }
         ]

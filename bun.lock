@@ -9,6 +9,7 @@
       },
       "devDependencies": {
         "@cloudflare/vitest-pool-workers": "0.20.3",
+        "@phibkro/oxlint-effect-plugin": "^0.1.0",
         "@types/node": "^22",
         "@vitest/coverage-istanbul": "^4.1.10",
         "fast-check": "^4.9.0",
@@ -364,6 +365,8 @@
     "@oxlint/binding-win32-ia32-msvc": ["@oxlint/binding-win32-ia32-msvc@1.77.0", "", { "os": "win32", "cpu": "ia32" }, "sha512-zja5b7+6a7UsRFgAQSrnax5vrzliEyNPLCjfXONu/vTWswaIVZGFajJZptaeRvPE4LghtFdAzVFlexTm7MVTGA=="],
 
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.77.0", "", { "os": "win32", "cpu": "x64" }, "sha512-+teyvPDZ2RjUvo+SuCqS/UhaJl1QtdW5fWT5NJTV61V5MIuIS90Db9LixmtEGvXixyttiK62P96MSu3UlpviBw=="],
+
+    "@phibkro/oxlint-effect-plugin": ["@phibkro/oxlint-effect-plugin@0.1.0", "", { "peerDependencies": { "oxlint": "1.76.0" }, "optionalPeers": ["oxlint"] }, "sha512-lqktdgHNBVvSYYV8FexnIh1925468N5kAlmcmdlmU+c7ihFmojg+XW4HfpGn3Jk6hIWswo1djIZKBiaceDvfqQ=="],
 
     "@poppinss/colors": ["@poppinss/colors@4.1.6", "", { "dependencies": { "kleur": "^4.1.5" } }, "sha512-H9xkIdFswbS8n1d6vmRd8+c10t2Qe+rZITbbDHHkQixH5+2x1FDGmi/0K+WgWiqQFKPSlIYB7jlH6Kpfn6Fleg=="],
 
