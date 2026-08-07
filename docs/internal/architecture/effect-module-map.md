@@ -235,6 +235,10 @@ guard can consult policy or entitlement natively. XState was the alternative and
 would have brought a parallel type system and its own actor model that composes
 with neither our schemas nor our layers.
 
+Not installed yet. The decision stands, but an unused dependency is bundle
+weight and supply-chain surface for a module that does not exist — it goes in
+when the agent session machine does.
+
 Adopted for the agent session only: locate the form, fill what is known, pause
 for the person, observe what they type, confirm, persist the mapping. That has
 real hierarchy, parallelism, and long pauses.

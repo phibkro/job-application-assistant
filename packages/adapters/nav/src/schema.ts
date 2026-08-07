@@ -32,7 +32,7 @@ export const Employer = Schema.Struct({
 export type Employer = typeof Employer.Type;
 
 /** The advert. Nested under `ad_content` in the live envelope — see `Detail`. */
-export const AdContent = Schema.Struct({
+const AdContent = Schema.Struct({
   published: nullishString,
   expires: nullishString,
   updated: nullishString,
@@ -68,7 +68,7 @@ export const Detail = Schema.Struct({
 export type Detail = typeof Detail.Type;
 
 /** One entry in the NAV JSON Feed page, with its NAV-specific extension. */
-export const FeedEntry = Schema.Struct({
+const FeedEntry = Schema.Struct({
   uuid: Schema.String,
   status: Schema.String,
   title: nullishString,

@@ -23,7 +23,7 @@ import * as NavSchema from "./schema.ts";
  * schema would spend a parse on a value that cannot fail.
  */
 export const NAV_SOURCE_ID = "nav" as SourceId;
-export const NAV_SOURCE_NAME = "Arbeidsplassen (NAV)";
+const NAV_SOURCE_NAME = "Arbeidsplassen (NAV)";
 
 const navPostingUrl = (uuid: string): string =>
   `https://arbeidsplassen.nav.no/stillinger/stilling/${uuid}`;
