@@ -2,18 +2,20 @@ import clsx from "clsx";
 import * as Match from "effect/Match";
 import { Button, Input, Select, Textarea } from "@foldkit/ui";
 import type { HtmlBuilder, Html } from "foldkit/html";
-import {
-  Navigated,
-  SessionCleared,
-  SessionTokenInputChanged,
-  SessionTokenSubmitted,
-} from "../Message.ts";
-import type { Message } from "../Message.ts";
-import { PageBrowse, PageFeed, PageProfile } from "../Model.ts";
-import type { Model, Page, Problem } from "../Model.ts";
+import type { Problem } from "../RequestStatus.ts";
 
 // Shared view vocabulary: every page composes these instead of writing its
 // own Tailwind strings, so a button or field only has one look to change.
+//
+// Generic over `M` (the caller's Message type) rather than pinned to the
+// root `Message` union: the profile Submodel's own view reuses every
+// helper here too, and pinning would make that a type error at the call
+// site (`HtmlBuilder<Message>` and `HtmlBuilder<Profile.Message>` are
+// different, non-interchangeable universes — see `HtmlBuilder`'s own
+// doc). None of these helpers dispatch a Message on their own behalf
+// (`nav`/`sessionPanel`, which do, live in `view/Chrome.ts`, the one file
+// that is genuinely root-only), so nothing here needs to know which
+// universe it is called from.
 
 // ---- LAYOUT -----------------------------------------------------------
 
@@ -21,9 +23,9 @@ export const pageClass = "mx-auto w-full max-w-3xl space-y-6 px-4 py-8";
 
 /** A bordered white surface, the one visual container every screen reaches
  *  for (results, a job's detail, a stage of the apply flow, a problem). */
-export const card = (
+export const card = <M>(
   children: ReadonlyArray<Html>,
-  h: HtmlBuilder<Message>,
+  h: HtmlBuilder<M>,
   className?: string,
 ): Html =>
   h.div(
@@ -31,7 +33,7 @@ export const card = (
     children,
   );
 
-export const sectionHeading = (text: string, h: HtmlBuilder<Message>): Html =>
+export const sectionHeading = <M>(text: string, h: HtmlBuilder<M>): Html =>
   h.h2([h.Class("text-xl font-semibold text-gray-900")], [text]);
 
 // ---- BUTTON -------------------------------------------------------------
@@ -57,15 +59,15 @@ const buttonBaseClass = clsx(
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
 );
 
-export const button = (
+export const button = <M>(
   config: Readonly<{
     label: string;
-    onClick?: Message;
+    onClick?: M;
     variant?: ButtonVariant;
     type?: "button" | "submit" | "reset";
     isDisabled?: boolean;
   }>,
-  h: HtmlBuilder<Message>,
+  h: HtmlBuilder<M>,
 ): Html =>
   Button.view(
     {
@@ -102,17 +104,17 @@ const fieldLabelClass = "block text-sm font-medium text-gray-700";
  *  placeholder already carries the visible name. */
 export const srOnlyLabelClass = "sr-only";
 
-export const inputField = (
+export const inputField = <M>(
   config: Readonly<{
     id: string;
     label: string;
     value: string;
-    onInput: (value: string) => Message;
+    onInput: (value: string) => M;
     placeholder?: string;
     type?: string;
     labelClassName?: string;
   }>,
-  h: HtmlBuilder<Message>,
+  h: HtmlBuilder<M>,
 ): Html =>
   Input.view(
     {
@@ -136,16 +138,16 @@ export const inputField = (
     h,
   );
 
-export const textareaField = (
+export const textareaField = <M>(
   config: Readonly<{
     id: string;
     label: string;
     value: string;
-    onInput: (value: string) => Message;
+    onInput: (value: string) => M;
     rows?: number;
     placeholder?: string;
   }>,
-  h: HtmlBuilder<Message>,
+  h: HtmlBuilder<M>,
 ): Html =>
   Textarea.view(
     {
@@ -166,16 +168,16 @@ export const textareaField = (
     h,
   );
 
-export const selectField = (
+export const selectField = <M>(
   config: Readonly<{
     id: string;
     label: string;
     value: string;
-    onChange: (value: string) => Message;
+    onChange: (value: string) => M;
     options: ReadonlyArray<Readonly<{ value: string; label: string }>>;
     labelClassName?: string;
   }>,
-  h: HtmlBuilder<Message>,
+  h: HtmlBuilder<M>,
 ): Html =>
   Select.view(
     {
@@ -220,7 +222,7 @@ const problemCardClass = (tone: "info" | "error"): string =>
  * failure. Every other member keeps the flat red/blue "something to notice"
  * treatment appropriate to an actual error or a sign-in prompt.
  */
-export const renderProblem = (problem: Problem, h: HtmlBuilder<Message>): Html =>
+export const renderProblem = <M>(problem: Problem, h: HtmlBuilder<M>): Html =>
   Match.value(problem).pipe(
     Match.tag("Unauthorized", ({ message }) =>
       h.div(
@@ -261,77 +263,4 @@ export const renderProblem = (problem: Problem, h: HtmlBuilder<Message>): Html =
       h.div([h.Class(problemCardClass("error"))], [h.p([], [`Request failed: ${detail}`])]),
     ),
     Match.exhaustive,
-  );
-
-// ---- CHROME -------------------------------------------------------------
-
-const navLinkClass = (isActive: boolean): string =>
-  clsx(
-    "rounded-md px-3 py-1.5 text-sm font-medium transition cursor-pointer",
-    isActive
-      ? "bg-indigo-50 text-indigo-700"
-      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-  );
-
-const isCurrentPage = (page: Page, tag: Page["_tag"]): boolean => page._tag === tag;
-
-export const nav = (model: Model, h: HtmlBuilder<Message>): Html =>
-  h.nav(
-    [h.Class("flex items-center gap-1")],
-    [
-      h.button(
-        [
-          h.Class(navLinkClass(isCurrentPage(model.page, "Browse"))),
-          h.OnClick(Navigated({ to: PageBrowse() })),
-        ],
-        ["Browse"],
-      ),
-      h.button(
-        [
-          h.Class(navLinkClass(isCurrentPage(model.page, "Feed"))),
-          h.OnClick(Navigated({ to: PageFeed() })),
-        ],
-        ["Fresh feed"],
-      ),
-      h.button(
-        [
-          h.Class(navLinkClass(isCurrentPage(model.page, "Profile"))),
-          h.OnClick(Navigated({ to: PageProfile() })),
-        ],
-        ["Profile"],
-      ),
-    ],
-  );
-
-/**
- * The session entry point. There is no login flow in this contract — an
- * account presents a session token or API key it already holds (see
- * `Accounts.authenticate` in the worker) — so this is a paste box, not a
- * form. The token never touches `localStorage`; `SessionTokenSubmitted` and
- * `SessionCleared` are the only two Messages that change it, and both route
- * through a Command that writes `sessionStorage` (see `Session.ts`).
- */
-export const sessionPanel = (model: Model, h: HtmlBuilder<Message>): Html =>
-  h.div(
-    [h.Class("flex items-center gap-2")],
-    model.session._tag === "Authenticated"
-      ? [
-          h.span([h.Class("text-sm text-gray-600")], ["Signed in."]),
-          button({ label: "Clear session", onClick: SessionCleared(), variant: "secondary" }, h),
-        ]
-      : [
-          inputField(
-            {
-              id: "session-token",
-              label: "Session token or API key",
-              labelClassName: srOnlyLabelClass,
-              value: model.sessionTokenInput,
-              type: "password",
-              placeholder: "Session token or API key",
-              onInput: (value) => SessionTokenInputChanged({ value }),
-            },
-            h,
-          ),
-          button({ label: "Use token", onClick: SessionTokenSubmitted(), variant: "secondary" }, h),
-        ],
   );

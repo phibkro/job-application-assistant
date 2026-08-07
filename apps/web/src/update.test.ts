@@ -140,16 +140,22 @@ describe("session", () => {
     expect(commands.map((c) => c.name)).toEqual(["PersistSessionToken"]);
   });
 
-  it("SessionCleared drops every cache the previous identity could have populated", () => {
+  it("SessionCleared resets the profile Submodel to its own init, not a hand-picked shape", () => {
     const signedIn: Model = {
       ...initialModel,
       session: { _tag: "Authenticated", token: "secret" },
-      profile: { _tag: "Success", data: { profile: { headline: "x" } as never, capabilities: [] } },
+      profile: {
+        ...initialModel.profile,
+        profile: {
+          _tag: "Success",
+          data: { profile: { headline: "x" } as never, capabilities: [] },
+        },
+      },
       applications: [{ jobId: "job-1", stage: Option.none(), pending: { _tag: "Idle" } }],
     };
     const [model, commands] = update(signedIn, SessionCleared());
     expect(model.session).toEqual({ _tag: "Anonymous" });
-    expect(model.profile).toEqual({ _tag: "Idle" });
+    expect(model.profile).toEqual(initialModel.profile);
     expect(model.applications).toEqual([]);
     expect(commands.map((c) => c.name)).toEqual(["ClearSessionToken"]);
   });

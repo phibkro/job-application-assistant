@@ -1,15 +1,16 @@
 import * as Match from "effect/Match";
 import type { Runtime } from "foldkit";
 import type { Document, Html, HtmlBuilder } from "foldkit/html";
+import { GotProfileMessage } from "./Message.ts";
 import type { Message } from "./Message.ts";
 import { initialModel, Model, SessionAnonymous, SessionAuthenticated } from "./Model.ts";
+import * as ProfileSubmodel from "./profile/index.ts";
 import * as Session from "./Session.ts";
 import { update } from "./update.ts";
 import { browseView } from "./view/Browse.ts";
+import { nav, sessionPanel } from "./view/Chrome.ts";
 import { feedView } from "./view/Feed.ts";
 import { jobDetailView } from "./view/JobDetail.ts";
-import { profileView } from "./view/Profile.ts";
-import { nav, sessionPanel } from "./view/Shared.ts";
 
 // The Foldkit-idiomatic split: this module defines the program (Model,
 // init, update, view) and stays importable — by `update.test.ts`, by any
@@ -71,7 +72,14 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
               Browse: () => browseView(model, h),
               JobDetail: () => jobDetailView(model, h),
               Feed: () => feedView(model, h),
-              Profile: () => profileView(model, h),
+              Profile: () =>
+                h.submodel({
+                  slotId: "profile",
+                  model: model.profile,
+                  view: ProfileSubmodel.view,
+                  viewInputs: { isAuthenticated: model.session._tag === "Authenticated" },
+                  toParentMessage: (message) => GotProfileMessage({ message }),
+                }),
             }),
           ),
         ],

@@ -1,24 +1,36 @@
-import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import { AsyncData } from "foldkit";
 import { ts } from "foldkit/schema";
 import { CanonicalJob } from "@job-index/domain/Job";
-import { Profile } from "@job-index/domain/Profile";
-// Reused rather than restated: these are the same TaggedError classes the
-// worker's contract declares for `feed`, `profile`, and `applications`. A
-// premium refusal or an unauthorized call decodes into the exact schema the
-// server encoded it with, so there is one definition of what those failures
-// look like, not a client-side guess that can drift from the server's.
+import * as ProfileSubmodel from "./profile/Model.ts";
+// `Problem` and the request tri-state live below every cluster (see
+// `RequestStatus.ts`'s own docstring for why); re-exported from here too so
+// every existing call site that reached them through `Model.ts` keeps
+// working unchanged.
 import {
   ForbiddenByPlatform,
+  NetworkError,
   NotFound,
+  Problem,
+  RequestFailed,
+  RequestIdle,
+  RequestPending,
+  RequestStatus,
   UpgradeRequired,
   Unauthorized,
-} from "../../worker/src/Api.ts";
-// Re-exported so callers (including tests) construct a `Problem` member
-// through `Model.ts` — the one place that assembles the union — instead of
-// reaching past it to the worker contract directly.
-export { ForbiddenByPlatform, NotFound, UpgradeRequired, Unauthorized };
+} from "./RequestStatus.ts";
+export {
+  ForbiddenByPlatform,
+  NetworkError,
+  NotFound,
+  Problem,
+  RequestFailed,
+  RequestIdle,
+  RequestPending,
+  RequestStatus,
+  UpgradeRequired,
+  Unauthorized,
+};
 
 /**
  * A page of jobs, as `corpus.listJobs` and `feed.fresh` both return it.
@@ -31,19 +43,6 @@ export { ForbiddenByPlatform, NotFound, UpgradeRequired, Unauthorized };
 const PageMeta = S.Struct({ limit: S.Number, nextCursor: S.NullOr(S.String) });
 export const JobPage = S.Struct({ data: S.Array(CanonicalJob), meta: PageMeta });
 export type JobPage = typeof JobPage.Type;
-
-/** A failure this app knows how to explain. `NetworkError` is the one member
- *  the wire contract does not declare: it covers a transport failure or a
- *  response that failed to decode, neither of which is a typed API error. */
-export const NetworkError = ts("NetworkError", { detail: S.String });
-export const Problem = S.Union([
-  Unauthorized,
-  NotFound,
-  UpgradeRequired,
-  ForbiddenByPlatform,
-  NetworkError,
-]);
-export type Problem = typeof Problem.Type;
 
 // PAGE — which screen is showing. Not URL-backed: this slot builds the loop,
 // not a router, so navigation is Model state like any other.
@@ -66,44 +65,6 @@ export type BrowseQuery = typeof BrowseQuery.Type;
 export const BrowseAsyncData = AsyncData.Schema(JobPage, Problem);
 export const JobDetailAsyncData = AsyncData.Schema(CanonicalJob, Problem);
 export const FeedAsyncData = AsyncData.Schema(JobPage, Problem);
-
-export const MeResponse = S.Struct({ profile: Profile, capabilities: S.Array(S.String) });
-export type MeResponse = typeof MeResponse.Type;
-export const ProfileAsyncData = AsyncData.Schema(MeResponse, Problem);
-
-/** The edit buffer for the profile form. A separate copy from the fetched
- *  `MeResponse` so typing does not retroactively change what "saved" means;
- *  `ProfileSaveClicked` is what commits it. */
-export const ProfileForm = S.Struct({
-  headline: S.String,
-  summary: S.String,
-  location: S.String,
-  languages: S.String,
-  /** Newline-separated in the form, split into `Profile.skills` on save. */
-  skillsText: S.String,
-  /** Newline-separated in the form, split into `Profile.education` on save. */
-  educationText: S.String,
-  experience: S.Array(
-    S.Struct({
-      title: S.String,
-      employer: S.String,
-      period: S.String,
-      /** Newline-separated in the form, split into `highlights` on save. */
-      highlightsText: S.String,
-    }),
-  ),
-});
-export type ProfileForm = typeof ProfileForm.Type;
-export type ExperienceForm = ProfileForm["experience"][number];
-
-// REQUEST STATUS — tri-state for a single in-flight action: nothing
-// meaningful to hold on success because success is already reflected by
-// `ApplyStage` advancing.
-export const RequestIdle = ts("Idle", {});
-export const RequestPending = ts("Pending", {});
-export const RequestFailed = ts("Failed", { problem: Problem });
-export const RequestStatus = S.Union([RequestIdle, RequestPending, RequestFailed]);
-export type RequestStatus = typeof RequestStatus.Type;
 
 /**
  * Where one job's application stands. Each stage carries forward what a
@@ -167,9 +128,7 @@ export const Model = S.Struct({
 
   feedResults: FeedAsyncData.schema,
 
-  profile: ProfileAsyncData.schema,
-  profileForm: S.Option(ProfileForm),
-  profileSaving: RequestStatus,
+  profile: ProfileSubmodel.Model,
 
   applications: S.Array(ApplyRecord),
 });
@@ -187,9 +146,7 @@ export const initialModel: Model = {
 
   feedResults: FeedAsyncData.Idle(),
 
-  profile: ProfileAsyncData.Idle(),
-  profileForm: Option.none(),
-  profileSaving: RequestIdle(),
+  profile: ProfileSubmodel.init(),
 
   applications: [],
 };
