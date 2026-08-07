@@ -1,10 +1,16 @@
-# Run the first live demo
+# Run the local preview
 
-This tutorial proves canonicalization, source lifecycle transitions, bounded live NAV synchronization, and incremental saved-search evaluation.
+RFC 0015 retired the Rust worker this tutorial used to describe (the
+`just dev` demo UI, its NAV-lifecycle fixture buttons, and the destructive
+staging smoke suite are gone with it). This is the tutorial for what
+currently runs: the TypeScript/Effect service, served locally against a
+seeded database.
 
 ## 1. Prepare the NAV token
 
-Setup fetches NAV's current public experiment token into the ignored `.dev.vars` file. The token is reused while it has more than 24 hours remaining:
+Setup fetches NAV's current public experiment token into the ignored
+`.dev.vars` file. The token is reused while it has more than 24 hours
+remaining:
 
 ```sh
 just setup
@@ -25,91 +31,43 @@ just nav-key
 ## 2. Verify locally
 
 ```sh
-just fix
-just verify
-# or: ./bootstrap fix && ./bootstrap verify
+nix shell nixpkgs#bun -c bun run check
+nix develop --command just check
 ```
 
-The suite builds the Rust Worker, creates a clean local D1 database, applies
-all migrations, and proves:
+`bun run check` runs the TypeScript workspace's own gates (format, lint,
+typecheck, `db/schema.sql` drift, bundle, tests). `just check` runs the
+repository, credential, and script gates. `just verify` runs both together.
 
-```text
-3 source observations → 2 canonical jobs
-1 duplicate occurrence merged
-0 canonical changes on identical replay
-NAV create → close → replay → reopen → update
-saved-search added → idle → updated → removed → re-added → closed
-D1 batch rollback
-```
-
-## 3. Explore deterministic journeys
+## 3. Serve the whole stack
 
 ```sh
-just dev
+nix develop --command just preview
 ```
 
-Open <http://localhost:8787>, then select:
+This bundles the interface, bundles the Worker for workerd, applies the
+generated schema (`db/schema.sql`) and a small seed to a local D1 database,
+and serves the result at `http://127.0.0.1:8799`. If port 8799 is in use,
+set `PORT` before running `./scripts/preview.sh` directly.
 
-1. **Reset D1 demo**
-2. **Collect fixture**
-3. **Replay fixture**
-
-The Technical Support Specialist job displays two source badges. The replay
-reports unchanged observations and no new canonical changes.
-
-The verification suite also exercises the NAV lifecycle fixtures through the
-JSON endpoints.
-
-## 4. Prove incremental saved-search evaluation
-
-In the browser:
-
-1. Select **Create Oslo support search**.
-2. Select **Evaluate changed jobs**. The two fixture jobs are added.
-3. Select **Evaluate changed jobs** again. The report shows `jobs_evaluated: 0`.
-4. Use the NAV fixture actions through the smoke suite or API to add, update, remove, re-add, and close one matching job. Each evaluation inspects exactly that changed canonical job.
-
-The saved-search panel shows its normalized definition, stable query signature, last evaluated sequence, and current match count.
-
-## 5. Synchronize one live NAV page
-
-Select **Sync one NAV page**. Local configuration permits this operation and
-uses NAV's rotating experimental token.
-
-The result reports:
-
-- cursor before and after;
-- active and inactive observations;
-- created, updated, closed, and reopened canonical jobs;
-- unchanged observations and detail fallbacks;
-- whether the current tail page returned no modification.
-
-The **NAV source state** panel displays the durable D1 checkpoint and connector
-health. Each click handles at most one feed page and at most 200 observations.
-
-## 6. Deploy to staging
+Sign in with the token `demo-token` to see the feed and the profile. Confirm
+the API answers directly:
 
 ```sh
-./deploy
+curl http://127.0.0.1:8799/api/v1/jobs
+curl http://127.0.0.1:8799/api/health
 ```
 
-This deploys the disposable staging environment and runs the full destructive demo smoke suite against the separate staging D1 database. The printed `workers.dev` URL is suitable for acceptance testing.
-
-Configure an administrator token for manual staging operations with:
+## 4. Deploy the preview stage
 
 ```sh
-just admin-key
+nix develop --command just deploy-preview
 ```
 
-A NAV-issued private consumer key can be stored with `just nav-key`; staging uploads it automatically when present.
-
-Production is deliberately separate and requires private NAV credentials and an administrator credential:
-
-```sh
-just nav-key
-just admin-key
-export JOB_INDEX_SOURCE_CODE_URL=https://github.com/<owner>/<repository>
-./deploy-production
-```
-
-Production disables all demo mutations and uses a non-destructive smoke suite.
+This deploys the same bundle to its own Cloudflare stage (`preview`), with
+its own Worker name and D1 database, independent of staging/production —
+RFC 0015's strangler migration keeps the TypeScript service exercisable
+against real Cloudflare without touching what `staging`/`production`
+currently serve. See [`docs/public/how-to/deploy.md`](../how-to/deploy.md)
+for the staging/production entry points, which still deploy the retired
+Rust worker until `infra/alchemy.run.ts`'s stages are repointed.

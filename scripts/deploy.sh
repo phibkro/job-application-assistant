@@ -194,12 +194,14 @@ until curl --fail --silent --show-error --max-time 10 "${deployment_url}/api/hea
   sleep 2
 done
 
-if [ "${environment}" = "production" ]; then
-  SMOKE_OUTPUT_DIR="${log_dir}/smoke" \
-    ./scripts/smoke-production.sh "${deployment_url}" "${source_code_url}"
-else
-  SMOKE_OUTPUT_DIR="${log_dir}/smoke" ./scripts/smoke.sh "${deployment_url}"
-fi
+# The Rust worker's destructive staging journey (scripts/smoke.sh) went with
+# the crate that served the routes it exercised — saved-search webhooks,
+# principals, and maintenance have no TypeScript implementation yet, so there
+# was nothing left to port a destructive smoke suite against. Every stage now
+# runs the same non-destructive check smoke-production.sh performs, which is
+# the whole live route surface the TypeScript service currently promises to
+# keep identical to the Rust one (health/about) plus a public-read proof.
+SMOKE_OUTPUT_DIR="${log_dir}/smoke" ./scripts/smoke-production.sh "${deployment_url}"
 
 python3 - "${environment}" "${deployment_url}" "${config}" "${database_name}" "${database_id}" "${nav_auth_mode}" "${source_code_url}" > "${state_dir}/${environment}.json" <<'PY'
 import hashlib
@@ -210,7 +212,6 @@ from datetime import datetime, timezone
 
 environment, url, config_path, database_name, database_id, nav_auth_mode, source_code_url = sys.argv[1:]
 config = pathlib.Path(config_path)
-lock = pathlib.Path("Cargo.lock")
 print(json.dumps({
     "environment": environment,
     "url": url,
@@ -219,9 +220,8 @@ print(json.dumps({
     "database_id": database_id,
     "nav_auth_mode": nav_auth_mode,
     "source_code_url": source_code_url or None,
-    "smoke_mode": "non-destructive" if environment == "production" else "destructive-staging",
+    "smoke_mode": "non-destructive",
     "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
-    "cargo_lock_sha256": hashlib.sha256(lock.read_bytes()).hexdigest(),
 }, indent=2))
 PY
 

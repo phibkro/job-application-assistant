@@ -210,4 +210,19 @@ before that gate.
 
 ## Amendments
 
-None.
+- 2026-08-07: Stage 5 of the implementation plan executed — "Retire the Rust
+  crates once no route depends on them" — per `apps/worker/src/Api.ts`
+  serving every route group. Deleted: `crates/` (11,301 lines), `migrations/`
+  (superseded by the generated `db/schema.sql` snapshot; see
+  `work/WS-0012-r1-typescript-migration-plan.md`'s "Identity is no longer a
+  constraint"), `Cargo.toml`/`Cargo.lock`/`rust-toolchain.toml`, the legacy
+  Wrangler configs (`wrangler.jsonc`, `wrangler.local.jsonc`,
+  `wrangler.test.jsonc`), and every script that only built, tested, or
+  smoked the Rust worker. `infra/alchemy.run.ts`'s `staging`/`production`
+  stages still deploy that (now-deleted) Rust build output — repointing them
+  at the TypeScript worker is a deliberately separate decision, not part of
+  this stage. Capabilities that existed only in the deleted implementation
+  and have not been ported — principal/API-key administration, owned
+  saved-search webhook delivery, corpus maintenance, and the query-plan/
+  restore-drill production-qualification probes — are recorded in
+  `memory-bank/progress.md`.

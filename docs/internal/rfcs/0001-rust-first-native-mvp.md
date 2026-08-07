@@ -120,3 +120,5 @@ The first rollout is a local or single-host demo. Rollback consists of restoring
 - 2026-08-05: Converted the architectural decision into the repository RFC format without changing its substance.
 
 - 2026-08-05: Superseded by RFC 0004 after the product owner required Cloudflare D1 from the first executable slice.
+
+- 2026-08-07: RFC 0015 moved the implementation language from Rust to TypeScript/Effect; the Rust crates this RFC's chain of decisions led to are deleted from the repository. Nothing else here changes.

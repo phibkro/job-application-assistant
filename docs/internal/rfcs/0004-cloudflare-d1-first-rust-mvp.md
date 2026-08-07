@@ -180,3 +180,5 @@ The first remote rollout targets an isolated staging Worker and D1 database cont
 ## Amendments
 
 - 2026-08-05: The accepted runtime architecture is unchanged. The operator boundary was simplified so exact Nix packages supply Wrangler and worker-build directly, and account-specific D1 identifiers are persisted in an ignored generated config rather than the source template.
+
+- 2026-08-07: Superseded by RFC 0015, which moved the implementation language to TypeScript/Effect for a strangler migration and, at its final stage, retired the Rust Worker this RFC accepted. The Cloudflare D1-first decision itself stands — D1 remains the system of record — only the language implementing it changed. The `crates/`, `migrations/`, and Rust toolchain this RFC's decision record refers to are deleted.

@@ -1,5 +1,10 @@
 # Audit and reconcile the corpus
 
+> **Historical.** This maintenance surface (audit/dry-run reconcile/purge)
+> existed only in the Rust worker retired by RFC 0015's cutover. The
+> TypeScript service has no maintenance routes yet; see
+> `memory-bank/progress.md` for the current gap list.
+
 Run a read-only integrity audit:
 
 ```sh

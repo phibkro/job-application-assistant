@@ -1,5 +1,11 @@
 # Minimal viable architecture
 
+> **Historical, superseded.** This describes the original Rust/Cloudflare
+> Worker prototype (RFC 0001/0004). RFC 0015 strangled it; the Rust crates
+> this document refers to are deleted. Current architecture:
+> [`effect-module-map.md`](effect-module-map.md). Left as written below —
+> it records what was decided at the time.
+
 ## Deployment
 
 ```text

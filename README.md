@@ -1,126 +1,95 @@
 # Job Index
 
-A Rust/Cloudflare D1 first production design for a source-aware Norwegian job corpus. It provides:
+A TypeScript/Effect Cloudflare Worker for a source-aware Norwegian job corpus.
+RFC 0015 strangled the original Rust/Cloudflare Worker prototype; this
+service now serves every route group, and the Rust implementation has been
+retired. It provides:
 
-1. reliable NAV backfill and tail ingestion with leases, retries, recovery, and provenance;
-2. a canonical lifecycle corpus with bounded maintenance and integrity audits;
-3. a versioned cursor-paginated public read and change API;
-4. API-key principals with quotas, revocation, ownership isolation, and audit records;
-5. incremental owned saved searches evaluated by scheduled bounded sweeps;
-6. a transactional HMAC-signed webhook outbox with retries and dead-state recovery; and
-7. explicit staging, production, SLO, restore, load, and release qualification gates.
+1. live NAV ingestion into a canonical, deduplicated job corpus with provenance;
+2. a versioned public read API (`/api/v1/jobs`, source catalogue);
+3. a browse / save / draft / apply application flow with account profiles; and
+4. explicit local, preview, staging, and production environments.
 
-## Deploy from the ZIP
+Principal (API-key) administration, owned saved-search webhook delivery, and
+corpus maintenance existed only in the retired Rust worker and have not been
+ported — see `memory-bank/progress.md` for the current gap list.
+
+## Run it
 
 Prerequisite: a NixOS or Linux machine with Nix installed and network access.
-No Git checkout, earlier ZIP, patch, rustup, npm, or globally installed Rust
-stack is required.
+No Git checkout, npm, or globally installed Bun/Node is required.
 
 ```sh
-unzip job-index.zip
+git clone <repository> job-index
 cd job-index
-./deploy
+nix develop --command just preview
 ```
 
-`./deploy` deploys the disposable staging environment after the full verification suite. Production is always explicit:
-
-```sh
-just nav-key
-just admin-key
-export JOB_INDEX_SOURCE_CODE_URL=https://github.com/<owner>/<repository>
-./deploy-production
-```
-
-Production uses a separate Worker and D1 database, private credentials, a two-phase publication before cron activation, and a non-destructive smoke suite.
-
-The first authenticated run may open `wrangler login`. A scoped
-`CLOUDFLARE_API_TOKEN` may be supplied instead.
+`just preview` bundles the interface and the Worker, applies the generated
+schema and a small seed to a local D1 database, and serves the whole stack —
+sign in with the token `demo-token` to see the feed and the profile.
 
 ## Local development
 
 ```sh
-just fix     # apply safe Clippy rewrites and Rust formatting
-just lint    # strict, non-mutating Clippy checks
-just check   # formatting, lint, policy, migration, and bundle checks
-just audit   # RustSec dependency vulnerability scan
-just qualification # query-plan and local restore drills
-just verify  # all checks, tests, qualification, and local D1/NAV-stub journeys
-just dev     # browser demo at http://localhost:8787
-just deploy  # verified disposable staging deployment
-just deploy-production # explicit non-destructive production deployment
+nix shell nixpkgs#bun -c bun run check   # TypeScript workspace: format, lint, typecheck, schema, bundle, tests
+nix develop --command just check          # repository, credential, and script gates
+nix develop --command just verify         # just check + bun run check
+nix develop --command just preview        # the whole stack, served locally
 ```
 
-Without a host `just`, use `./bootstrap <command>` or `./deploy`.
+Without a host `just`, use `./bootstrap <command>`.
 
-## Demo journeys
-
-Open the local or deployed URL.
-
-### Deterministic corpus journey
-
-1. **Reset D1 demo**
-2. **Collect fixture** — three source ads become two canonical jobs
-3. **Replay fixture** — zero new canonical changes
-
-### Incremental saved-search journey
-
-1. Collect the deterministic fixture.
-2. Create the **Oslo support and customer service** search.
-3. Evaluate it once to add the existing matches.
-4. Evaluate it again and observe `jobs_evaluated: 0`.
-5. Add, update, or close the NAV fixture job and evaluate only that changed job.
-
-### Live NAV journey
-
-1. Select **Sync one NAV page**.
-2. The Worker fetches one bounded page from NAV's official vacancy feed.
-3. D1 records the cursor, ETag/Last-Modified metadata, success/failure state,
-   observations, and canonical changes.
-4. Repeating the operation consumes only the next page or receives `304 Not
-   Modified` at the tail.
-
-Local development uses NAV's rotating experimental token. Before sustained
-production use, configure the private token supplied by NAV:
+## Deploy
 
 ```sh
 just nav-key
+just admin-key
+./deploy
 ```
 
-The deployed manual sync route is protected by `ADMIN_SYNC_TOKEN`; scheduled sync uses the same bounded application function. Use `just admin-key` to configure the local production credential.
+`./deploy` deploys the disposable staging environment after `just verify`.
+Production is always explicit:
+
+```sh
+just nav-key
+just admin-key
+./deploy-production
+```
+
+Both currently deploy through `infra/alchemy.run.ts`'s Rust branch, which
+this cutover leaves in place — that file's stage repoint to the TypeScript
+worker is a separate, deliberately-not-yet-taken decision. `scripts/preview.sh`
+and `scripts/deploy-preview.sh` exercise the TypeScript worker directly,
+independent of that repoint.
+
+The first authenticated Cloudflare run may open `wrangler login`. A scoped
+`CLOUDFLARE_API_TOKEN` may be supplied instead.
 
 ## Architecture
 
 ```text
-API clients / Admin operator / Cron Trigger
+API clients / browser interface / Cron Trigger
                  ↓
-Rust Cloudflare Worker (workers-rs)
+TypeScript + Effect v4 Cloudflare Worker (apps/worker/)
                  ↓
-Cloudflare D1 corpus, principals, searches, audit, and outbox
+Cloudflare D1 corpus, accounts, applications
                  ↓
-NAV official vacancy feed / signed webhook receivers
+NAV official vacancy feed / other catalogued sources
 ```
 
-`job-index-core` owns runtime-independent parsing, normalization, and identity.
-`job-index-worker` owns Cloudflare Fetch, D1 persistence, HTTP routes, and the
-scheduled handler.
+`packages/domain/` owns canonical identity, normalization, and matching as
+Effect Schema models. `apps/worker/src/Api.ts` declares the HTTP contract
+that the router, the interface, and the test suite are all derived from —
+see its doc comment for why that replaces a hand-kept OpenAPI document.
 
 ## Documentation
 
 - [Documentation map](docs/index.md)
-- [First demo tutorial](docs/public/tutorials/run-first-demo.md)
-- [Deployment guide](docs/public/how-to/deploy.md)
-- [Production API v1 reference](docs/public/reference/api-v1.md)
-- [HTTP/demo API reference](docs/public/reference/http-api.md)
-- [Principal management](docs/public/how-to/manage-principals.md)
-- [Corpus maintenance](docs/public/how-to/corpus-maintenance.md)
-- [Webhook delivery](docs/public/how-to/webhooks.md)
-- [Production qualification](docs/public/how-to/production-qualification.md)
-- [Add a source](docs/public/how-to/add-source.md)
-- [Canonical corpus explanation](docs/public/explanation/canonical-corpus.md)
-- [Incremental saved-search explanation](docs/public/explanation/incremental-saved-searches.md)
-- [RFC 0006: incremental saved searches](docs/internal/rfcs/0006-incremental-saved-searches.md)
-- [RFC 0005: live NAV ingestion](docs/internal/rfcs/0005-live-nav-incremental-ingestion.md)
+- [Effect module specification](docs/internal/architecture/effect-module-map.md)
+- [RFC 0015: implementation language for the application product](docs/internal/rfcs/0015-implementation-language-for-the-application-product.md)
 - [Current agent context](memory-bank/activeContext.md)
+- [Deployment guide](docs/public/how-to/deploy.md)
 
 ## License
 

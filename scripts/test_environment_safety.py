@@ -1,31 +1,19 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-
-def load(name: str) -> dict:
-    return json.loads((ROOT / name).read_text())
-
-
-# Local and test remain Wrangler configs because they describe how the service
-# runs on a developer machine. Staging and production are declared in
-# infra/alchemy.run.ts, so the safety properties for those are asserted against
-# that file: a second copy here is exactly the drift this test exists to stop.
-local = load("wrangler.local.jsonc")
-test = load("wrangler.test.jsonc")
-
-assert local["vars"]["ENVIRONMENT"] == "local"
-assert test["vars"]["ENVIRONMENT"] == "test"
-for config in (local, test):
-    assert config["vars"]["ALLOW_DEMO_MUTATIONS"] == "true", config["name"]
-
-assert test["vars"]["NAV_BASE_URL"].startswith("http://127.0.0.1:")
-assert "triggers" not in local
-assert "triggers" not in test
+# The Rust worker's local/test Wrangler configs (wrangler.local.jsonc,
+# wrangler.test.jsonc) are gone with the crate that built against them. The
+# TypeScript service's local config is dev/preview.wrangler.jsonc, asserted
+# below; staging and production remain declared in infra/alchemy.run.ts, so
+# the safety properties for those are asserted against that file: a second
+# copy here is exactly the drift this test exists to stop.
+preview_config = (ROOT / "dev/preview.wrangler.jsonc").read_text()
+assert '"ENVIRONMENT": "local"' in preview_config
+assert "triggers" not in preview_config
 
 infra = (ROOT / "infra/alchemy.run.ts").read_text()
 
@@ -69,20 +57,14 @@ deploy_preview = (ROOT / "scripts/deploy-preview.sh").read_text()
 assert "db/schema.sql" in deploy_preview
 
 justfile = (ROOT / "justfile").read_text()
-for recipe in ["deploy-staging:", "deploy-production:", "admin-key:", "cargo test --workspace --lib"]:
+for recipe in ["deploy-staging:", "deploy-production:", "admin-key:"]:
     assert recipe in justfile, recipe
-
-verify = (ROOT / "scripts/verify-local.sh").read_text()
-assert "scripts/nav_stub.py" in verify
-assert "wrangler.test.jsonc" in verify
-assert "scripts/smoke-nav-stub.sh" in verify
 
 deploy = (ROOT / "scripts/deploy.sh").read_text()
 assert 'environment="${1:-staging}"' in deploy
 assert "Production requires a NAV-issued private consumer token" in deploy
 assert "Production requires ADMIN_SYNC_TOKEN" in deploy
 assert "smoke-production.sh" in deploy
-assert "smoke.sh" in deploy
 assert "JOB_INDEX_DEV_VARS_FILE" in deploy
 assert "bootstrap-publish" in deploy
 # The two-phase production publication: schedules off, then on.
@@ -92,13 +74,12 @@ assert "JOB_INDEX_ACTIVATE_SCHEDULES" in deploy
 # A freshly published Worker is smoked only once it answers.
 assert "/api/health" in deploy
 
+# smoke-production.sh only knows the two routes deliberately mirrored across
+# the cutover (see apps/worker/src/index.ts); the Rust-only demo/NAV-status
+# checks it used to run went with the crate that served them.
 production_smoke = (ROOT / "scripts/smoke-production.sh").read_text()
-assert 'demo_status == "403"' in production_smoke
-assert 'nav_status == "403"' in production_smoke
-assert "source_code_url" in production_smoke
+assert "/api/health" in production_smoke
+assert "/api/about" in production_smoke
+assert 'about["license"] == "proprietary"' in production_smoke
 
-connector = (ROOT / "crates/job-index-worker/src/nav_connector.rs").read_text()
-assert 'var("NAV_BASE_URL")' in connector
-assert "DEFAULT_NAV_BASE_URL" in connector
-
-print("Environment-safety checks passed: local/test/staging/production boundaries are explicit.")
+print("Environment-safety checks passed: staging/production boundaries are explicit.")

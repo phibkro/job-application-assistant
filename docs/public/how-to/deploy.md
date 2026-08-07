@@ -1,5 +1,17 @@
 # Deploy staging or production
 
+> **Historical, partially superseded.** Written for the Rust worker and the
+> pre-Alchemy Wrangler templates (`wrangler.staging.jsonc`,
+> `wrangler.production.jsonc`, generated `wrangler.<env>.deploy.jsonc`) —
+> none of these exist any more. Staging/production infrastructure is now
+> declared in `infra/alchemy.run.ts`; `./deploy` and `./deploy-production`
+> still work as entry points and the credential-setup steps below
+> (`just nav-key`, `just admin-key`) are still accurate, but the internals
+> they describe (migrations, per-file Wrangler templates, the `/api/sources/
+> nav/sync` manual route) belong to the retired Rust worker that
+> `infra/alchemy.run.ts` still deploys for these two stages. See
+> `memory-bank/activeContext.md` for the current, accurate command surface.
+
 ## Prerequisite
 
 Use NixOS or Linux with Nix installed and outbound network access. Git history,

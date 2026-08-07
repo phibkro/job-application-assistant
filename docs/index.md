@@ -5,7 +5,8 @@ The repository uses progressive disclosure: start with the smallest document tha
 ## Five-minute orientation
 
 - [Product vision](internal/product/vision.md)
-- [Prototype architecture](internal/architecture/mvp.md)
+- [Current architecture: Effect module map](internal/architecture/effect-module-map.md)
+- [Original prototype architecture (historical, superseded)](internal/architecture/mvp.md)
 - [ADLC overview](internal/lifecycle/adlc.md)
 - [Quality assurance strategy](internal/lifecycle/quality-assurance.md)
 - [Current project state](../memory-bank/activeContext.md)
@@ -30,7 +31,8 @@ A page should primarily serve one quadrant. Mixed pages should be split rather t
 - [Research](internal/research/)
 - [Requests for Comments](internal/rfcs/)
   - [RFC process](internal/rfcs/README.md)
-  - [Current runtime decision: RFC 0004](internal/rfcs/0004-cloudflare-d1-first-rust-mvp.md)
+  - [Current implementation-language decision: RFC 0015](internal/rfcs/0015-implementation-language-for-the-application-product.md)
+  - [Original Rust runtime decision (historical, superseded): RFC 0004](internal/rfcs/0004-cloudflare-d1-first-rust-mvp.md)
   - [Live NAV ingestion: RFC 0005](internal/rfcs/0005-live-nav-incremental-ingestion.md)
   - [Incremental saved searches: RFC 0006](internal/rfcs/0006-incremental-saved-searches.md)
   - [Reliable ingestion control: RFC 0007](internal/rfcs/0007-reliable-ingestion-control.md)

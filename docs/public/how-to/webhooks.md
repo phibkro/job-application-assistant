@@ -1,5 +1,10 @@
 # Deliver saved-search webhooks
 
+> **Historical.** The saved-search webhook outbox existed only in the Rust
+> worker retired by RFC 0015's cutover. The TypeScript service has no owned
+> saved searches or webhook delivery; see `memory-bank/progress.md` for the
+> current gap list.
+
 Create a subscription with an authenticated principal:
 
 ```sh
