@@ -8,6 +8,8 @@ import * as Handlers from "./handlers/index.ts";
 import { decodeEnv, type Env } from "./runtime/Env.ts";
 import { services } from "./runtime/Layers.ts";
 import { platform } from "./runtime/Platform.ts";
+import { configFrom, layer as telemetry } from "./runtime/Telemetry.ts";
+import type { TelemetryConfig } from "./runtime/Telemetry.ts";
 import { Ingestion } from "./services/Ingestion.ts";
 import type { RunBudget } from "./services/Ingestion.ts";
 import { SourceCatalog } from "./services/SourceCatalog.ts";
@@ -71,7 +73,10 @@ const operationalRoutes = (env: Env): Layer.Layer<never, never, HttpRouter.HttpR
  * `HttpRouter.toWebHandler` against a substituted service layer, rather than
  * asserting on the parts and hoping the wiring agrees.
  */
-export const appLayer = (env: Env): Layer.Layer<never, never, never> =>
+export const appLayer = (
+  env: Env,
+  telemetryConfig?: TelemetryConfig,
+): Layer.Layer<never, never, never> =>
   Layer.mergeAll(
     operationalRoutes(env),
     // Every group's handlers, then the api itself: `HttpApiBuilder.layer`
@@ -96,6 +101,10 @@ export const appLayer = (env: Env): Layer.Layer<never, never, never> =>
     Layer.provide(services(env)),
     Layer.provide(platform),
     Layer.provide(HttpRouter.layer),
+    // Outermost, so spans and logs from every layer beneath it are exported —
+    // including the ones emitted while the graph is still being built. Absent
+    // configuration makes this `Layer.empty`; see `runtime/Telemetry.ts`.
+    Layer.provide(telemetry(telemetryConfig)),
   );
 
 let handler: ((request: Request) => Promise<Response>) | undefined;
@@ -155,7 +164,7 @@ interface ScheduledContext {
 export default {
   fetch(request: Request, env: unknown): Promise<Response> {
     if (handler === undefined) {
-      handler = HttpRouter.toWebHandler(appLayer(decodeEnv(env))).handler;
+      handler = HttpRouter.toWebHandler(appLayer(decodeEnv(env), configFrom(env))).handler;
     }
     return handler(request);
   },
