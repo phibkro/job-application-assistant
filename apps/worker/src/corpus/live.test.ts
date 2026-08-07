@@ -1,30 +1,33 @@
 import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type { RawListing } from "@job-index/domain/Job";
 import type { SourceId } from "@job-index/domain/Ids";
-import { layerSqlite } from "../db/Sqlite.ts";
+import { layer as databaseLayer } from "../db/Live.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { layer as corpusLayer } from "./index.ts";
 import { normalize } from "./identity.ts";
 
 /**
- * The corpus against a real SQL engine running the generated schema.
+ * The corpus against a real D1 binding running the generated schema.
  *
  * Every other test in this slot runs on `testSupport.ts`'s fake `Database`,
  * which recognises a statement by object identity — so it proves the logic and
  * can prove nothing whatever about the SQL. A misspelt column, a placeholder
  * count that does not match its bindings, a table that `db/schema.sql` never
- * had: the fake passes all three. `bun:sqlite` executing `db/schema.sql`
+ * had: the fake passes all three. A real engine executing `db/schema.sql`
  * rejects them, which is why this file exists and why it imports the
  * persistence slot's layer instead of a second engine of its own.
  *
  * This closes the gap the corpus slot reported: it could not test against a
  * real engine because `canonical_jobs` and `occurrences` were absent from the
- * snapshot. They are generated from the domain models now.
+ * snapshot. They are generated from the domain models now. The engine itself
+ * moved on from `bun:sqlite` to the real D1 binding this file's Worker was
+ * given (`vitest.workers.config.ts`) — see that file for why.
  */
 const run = <A>(effect: Effect.Effect<A, never, Corpus>): Promise<A> =>
-  Effect.runPromise(Effect.provide(effect, Layer.provide(corpusLayer, layerSqlite())));
+  Effect.runPromise(Effect.provide(effect, Layer.provide(corpusLayer, databaseLayer(env.DB))));
 
 const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: "nav" as SourceId,

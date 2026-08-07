@@ -111,6 +111,26 @@ describe("layerSqlite", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it(
+    "an interactive transaction, the trap this contract's shape used to invite: bun:sqlite " +
+      "silently accepts a raw BEGIN — the real D1 binding rejects the identical statement " +
+      "outright (see db/transactionSemantics.live.test.ts, the workers-pool counterpart of this test)",
+    async () => {
+      await run(
+        Effect.gen(function* () {
+          const db = yield* Database;
+          // Does not throw: `bun:sqlite` opens an interactive transaction
+          // here and would happily leave it open across arbitrary further
+          // calls. `Database.atomic` deliberately does not expose this — see
+          // its own doc comment — precisely because it is not a promise D1
+          // can keep.
+          yield* db.run("BEGIN", []);
+          yield* db.run("ROLLBACK", []);
+        }),
+      );
+    },
+  );
+
   it("rolls the whole list back when one statement fails, so a partial batch is not observable", async () => {
     const outcome = await Effect.runPromise(
       Effect.provide(

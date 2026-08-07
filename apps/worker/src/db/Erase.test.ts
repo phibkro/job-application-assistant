@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import * as node_fs from "node:fs";
-import * as node_path from "node:path";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as OptionMod from "effect/Option";
@@ -13,6 +11,10 @@ import { Subscription } from "@job-index/domain/Subscription";
 import type { JobSnapshot } from "@job-index/domain/Job";
 import { Database } from "../services/Database.ts";
 import { eraseProfile, ERASED_TABLES, RETAINED_TABLES_WITH_PROFILE_ID } from "./Erase.ts";
+// Raw text, not a runtime file read: this test runs inside workerd, which
+// has no filesystem — see `testSupport/workerdEnv.d.ts`.
+// @ts-expect-error typed ambiently in workerdEnv.d.ts
+import schemaSql from "../../../../db/schema.sql?raw";
 import * as Answers from "./repositories/Answers.ts";
 import * as Sessions from "./repositories/Sessions.ts";
 import * as ApplicationRecords from "../applications/applicationRecords.ts";
@@ -33,11 +35,9 @@ const now = DateTime.nowUnsafe();
  * picks it up on the next test run without anyone updating this file.
  */
 const profileTablesInSchema = (): ReadonlyArray<string> => {
-  const schemaPath = node_path.resolve(import.meta.dirname, "../../../../db/schema.sql");
-  const schema = node_fs.readFileSync(schemaPath, "utf8");
   const tables: Array<string> = [];
   const tablePattern = /CREATE TABLE IF NOT EXISTS (\w+) \(\n([\s\S]*?)\n\);/g;
-  for (const match of schema.matchAll(tablePattern)) {
+  for (const match of schemaSql.matchAll(tablePattern)) {
     const [, table, body] = match;
     if (table !== undefined && body !== undefined && /^\s*profileId\s/m.test(body)) {
       tables.push(table);

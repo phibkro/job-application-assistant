@@ -21,6 +21,24 @@
   migration-integrity checks.
 - Local preview (`just preview`) serving the whole stack — API, interface,
   and a seeded local D1 — for real-journey verification without a deploy.
+- `@cloudflare/vitest-pool-workers` adopted for the persistence/ingestion/DO
+  seam: `apps/worker/src/db/**` (except the two files below), `ingestion/
+  live.test.ts`, `ingestion/SourceLeaseObject.test.ts`, `corpus/live.test.ts`,
+  and `handlers/corpus.live.test.ts` now run *inside workerd*, against a real
+  local D1 binding and a real `SourceLeaseObject` Durable Object namespace
+  (`dev/test.wrangler.jsonc`, `vitest.workers.config.ts`), not `bun:sqlite` or
+  a hand-built fake. `apps/worker/src/db/transactionSemantics.live.test.ts`
+  pins the seam is real: D1 rejects a raw `BEGIN`; `Sqlite.test.ts`'s
+  companion test shows the identical statement silently succeeds under
+  `bun:sqlite`. The pool does not run under Bun — verified directly, it hangs
+  on a `ws` gap in Bun's WebSocket shim — so this is a second, Node-only
+  `vitest` invocation (`bun run test:workers`/`coverage:workers`, folded into
+  `bun run check` via `coverage:all`), never added to the shared Nix dev
+  shell (that already broke `bun:sqlite` resolution once — see `flake.nix`).
+  `layerSqlite`/`Sqlite.ts` stays: `accounts/live.test.ts`,
+  `applications/live.test.ts`, and `db/Sqlite.test.ts`/`db/Live.test.ts`
+  (which pins `Live.ts`'s `batch()` call-shape against `FakeD1.ts`, a claim no
+  real binding can expose) still use it, deliberately, on Bun.
 
 ## Known gaps left by the cutover
 

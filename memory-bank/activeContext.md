@@ -39,6 +39,8 @@ just nav-key           # configure NAV private consumer key
 just admin-key          # generate/configure protected operator token
 just check              # repository, credential, and script gates
 bun run check            # TypeScript workspace: format, lint, typecheck, schema, bundle, tests
+bun run test:workers     # the workerd-real half of the suite alone (D1 + Durable Object), via Node
+bun run coverage:all     # both coverage runs; `bun run check` already includes this
 just verify              # just check + bun run check
 just preview             # local TypeScript stack: API + interface + seeded D1
 just soak                # bounded staging soak; use seven days for acceptance

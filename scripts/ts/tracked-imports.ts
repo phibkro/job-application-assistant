@@ -49,7 +49,13 @@ const SPECIFIERS: ReadonlyArray<RegExp> = [
 ];
 
 const resolveSpecifier = (fromFile: string, specifier: string): string | undefined => {
-  const base = path.resolve(path.dirname(path.join(ROOT, fromFile)), specifier);
+  // Vite's `?raw`/`?url`/etc. import-suffix convention (`vitest.workers.config.ts`'s
+  // project uses `?raw` to inline `db/schema.sql` as text — workerd has no
+  // filesystem, so a runtime read is not an option there) names a real file
+  // on disk, plus a query the bundler strips before resolving. Stripped here
+  // for the same reason: git only tracks the file, never the suffix.
+  const withoutQuery = specifier.replace(/\?.*$/, "");
+  const base = path.resolve(path.dirname(path.join(ROOT, fromFile)), withoutQuery);
   // The repository imports with explicit `.ts` extensions, but a directory
   // import or an extensionless one should resolve the way a bundler would
   // rather than be reported as missing.
