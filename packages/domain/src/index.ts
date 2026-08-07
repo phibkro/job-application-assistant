@@ -7,6 +7,7 @@
  */
 export * as Access from "./Access.ts";
 export * as Answer from "./Answer.ts";
+export * as Applications from "./Applications.ts";
 export * as Delivery from "./Delivery.ts";
 export * as Failure from "./Failure.ts";
 export * as Freshness from "./Freshness.ts";

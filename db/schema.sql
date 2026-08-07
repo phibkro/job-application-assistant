@@ -147,3 +147,44 @@ CREATE TABLE IF NOT EXISTS occurrences (
 CREATE INDEX IF NOT EXISTS idx_occurrences_canonicalJobId ON occurrences (canonicalJobId);
 
 CREATE INDEX IF NOT EXISTS idx_occurrences_sourceId_active ON occurrences (sourceId, active);
+
+CREATE TABLE IF NOT EXISTS saved_jobs (
+  id TEXT NOT NULL,
+  profileId TEXT NOT NULL,
+  canonicalJobId TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  createdAt TEXT NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE (profileId, canonicalJobId)
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_jobs_profileId ON saved_jobs (profileId);
+
+CREATE TABLE IF NOT EXISTS applications (
+  id TEXT NOT NULL,
+  profileId TEXT NOT NULL,
+  savedJobId TEXT NOT NULL,
+  canonicalJobId TEXT NOT NULL,
+  method TEXT NOT NULL CHECK (method IN ('assisted', 'automated')),
+  status TEXT NOT NULL CHECK (status IN ('ready', 'submitted', 'rejected', 'interview', 'offer', 'withdrawn')),
+  applicationUrl TEXT NOT NULL,
+  cv TEXT NOT NULL,
+  letter TEXT NOT NULL,
+  generator TEXT NOT NULL,
+  downgradeReason TEXT,
+  notes TEXT NOT NULL DEFAULT '',
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_applications_profileId ON applications (profileId);
+
+CREATE INDEX IF NOT EXISTS idx_applications_savedJobId ON applications (savedJobId);
+
+CREATE TABLE IF NOT EXISTS platform_policies (
+  platformId TEXT NOT NULL,
+  policy TEXT NOT NULL CHECK (policy IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed')),
+  updatedAt TEXT NOT NULL,
+  PRIMARY KEY (platformId)
+);
