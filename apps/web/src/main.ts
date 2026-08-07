@@ -1,0 +1,60 @@
+import * as Match from "effect/Match";
+import type { Runtime } from "foldkit";
+import type { Document, Html, HtmlBuilder } from "foldkit/html";
+import type { Message } from "./Message.ts";
+import { initialModel, Model, SessionAnonymous, SessionAuthenticated } from "./Model.ts";
+import * as Session from "./Session.ts";
+import { update } from "./update.ts";
+import { browseView } from "./view/Browse.ts";
+import { feedView } from "./view/Feed.ts";
+import { jobDetailView } from "./view/JobDetail.ts";
+import { profileView } from "./view/Profile.ts";
+import { nav, sessionPanel } from "./view/Shared.ts";
+
+// The Foldkit-idiomatic split: this module defines the program (Model,
+// init, update, view) and stays importable — by `update.test.ts`, by any
+// future Scene test — without booting a runtime. `entry.ts` is the only
+// module that touches the DOM.
+export { Model, update };
+export type { Message };
+
+/** Reads the previously-stored session token once at startup so a returning
+ *  visitor is not shown "signed out" for the one frame before their first
+ *  request would have proven otherwise. This is a synchronous, read-only
+ *  peek at `sessionStorage` — the same boundary `Commands.ts` reads fresh on
+ *  every authenticated call — not a second source of truth: `init` only
+ *  ever reads it, never writes it. */
+export const init: Runtime.ApplicationInit<Model, Message> = () => {
+  const token = Session.readToken();
+  return [
+    {
+      ...initialModel,
+      session: token === null ? SessionAnonymous() : SessionAuthenticated({ token }),
+    },
+    [],
+  ];
+};
+
+export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
+  title: "Job Index",
+  body: h.div(
+    [h.Class("app")],
+    [
+      h.header([h.Class("app-header")], [h.h1([], ["Job Index"]), nav(h), sessionPanel(model, h)]),
+      h.main(
+        [],
+        [
+          Match.value(model.page).pipe(
+            Match.withReturnType<Html>(),
+            Match.tagsExhaustive({
+              Browse: () => browseView(model, h),
+              JobDetail: () => jobDetailView(model, h),
+              Feed: () => feedView(model, h),
+              Profile: () => profileView(model, h),
+            }),
+          ),
+        ],
+      ),
+    ],
+  ),
+});
