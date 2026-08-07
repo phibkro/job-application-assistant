@@ -1,5 +1,6 @@
 import * as Data from "effect/Data";
 import type { D1Database } from "../db/D1.ts";
+import type { SourceLeaseNamespace } from "../ingestion/SourceLeaseObject.ts";
 
 /**
  * The Worker's environment, checked at the edge of the program.
@@ -13,6 +14,11 @@ import type { D1Database } from "../db/D1.ts";
  */
 export interface Env {
   readonly DB: D1Database;
+  /**
+   * One Durable Object per source, admitting one `Ingestion.collect` run at
+   * a time for it. See `ingestion/SourceLeaseObject.ts`.
+   */
+  readonly SOURCE_LEASE: SourceLeaseNamespace;
   /** `staging` or `production`; whatever the deploy set, reported as-is. */
   readonly ENVIRONMENT: string;
   /**
@@ -45,6 +51,15 @@ const isD1 = (value: unknown): value is D1Database =>
   typeof (value as { prepare?: unknown }).prepare === "function" &&
   typeof (value as { batch?: unknown }).batch === "function";
 
+/** Same duck-typed reasoning as `isD1`: recognised by the methods this
+ *  workspace actually calls, not by an `instanceof` the platform's runtime
+ *  class does not export. */
+const isSourceLeaseNamespace = (value: unknown): value is SourceLeaseNamespace =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as { idFromName?: unknown }).idFromName === "function" &&
+  typeof (value as { get?: unknown }).get === "function";
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
@@ -55,6 +70,9 @@ export const decodeEnv = (env: unknown): Env => {
   if (!isD1(bag.DB)) {
     missing.push("DB (a D1 binding)");
   }
+  if (!isSourceLeaseNamespace(bag.SOURCE_LEASE)) {
+    missing.push("SOURCE_LEASE (a Durable Object namespace binding)");
+  }
   if (!isNonEmptyString(bag.ENVIRONMENT)) {
     missing.push("ENVIRONMENT");
   }
@@ -64,6 +82,7 @@ export const decodeEnv = (env: unknown): Env => {
 
   return {
     DB: bag.DB as D1Database,
+    SOURCE_LEASE: bag.SOURCE_LEASE as SourceLeaseNamespace,
     ENVIRONMENT: bag.ENVIRONMENT as string,
     NAV_API_TOKEN: isNonEmptyString(bag.NAV_API_TOKEN) ? bag.NAV_API_TOKEN : undefined,
   };

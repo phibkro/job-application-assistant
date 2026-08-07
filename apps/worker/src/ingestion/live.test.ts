@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import type { RawListing } from "@job-index/domain/Job";
 import type { CatalogEntry } from "@job-index/domain/Source";
@@ -13,7 +15,9 @@ import { Database } from "../services/Database.ts";
 import { Ingestion } from "../services/Ingestion.ts";
 import type { RunBudget } from "../services/Ingestion.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
+import { SourceLease } from "../services/SourceLease.ts";
 import { layer as corpusLayer, normalize } from "../corpus/index.ts";
+import * as SourceStateRepo from "../db/repositories/SourceState.ts";
 import { layer as ingestionLayer } from "./index.ts";
 import type { PageFailure } from "./failureDetail.ts";
 
@@ -60,6 +64,38 @@ const fakeAcquisition = (script: PageScript): Acquisition["Service"] => ({
   },
 });
 
+/**
+ * An in-memory `SourceLease`: check-and-set inside one `Effect.sync` — a
+ * single, `yield`-free step no concurrent fiber can land inside of — which
+ * is what actually models the Durable Object's single-threadedness rather
+ * than merely asserting it. What it cannot model is the platform guarantee
+ * *behind* that atomicity — that no two isolates can ever reach the same
+ * object at once — only a real Durable Object under workerd proves that;
+ * see the operator report for this slot's `just preview` run.
+ */
+const fakeSourceLease = (
+  held: ReadonlyMap<PlatformId, string> = new Map(),
+): SourceLease["Service"] => {
+  const active = new Map(held);
+  return {
+    acquire: (platform, owner) =>
+      Effect.sync(() => {
+        const current = active.get(platform);
+        if (current !== undefined) {
+          return { _tag: "Held", owner: current } as const;
+        }
+        active.set(platform, owner);
+        return { _tag: "Granted" } as const;
+      }),
+    release: (platform, owner) =>
+      Effect.sync(() => {
+        if (active.get(platform) === owner) {
+          active.delete(platform);
+        }
+      }),
+  };
+};
+
 const fakeCatalog = (startCursor: string): SourceCatalog["Service"] => ({
   list: () =>
     Effect.succeed([
@@ -96,7 +132,7 @@ const BUDGET: RunBudget = {
   maxPages: 10,
   maxObservations: 100,
   maxDurationMs: 10_000,
-  leaseTtlMs: 60_000,
+  leaseRecoveryMs: 60_000,
 };
 
 /**
@@ -104,13 +140,20 @@ const BUDGET: RunBudget = {
  * `Layer.provideMerge` twice, not `Layer.mergeAll`, because `mergeAll` only
  * unions sibling layers' requirements without wiring one's output into
  * another's input; `provideMerge` is what actually threads `corpusLayer`'s
- * `Corpus` into `ingestionLayer`.
+ * `Corpus` into `ingestionLayer`. `sourceLease` defaults to a fresh, empty
+ * store — most tests never contend for it — and is a parameter for the ones
+ * that do (pre-held, or shared across two overlapping `collect` calls).
  */
-const testLayer = (script: PageScript, startCursor: string) => {
+const testLayer = (
+  script: PageScript,
+  startCursor: string,
+  sourceLease: SourceLease["Service"] = fakeSourceLease(),
+) => {
   const deps = Layer.mergeAll(
     layerSqlite(),
     Layer.succeed(Acquisition, fakeAcquisition(script)),
     Layer.succeed(SourceCatalog, fakeCatalog(startCursor)),
+    Layer.succeed(SourceLease, sourceLease),
   );
   const withCorpus = Layer.provideMerge(corpusLayer, deps);
   return Layer.provideMerge(ingestionLayer, withCorpus);
@@ -204,7 +247,13 @@ describe("Ingestion.collect on a real SQLite engine", () => {
 
         const staleJob = yield* corpus.get(stale.canonicalJobId);
         const aJob = yield* corpus.get(normalize(listing("a")).canonicalJobId);
-        return { first, second, staleJob, aJob };
+        // What `source_state` itself holds after the reset — not just what
+        // `second`'s report claims — because a run's own `RunReport` and
+        // `ingestion_runs` log are built *after* the in-memory reset either
+        // way; only reading the row back proves the reset actually reached
+        // the table `checkpoint`/`release` write to.
+        const persisted = yield* SourceStateRepo.find(PLATFORM);
+        return { first, second, staleJob, aJob, persisted };
       }),
     );
 
@@ -222,33 +271,101 @@ describe("Ingestion.collect on a real SQLite engine", () => {
     expect(result.staleJob?.status._tag).toBe("Closed");
     // "a" itself is untouched by the close (it was seen, just not this run).
     expect(result.aJob?.status._tag).toBe("Active");
+    // The reset is not merely a report-level courtesy: a third sweep must
+    // actually resume from `startCursor` with an empty seen-id set, which is
+    // only true if this is what `source_state` itself says.
+    expect(result.persisted?.cursor).toBe("start");
+    expect(result.persisted?.seenExternalIds).toEqual([]);
   });
 
-  it("fails LeaseHeld against a live, unexpired lease, naming its owner, and never touches the corpus", async () => {
+  it("fails LeaseHeld when the platform's SourceLease is already held, naming its owner, and never writes to source_state", async () => {
     const script: PageScript = {
       start: { listings: [listing("1")], cursor: "start", more: false },
     };
+    const held = fakeSourceLease(new Map([[PLATFORM, "someone-else"]]));
 
-    const failure = await Effect.runPromise(
+    const result = await Effect.runPromise(
       Effect.provide(
         Effect.gen(function* () {
-          const db = yield* Database;
-          const farFuture = Date.now() + 60_000;
-          yield* db.run(
-            `INSERT INTO source_state (platformId, cursor, seenExternalIds, resolvedSourceId, leaseOwner, leaseExpiresAt, updatedAt)
-             VALUES (?, 'start', '[]', NULL, 'someone-else', ?, ?)`,
-            [PLATFORM, farFuture, new Date().toISOString()],
-          );
           const ingestion = yield* Ingestion;
-          return yield* ingestion.collect(PLATFORM, BUDGET);
-        }).pipe(Effect.flip),
-        testLayer(script, "start"),
+          const failure = yield* ingestion.collect(PLATFORM, BUDGET).pipe(Effect.flip);
+          const persisted = yield* SourceStateRepo.find(PLATFORM);
+          return { failure, persisted };
+        }),
+        testLayer(script, "start", held),
       ),
     );
 
-    expect(failure._tag).toBe("LeaseHeld");
-    expect(failure.owner).toBe("someone-else");
+    expect(result.failure._tag).toBe("LeaseHeld");
+    expect(result.failure.owner).toBe("someone-else");
+    // A denied caller leaves no trace: it never reached `SourceStateRepo`.
+    expect(result.persisted).toBeUndefined();
   });
+
+  it(
+    "two collect() calls for the same platform, genuinely overlapping — the second is denied " +
+      "while the first is still mid-fetch, not called after it already finished",
+    async () => {
+      const sourceLease = fakeSourceLease();
+      const startedFirstFetch = Deferred.makeUnsafe<void>();
+      const releaseFirstFetch = Deferred.makeUnsafe<void>();
+
+      // Blocks the first page fetch until the test explicitly lets it go, so
+      // the second `collect` call is issued while the first is provably still
+      // inside its walk — not merely scheduled one after the other, which
+      // would prove nothing about the lease actually serializing anything.
+      const blockingAcquisition: Acquisition["Service"] = {
+        page: (_platform, cursor) =>
+          Effect.gen(function* () {
+            yield* Deferred.succeed(startedFirstFetch, undefined);
+            yield* Deferred.await(releaseFirstFetch);
+            return {
+              listings: [listing("1")],
+              cursor,
+              more: false,
+              via: "feed",
+            } satisfies AcquiredPage;
+          }),
+      };
+
+      const deps = Layer.mergeAll(
+        layerSqlite(),
+        Layer.succeed(Acquisition, blockingAcquisition),
+        Layer.succeed(SourceCatalog, fakeCatalog("start")),
+        Layer.succeed(SourceLease, sourceLease),
+      );
+      const layer = Layer.provideMerge(ingestionLayer, Layer.provideMerge(corpusLayer, deps));
+
+      const outcome = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const ingestion = yield* Ingestion;
+
+            const firstFiber = yield* Effect.forkChild(ingestion.collect(PLATFORM, BUDGET));
+            // Not a timing guess: this blocks until `collect` has acquired
+            // the lease *and* entered its first page fetch — the earliest
+            // point at which the two calls genuinely overlap.
+            yield* Deferred.await(startedFirstFetch);
+
+            const secondResult = yield* Effect.result(ingestion.collect(PLATFORM, BUDGET));
+
+            yield* Deferred.succeed(releaseFirstFetch, undefined);
+            const firstReport = yield* Fiber.join(firstFiber);
+
+            return { firstReport, secondResult };
+          }),
+          layer,
+        ),
+      );
+
+      expect(outcome.firstReport.stoppedReason).toBe("reached tail");
+      if (outcome.secondResult._tag !== "Failure") {
+        throw new Error("expected the overlapping call to be denied");
+      }
+      expect(outcome.secondResult.failure._tag).toBe("LeaseHeld");
+      expect(outcome.secondResult.failure.owner).not.toBe("");
+    },
+  );
 
   it("records a page failure in the ledger and stops the run without closing anything", async () => {
     const script: PageScript = { start: { fail: new Unauthorized({ source: "test-source" }) } };

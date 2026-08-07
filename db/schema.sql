@@ -220,8 +220,6 @@ CREATE TABLE IF NOT EXISTS source_state (
   cursor TEXT NOT NULL,
   seenExternalIds TEXT NOT NULL DEFAULT '[]',
   resolvedSourceId TEXT,
-  leaseOwner TEXT,
-  leaseExpiresAt INTEGER,
   updatedAt TEXT NOT NULL,
   PRIMARY KEY (platformId)
 );

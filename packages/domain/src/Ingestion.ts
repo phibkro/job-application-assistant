@@ -8,14 +8,21 @@ import { PlatformId, Sequence, SourceId } from "./Ids.ts";
  * an earlier slot.
  *
  * - `SourceState` is the resumable position of one platform's sweep: where
- *   the cursor is, which external ids this sweep has accumulated so far, and
- *   who currently holds the right to advance it. `Corpus.closeAbsent` may
- *   only be called with a *complete* enumeration (see its own doc comment),
- *   and a sweep can span more than one bounded `collect` invocation — a
- *   worker that dies mid-sweep must resume it, not restart it, or its next
- *   attempt would call `closeAbsent` having forgotten everything the earlier,
- *   interrupted attempts already saw. So "which ids has this sweep seen so
- *   far" has to survive between invocations the same way the cursor does.
+ *   the cursor is, and which external ids this sweep has accumulated so far.
+ *   `Corpus.closeAbsent` may only be called with a *complete* enumeration
+ *   (see its own doc comment), and a sweep can span more than one bounded
+ *   `collect` invocation — a worker that dies mid-sweep must resume it, not
+ *   restart it, or its next attempt would call `closeAbsent` having
+ *   forgotten everything the earlier, interrupted attempts already saw. So
+ *   "which ids has this sweep seen so far" has to survive between
+ *   invocations the same way the cursor does.
+ *
+ *   Who currently holds the right to advance a sweep is *not* here: that is
+ *   `SourceLease`'s Durable Object, one per platform, not a row in this
+ *   table. A Durable Object is single-threaded and globally unique per id,
+ *   so "one collector at a time" is a property of where that check runs,
+ *   not a fact this table has to store and every caller has to compare
+ *   clocks against.
  * - `IngestionRun` is a log of every `collect` invocation: what it decided
  *   (`RunReport`, stored as it was reported), because a quiet week and a
  *   broken connector produce the same empty corpus and are only
@@ -46,9 +53,6 @@ export class SourceState extends Model.Class<SourceState>("SourceState")({
    * until a listing has actually been seen.
    */
   resolvedSourceId: Model.FieldOption(SourceId),
-  leaseOwner: Model.FieldOption(Schema.String),
-  /** Epoch ms. A run that dies mid-sweep must not lock its source forever. */
-  leaseExpiresAt: Model.FieldOption(Schema.Number),
   updatedAt: Model.DateTimeUpdate,
 }) {}
 

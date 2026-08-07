@@ -25,6 +25,7 @@ import { layer as applicationsLayer } from "../applications/index.ts";
 import { layer as catalogLayer } from "../catalog/index.ts";
 import { layer as draftingLayer } from "../drafting/index.ts";
 import { layer as ingestionLayer } from "../ingestion/index.ts";
+import { layer as sourceLeaseLayer } from "../ingestion/SourceLeaseObject.ts";
 import type { Env } from "./Env.ts";
 
 /**
@@ -61,14 +62,15 @@ export type Services =
  * `source_catalog` behind its back.
  *
  * `Ingestion` is provided the same way, one step further out: it needs
- * `Acquisition`, `Corpus`, `SourceCatalog`, and `Database`, so it is composed
- * only after `leaves` already carries all four. `Acquisition` itself is
- * never added to `Services` — nothing outside this file talks to it
- * directly, `Ingestion` is the one consumer, exactly as the plugin-surface
- * design spec anticipated ("the next real registration list ... belongs to
- * whichever change implements `Ingestion`"). NAV is registered here, not
- * inside `acquisition/index.ts`, because only this file has `env` — and
- * therefore `env.NAV_API_TOKEN` — in scope.
+ * `Acquisition`, `Corpus`, `SourceCatalog`, `Database`, and `SourceLease`, so
+ * it is composed only after `leaves` already carries the first four.
+ * `Acquisition` and `SourceLease` are never added to `Services` — nothing
+ * outside this file talks to either directly, `Ingestion` is the one
+ * consumer, exactly as the plugin-surface design spec anticipated ("the next
+ * real registration list ... belongs to whichever change implements
+ * `Ingestion`"). NAV is registered here, not inside `acquisition/index.ts`,
+ * because only this file has `env` — and therefore `env.NAV_API_TOKEN` and
+ * `env.SOURCE_LEASE` — in scope.
  */
 export const services = (env: Env): Layer.Layer<Services> => {
   const leaves = Layer.mergeAll(corpusLayer, accountsLayer, draftingLayer, catalogLayer).pipe(
@@ -79,7 +81,10 @@ export const services = (env: Env): Layer.Layer<Services> => {
   const acquisition = acquisitionLayer([
     { tier: "Feed", adapter: makeNavAdapter(env.NAV_API_TOKEN) },
   ]);
-  const ingestion = ingestionLayer.pipe(Layer.provide(acquisition));
+  const ingestion = ingestionLayer.pipe(
+    Layer.provide(acquisition),
+    Layer.provide(sourceLeaseLayer(env.SOURCE_LEASE)),
+  );
 
   return Layer.provideMerge(ingestion, withApplications);
 };

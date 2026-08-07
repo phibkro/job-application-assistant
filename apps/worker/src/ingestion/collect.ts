@@ -11,13 +11,14 @@ import type { Acquisition } from "../services/Acquisition.ts";
 import type { Corpus } from "../services/Corpus.ts";
 import { Database } from "../services/Database.ts";
 import type { SourceCatalog } from "../services/SourceCatalog.ts";
+import type { SourceLease } from "../services/SourceLease.ts";
 import type { RunBudget, RunReport } from "../services/Ingestion.ts";
 import { normalize } from "../corpus/index.ts";
 import * as SourceStateRepo from "../db/repositories/SourceState.ts";
 import * as IngestionRunsRepo from "../db/repositories/IngestionRuns.ts";
 import * as IngestionFailuresRepo from "../db/repositories/IngestionFailures.ts";
 import { decideAfterPage, decideContinuation, foldPage } from "./budget.ts";
-import type { WalkState } from "./budget.ts";
+import type { SweepOutcome, WalkState } from "./budget.ts";
 import { describeFailure, isRetryable } from "./failureDetail.ts";
 import type { PageFailure } from "./failureDetail.ts";
 
@@ -25,12 +26,14 @@ type AcquisitionShape = Effect.Success<typeof Acquisition>;
 type CorpusShape = Effect.Success<typeof Corpus>;
 type SourceCatalogShape = Effect.Success<typeof SourceCatalog>;
 type DatabaseShape = Effect.Success<typeof Database>;
+type SourceLeaseShape = Effect.Success<typeof SourceLease>;
 
 export interface CollectDeps {
   readonly database: DatabaseShape;
   readonly acquisition: AcquisitionShape;
   readonly corpus: CorpusShape;
   readonly sourceCatalog: SourceCatalogShape;
+  readonly sourceLease: SourceLeaseShape;
 }
 
 /** Bounded retry with backoff for a transient page failure — SQLite/D1 aside, the one place this slot reaches for `Schedule`. */
@@ -55,10 +58,13 @@ const fetchPage = (
   }).pipe(Effect.timeout(Math.max(remainingMs, 0)));
 
 /**
- * `Ingestion.collect`'s implementation. Acquires the lease, walks pages
- * within budget, checkpoints each fully-folded page, closes absent
+ * `Ingestion.collect`'s implementation. Asks the platform's `SourceLease`
+ * Durable Object whether this run may proceed — before anything else
+ * touches `Database` or `Corpus`, so a denied caller leaves no trace — walks
+ * pages within budget, checkpoints each fully-folded page, closes absent
  * occurrences only when the walk actually reached the tail, and always
- * releases the lease — success, budget exhaustion, or failure alike.
+ * persists the final position and releases the lease, in that order —
+ * success, budget exhaustion, or failure alike.
  */
 export const makeCollect =
   (deps: CollectDeps) =>
@@ -66,6 +72,18 @@ export const makeCollect =
     Effect.gen(function* () {
       const owner = crypto.randomUUID();
       const startedAt = yield* DateTime.now;
+
+      // The Durable Object is the entire serialization story: single-
+      // threaded and globally unique per `platform`, so two concurrent
+      // `collect` calls for the same source can never both be granted, by
+      // construction of *where* this check runs — not by any clock
+      // comparison here. `LeaseHeld` is the caller-visible contract either
+      // way; nothing downstream can tell whether it came from here or from
+      // the old D1-backed lease.
+      const outcome = yield* deps.sourceLease.acquire(platform, owner, budget.leaseRecoveryMs);
+      if (outcome._tag === "Held") {
+        return yield* Effect.fail(new LeaseHeld({ source: platform, owner: outcome.owner }));
+      }
 
       // The catalogue is this platform's one durable fact Ingestion needs
       // beyond what Acquisition already resolves for itself: where a
@@ -77,158 +95,162 @@ export const makeCollect =
       const startCursor =
         catalog.find((entry: CatalogEntry) => entry.id === platform)?.listingsUrl ?? "";
 
-      const state = yield* Effect.provideService(
-        SourceStateRepo.acquireLease({
-          platformId: platform,
-          owner,
-          leaseTtlMs: budget.leaseTtlMs,
-          startCursor,
-          now: startedAt,
-        }),
+      const existing = yield* Effect.provideService(
+        SourceStateRepo.find(platform),
         Database,
         deps.database,
       );
-      const heldBy = SourceStateRepo.ownerOf(state);
-      if (heldBy !== owner) {
-        return yield* Effect.fail(new LeaseHeld({ source: platform, owner: heldBy ?? "unknown" }));
-      }
 
-      const cursorBefore = state.cursor;
-      let walk: WalkState = { cursor: state.cursor, seenExternalIds: state.seenExternalIds };
-      let resolvedSourceId: SourceId | undefined = Option.getOrUndefined(state.resolvedSourceId);
+      const cursorBefore = existing?.cursor ?? startCursor;
+      let walk: WalkState =
+        existing === undefined
+          ? { cursor: startCursor, seenExternalIds: [] }
+          : { cursor: existing.cursor, seenExternalIds: existing.seenExternalIds };
+      let resolvedSourceId: SourceId | undefined =
+        existing === undefined ? undefined : Option.getOrUndefined(existing.resolvedSourceId);
       let pages = 0;
       let observations = 0;
       let canonicalChanges = 0;
       let lastChangedId: CanonicalJobId | undefined;
 
-      // The finalizer reads `walk`/`resolvedSourceId` at the moment it runs
-      // (via closure, not by capturing a value now), so whatever the loop
-      // below last set — mid-sweep progress, or the reset-to-start state a
-      // completed sweep leaves behind — is exactly what gets persisted,
-      // regardless of which branch below actually produced it.
+      // Runs once, however the run ends, and always in this order: persist
+      // wherever `walk` finally landed, then release. `walk` is read via
+      // closure at the moment this runs, which is *after* the reset-to-start
+      // block below decides whether a completed sweep changes it — so this
+      // persists that reset, not the last fetched page's own cursor.
+      // Persisting before releasing matters on its own: a new run that
+      // acquires the instant this one lets go must see this run's writes,
+      // not whatever `source_state` said before them.
       const release = Effect.suspend(() =>
-        Effect.provideService(
-          Effect.gen(function* () {
-            const now = yield* DateTime.now;
-            yield* SourceStateRepo.finish(
+        Effect.gen(function* () {
+          const now = yield* DateTime.now;
+          yield* Effect.provideService(
+            SourceStateRepo.checkpoint(
               platform,
-              owner,
               walk.cursor,
               walk.seenExternalIds,
               resolvedSourceId,
               now,
-            );
-          }),
-          Database,
-          deps.database,
-        ),
-      );
-
-      const sweepOutcome = yield* Effect.gen(function* () {
-        while (true) {
-          const now = yield* DateTime.now;
-          const elapsedMs = DateTime.toEpochMillis(now) - DateTime.toEpochMillis(startedAt);
-          const continuation = decideContinuation(budget, { pages, observations, elapsedMs });
-          if (continuation._tag === "BudgetExhausted") {
-            return continuation;
-          }
-
-          const remainingMs = budget.maxDurationMs - elapsedMs;
-          const attempt = yield* Effect.result(
-            fetchPage(deps.acquisition, platform, walk.cursor, remainingMs),
-          );
-          if (Result.isFailure(attempt)) {
-            const failure = attempt.failure;
-            if (failure._tag === "TimeoutError") {
-              return { _tag: "BudgetExhausted", boundary: "duration" } as const;
-            }
-            const pageFailure = failure as PageFailure;
-            yield* Effect.provideService(
-              IngestionFailuresRepo.record(
-                new IngestionFailure({
-                  platformId: platform,
-                  occurredAt: now,
-                  failureTag: pageFailure._tag,
-                  detail: describeFailure(pageFailure),
-                  cursor: walk.cursor,
-                }),
-              ),
-              Database,
-              deps.database,
-            );
-            return {
-              _tag: "Failed",
-              failureTag: pageFailure._tag,
-              detail: describeFailure(pageFailure),
-            } as const;
-          }
-          const page = attempt.success;
-
-          for (const raw of page.listings) {
-            resolvedSourceId ??= raw.sourceId;
-            const outcome = yield* deps.corpus.observe(normalize(raw));
-            if (outcome._tag !== "Unchanged") {
-              canonicalChanges += 1;
-              lastChangedId = outcome.id;
-            }
-          }
-
-          walk = foldPage(walk, page);
-          pages += 1;
-          observations += page.listings.length;
-
-          const checkpointNow = yield* DateTime.now;
-          yield* Effect.provideService(
-            SourceStateRepo.checkpoint(
-              platform,
-              owner,
-              walk.cursor,
-              walk.seenExternalIds,
-              resolvedSourceId,
-              checkpointNow,
             ),
             Database,
             deps.database,
           );
+          yield* deps.sourceLease.release(platform, owner);
+        }),
+      );
 
-          const decided = decideAfterPage(
-            budget,
-            {
-              pages,
-              observations,
-              elapsedMs: DateTime.toEpochMillis(checkpointNow) - DateTime.toEpochMillis(startedAt),
-            },
-            page,
-            walk.seenExternalIds,
-          );
-          if (decided !== undefined) {
-            return decided;
+      const sweepOutcome: SweepOutcome = yield* Effect.gen(function* () {
+        const walkOutcome: SweepOutcome = yield* Effect.gen(function* () {
+          while (true) {
+            const now = yield* DateTime.now;
+            const elapsedMs = DateTime.toEpochMillis(now) - DateTime.toEpochMillis(startedAt);
+            const continuation = decideContinuation(budget, { pages, observations, elapsedMs });
+            if (continuation._tag === "BudgetExhausted") {
+              return continuation;
+            }
+
+            const remainingMs = budget.maxDurationMs - elapsedMs;
+            const attempt = yield* Effect.result(
+              fetchPage(deps.acquisition, platform, walk.cursor, remainingMs),
+            );
+            if (Result.isFailure(attempt)) {
+              const failure = attempt.failure;
+              if (failure._tag === "TimeoutError") {
+                return { _tag: "BudgetExhausted", boundary: "duration" } as const;
+              }
+              const pageFailure = failure as PageFailure;
+              yield* Effect.provideService(
+                IngestionFailuresRepo.record(
+                  new IngestionFailure({
+                    platformId: platform,
+                    occurredAt: now,
+                    failureTag: pageFailure._tag,
+                    detail: describeFailure(pageFailure),
+                    cursor: walk.cursor,
+                  }),
+                ),
+                Database,
+                deps.database,
+              );
+              return {
+                _tag: "Failed",
+                failureTag: pageFailure._tag,
+                detail: describeFailure(pageFailure),
+              } as const;
+            }
+            const page = attempt.success;
+
+            for (const raw of page.listings) {
+              resolvedSourceId ??= raw.sourceId;
+              const observed = yield* deps.corpus.observe(normalize(raw));
+              if (observed._tag !== "Unchanged") {
+                canonicalChanges += 1;
+                lastChangedId = observed.id;
+              }
+            }
+
+            walk = foldPage(walk, page);
+            pages += 1;
+            observations += page.listings.length;
+
+            const checkpointNow = yield* DateTime.now;
+            yield* Effect.provideService(
+              SourceStateRepo.checkpoint(
+                platform,
+                walk.cursor,
+                walk.seenExternalIds,
+                resolvedSourceId,
+                checkpointNow,
+              ),
+              Database,
+              deps.database,
+            );
+
+            const decided = decideAfterPage(
+              budget,
+              {
+                pages,
+                observations,
+                elapsedMs:
+                  DateTime.toEpochMillis(checkpointNow) - DateTime.toEpochMillis(startedAt),
+              },
+              page,
+              walk.seenExternalIds,
+            );
+            if (decided !== undefined) {
+              return decided;
+            }
           }
+        });
+
+        // `closeAbsent` is reachable from exactly one branch: `ReachedTail`
+        // is the only variant with a `seenExternalIds` field to pass it. A
+        // `BudgetExhausted` or `Failed` value has nowhere to read that
+        // argument from — there is no `if` here guarding the call, because
+        // there is no way to *write* the call against the other two
+        // branches at all.
+        if (walkOutcome._tag === "ReachedTail") {
+          if (resolvedSourceId !== undefined) {
+            const closeOutcomes = yield* deps.corpus.closeAbsent(
+              resolvedSourceId,
+              walkOutcome.seenExternalIds,
+            );
+            for (const closed of closeOutcomes) {
+              if (closed._tag === "Unchanged") continue;
+              canonicalChanges += 1;
+              lastChangedId = closed.id;
+            }
+          }
+          // The sweep is complete: the next run starts a fresh one, from the
+          // beginning, rather than resuming a cursor that has nothing left
+          // to resume. `release` (above) runs once this whole block does —
+          // after this reset, not before — so this is what actually reaches
+          // `source_state`.
+          walk = { cursor: startCursor, seenExternalIds: [] };
         }
+
+        return walkOutcome;
       }).pipe(Effect.ensuring(release));
-
-      // `closeAbsent` is reachable from exactly one branch: `ReachedTail` is
-      // the only variant with a `seenExternalIds` field to pass it. A
-      // `BudgetExhausted` or `Failed` value has nowhere to read that argument
-      // from — there is no `if` here guarding the call, because there is no
-      // way to *write* the call against the other two branches at all.
-      if (sweepOutcome._tag === "ReachedTail") {
-        if (resolvedSourceId !== undefined) {
-          const closeOutcomes = yield* deps.corpus.closeAbsent(
-            resolvedSourceId,
-            sweepOutcome.seenExternalIds,
-          );
-          for (const outcome of closeOutcomes) {
-            if (outcome._tag === "Unchanged") continue;
-            canonicalChanges += 1;
-            lastChangedId = outcome.id;
-          }
-        }
-        // The sweep is complete: the next run starts a fresh one, from the
-        // beginning, rather than resuming a cursor that has nothing left to
-        // resume.
-        walk = { cursor: startCursor, seenExternalIds: [] };
-      }
 
       const highestSequence: Sequence =
         lastChangedId === undefined
@@ -270,12 +292,7 @@ export const makeCollect =
       };
     });
 
-const stoppedReasonText = (
-  outcome:
-    | { readonly _tag: "ReachedTail"; readonly seenExternalIds: ReadonlyArray<string> }
-    | { readonly _tag: "BudgetExhausted"; readonly boundary: "pages" | "observations" | "duration" }
-    | { readonly _tag: "Failed"; readonly failureTag: string; readonly detail: string },
-): string => {
+const stoppedReasonText = (outcome: SweepOutcome): string => {
   switch (outcome._tag) {
     case "ReachedTail":
       return "reached tail";

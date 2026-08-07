@@ -126,9 +126,6 @@ const columnTypes: Record<string, string> = {
   cursorAfter: "TEXT NOT NULL",
   seenExternalIds: "TEXT NOT NULL DEFAULT '[]'",
   resolvedSourceId: "TEXT",
-  leaseOwner: "TEXT",
-  // Nullable: unlike every other INTEGER above, "no lease" is a real state.
-  leaseExpiresAt: "INTEGER",
   startedAt: "TEXT NOT NULL",
   occurredAt: "TEXT NOT NULL",
   pages: "INTEGER NOT NULL",

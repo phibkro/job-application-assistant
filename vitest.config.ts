@@ -24,6 +24,14 @@ export default defineConfig({
         replacement: from("./packages/adapters/shared/src/$1.ts"),
       },
       { find: /^@job-index\/adapters\/(.*)$/, replacement: from("./packages/adapters/src/$1.ts") },
+      // `cloudflare:workers` resolves only inside workerd. This is what lets
+      // a Durable Object class (`ingestion/SourceLeaseObject.ts`) load under
+      // Vitest at all, against the fake `DurableObject` base in
+      // `testSupport/cloudflareWorkers.ts` rather than the real module.
+      {
+        find: "cloudflare:workers",
+        replacement: from("./apps/worker/src/testSupport/cloudflareWorkers.ts"),
+      },
     ],
   },
   test: {
