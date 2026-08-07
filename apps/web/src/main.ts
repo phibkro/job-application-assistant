@@ -38,9 +38,30 @@ export const init: Runtime.ApplicationInit<Model, Message> = () => {
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
   title: "Job Index",
   body: h.div(
-    [h.Class("app")],
+    [h.Class("min-h-screen bg-gray-50")],
     [
-      h.header([h.Class("app-header")], [h.h1([], ["Job Index"]), nav(h), sessionPanel(model, h)]),
+      h.header(
+        [h.Class("sticky top-0 z-10 border-b border-gray-200 bg-white")],
+        [
+          h.div(
+            [
+              h.Class(
+                "mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-3",
+              ),
+            ],
+            [
+              h.div(
+                [h.Class("flex items-center gap-6")],
+                [
+                  h.h1([h.Class("text-lg font-semibold text-gray-900")], ["Job Index"]),
+                  nav(model, h),
+                ],
+              ),
+              sessionPanel(model, h),
+            ],
+          ),
+        ],
+      ),
       h.main(
         [],
         [

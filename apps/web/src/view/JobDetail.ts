@@ -8,24 +8,34 @@ import type { Message } from "../Message.ts";
 import * as Applications from "../Applications.ts";
 import { RequestIdle } from "../Model.ts";
 import type { ApplyStage, Model, RequestStatus } from "../Model.ts";
-import { renderProblem } from "./Shared.ts";
+import { button, card, pageClass, renderProblem } from "./Shared.ts";
 
 const statusLabel = (job: CanonicalJob): string =>
   job.status._tag === "Active" ? "Active" : `Closed ${job.status.closedAt}`;
 
 const jobBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
-  h.div(
-    [],
+  card(
     [
-      h.h2([], [job.title]),
-      h.p([], [`${job.employerName} — ${job.location} — ${statusLabel(job)}`]),
-      job.deadline === undefined ? h.empty : h.p([], [`Deadline: ${job.deadline}`]),
-      h.p([h.Class("job-description")], [job.description]),
+      h.h2([h.Class("text-xl font-semibold text-gray-900")], [job.title]),
+      h.p(
+        [h.Class("mt-1 text-sm text-gray-500")],
+        [`${job.employerName} — ${job.location} — ${statusLabel(job)}`],
+      ),
+      job.deadline === undefined
+        ? h.empty
+        : h.p([h.Class("mt-1 text-sm text-gray-500")], [`Deadline: ${job.deadline}`]),
+      h.p([h.Class("mt-4 whitespace-pre-wrap text-sm text-gray-700")], [job.description]),
       h.a(
-        [h.Href(job.applicationUrl), h.Target("_blank"), h.Rel("noopener")],
+        [
+          h.Href(job.applicationUrl),
+          h.Target("_blank"),
+          h.Rel("noopener"),
+          h.Class("mt-4 inline-block text-sm font-medium text-indigo-700 hover:text-indigo-900"),
+        ],
         ["Original listing ↗"],
       ),
     ],
+    h,
   );
 
 /** Renders the four Prepare buttons' worth of choice as three: default,
@@ -38,40 +48,69 @@ const prepareControls = (
   h: HtmlBuilder<Message>,
 ): Html =>
   h.div(
-    [h.Class("prepare-controls")],
+    [h.Class("flex flex-wrap gap-2")],
     [
-      h.button(
-        [
-          h.Disabled(disabled),
-          h.OnClick(PrepareRequested({ jobId, savedJobId, method: Option.none() })),
-        ],
-        ["Prepare application"],
+      button(
+        {
+          label: "Prepare application",
+          isDisabled: disabled,
+          onClick: PrepareRequested({ jobId, savedJobId, method: Option.none() }),
+        },
+        h,
       ),
-      h.button(
-        [
-          h.Disabled(disabled),
-          h.OnClick(PrepareRequested({ jobId, savedJobId, method: Option.some("automated") })),
-        ],
-        ["Prepare (automated)"],
+      button(
+        {
+          label: "Prepare (automated)",
+          variant: "secondary",
+          isDisabled: disabled,
+          onClick: PrepareRequested({ jobId, savedJobId, method: Option.some("automated") }),
+        },
+        h,
       ),
-      h.button(
-        [
-          h.Disabled(disabled),
-          h.OnClick(PrepareRequested({ jobId, savedJobId, method: Option.some("assisted") })),
-        ],
-        ["Prepare (assisted)"],
+      button(
+        {
+          label: "Prepare (assisted)",
+          variant: "secondary",
+          isDisabled: disabled,
+          onClick: PrepareRequested({ jobId, savedJobId, method: Option.some("assisted") }),
+        },
+        h,
       ),
     ],
   );
 
 const draftPreview = (cv: string, letter: string, h: HtmlBuilder<Message>): Html =>
   h.div(
-    [h.Class("draft-preview")],
+    [h.Class("grid gap-4 sm:grid-cols-2")],
     [
-      h.p([], [h.strong([], ["CV draft"])]),
-      h.pre([], [cv]),
-      h.p([], [h.strong([], ["Letter draft"])]),
-      h.pre([], [letter]),
+      h.div(
+        [],
+        [
+          h.p([h.Class("text-sm font-semibold text-gray-900")], ["CV draft"]),
+          h.pre(
+            [
+              h.Class(
+                "mt-1 max-h-64 overflow-auto rounded-md bg-gray-50 p-3 text-xs text-gray-700",
+              ),
+            ],
+            [cv],
+          ),
+        ],
+      ),
+      h.div(
+        [],
+        [
+          h.p([h.Class("text-sm font-semibold text-gray-900")], ["Letter draft"]),
+          h.pre(
+            [
+              h.Class(
+                "mt-1 max-h-64 overflow-auto rounded-md bg-gray-50 p-3 text-xs text-gray-700",
+              ),
+            ],
+            [letter],
+          ),
+        ],
+      ),
     ],
   );
 
@@ -82,28 +121,37 @@ const decisionControls = (
   h: HtmlBuilder<Message>,
 ): Html =>
   h.div(
-    [h.Class("decision-controls")],
+    [h.Class("flex flex-wrap gap-2")],
     [
-      h.button(
-        [
-          h.Disabled(disabled),
-          h.OnClick(DecisionRequested({ jobId, applicationId, decision: "Approve" })),
-        ],
-        ["Approve"],
+      button(
+        {
+          label: "Approve",
+          variant: "success",
+          isDisabled: disabled,
+          onClick: DecisionRequested({ jobId, applicationId, decision: "Approve" }),
+        },
+        h,
       ),
-      h.button(
-        [
-          h.Disabled(disabled),
-          h.OnClick(DecisionRequested({ jobId, applicationId, decision: "Rework" })),
-        ],
-        ["Rework"],
+      // Rework and Decline are both legitimate decisions, not failures — a
+      // cautionary amber and a neutral gray, never the red `renderProblem`
+      // reserves for an actual `Problem`.
+      button(
+        {
+          label: "Rework",
+          variant: "warning",
+          isDisabled: disabled,
+          onClick: DecisionRequested({ jobId, applicationId, decision: "Rework" }),
+        },
+        h,
       ),
-      h.button(
-        [
-          h.Disabled(disabled),
-          h.OnClick(DecisionRequested({ jobId, applicationId, decision: "Decline" })),
-        ],
-        ["Decline"],
+      button(
+        {
+          label: "Decline",
+          variant: "secondary",
+          isDisabled: disabled,
+          onClick: DecisionRequested({ jobId, applicationId, decision: "Decline" }),
+        },
+        h,
       ),
     ],
   );
@@ -112,7 +160,9 @@ const decisionControls = (
  *  (the platform's automation policy stopped an automatic submission the
  *  server would have refused outright otherwise) — so it gets its own,
  *  clearly-labelled callout with the platform and the reason, never a
- *  silently-swapped value the person has to notice on their own. */
+ *  silently-swapped value the person has to notice on their own. The
+ *  platform name is part of `reason`'s own text (see `Applications.Prepared`
+ *  in the worker), so surfacing `reason` prominently surfaces the platform. */
 const downgradeNotice = (
   applicationUrl: string,
   method: string,
@@ -120,15 +170,21 @@ const downgradeNotice = (
   h: HtmlBuilder<Message>,
 ): Html =>
   h.div(
-    [h.Class("downgrade-notice")],
+    [h.Class("rounded-lg border border-amber-300 bg-amber-50 p-4")],
     [
-      h.p([], [h.strong([], [`Prepared as "${method}" instead of what was requested.`])]),
-      h.p([], [reason]),
       h.p(
-        [],
+        [h.Class("text-sm font-semibold text-amber-900")],
+        [`Prepared as "${method}" instead of what was requested.`],
+      ),
+      h.p([h.Class("mt-1 text-sm text-amber-800")], [reason]),
+      h.p(
+        [h.Class("mt-2 text-sm text-amber-800")],
         [
           "Apply at: ",
-          h.a([h.Href(applicationUrl), h.Target("_blank"), h.Rel("noopener")], [applicationUrl]),
+          h.a(
+            [h.Href(applicationUrl), h.Target("_blank"), h.Rel("noopener"), h.Class("underline")],
+            [applicationUrl],
+          ),
         ],
       ),
     ],
@@ -147,53 +203,77 @@ const stageView = (
     Match.withReturnType<Html>(),
     Match.tagsExhaustive({
       Saved: (saved) =>
-        h.div(
-          [h.Class("apply-stage")],
+        card(
           [
-            h.p([], ["Shortlisted."]),
-            h.button(
+            h.p([h.Class("text-sm text-gray-700")], ["Shortlisted."]),
+            h.div(
+              [h.Class("mt-3")],
               [
-                h.Disabled(disabled),
-                h.OnClick(DraftRequested({ jobId, savedJobId: saved.savedJobId })),
+                button(
+                  {
+                    label: disabled ? "Drafting…" : "Draft CV & letter",
+                    isDisabled: disabled,
+                    onClick: DraftRequested({ jobId, savedJobId: saved.savedJobId }),
+                  },
+                  h,
+                ),
               ],
-              [disabled ? "Drafting…" : "Draft CV & letter"],
             ),
           ],
+          h,
         ),
       Drafted: (drafted) =>
-        h.div(
-          [h.Class("apply-stage")],
+        card(
           [
-            h.p([], [`Draft ready (generator: ${drafted.generator}).`]),
-            draftPreview(drafted.cv, drafted.letter, h),
-            prepareControls(jobId, drafted.savedJobId, disabled, h),
+            h.p(
+              [h.Class("text-sm text-gray-700")],
+              [`Draft ready (generator: ${drafted.generator}).`],
+            ),
+            h.div([h.Class("mt-3")], [draftPreview(drafted.cv, drafted.letter, h)]),
+            h.div([h.Class("mt-4")], [prepareControls(jobId, drafted.savedJobId, disabled, h)]),
           ],
+          h,
         ),
       Prepared: (prepared) =>
-        h.div(
-          [h.Class("apply-stage")],
+        card(
           [
             prepared.downgradeReason === null
-              ? h.p([], [`Prepared via "${prepared.method}". Ready to decide.`])
+              ? h.p(
+                  [h.Class("text-sm text-gray-700")],
+                  [`Prepared via "${prepared.method}". Ready to decide.`],
+                )
               : downgradeNotice(
                   prepared.applicationUrl,
                   prepared.method,
                   prepared.downgradeReason,
                   h,
                 ),
-            draftPreview(prepared.cv, prepared.letter, h),
-            decisionControls(jobId, prepared.applicationId, disabled, h),
+            h.div([h.Class("mt-3")], [draftPreview(prepared.cv, prepared.letter, h)]),
+            h.div(
+              [h.Class("mt-4")],
+              [decisionControls(jobId, prepared.applicationId, disabled, h)],
+            ),
           ],
+          h,
         ),
       Decided: (decided) =>
-        h.div(
-          [h.Class("apply-stage")],
+        card(
           [
             decided.downgradeReason === null
               ? h.empty
               : downgradeNotice(decided.applicationUrl, decided.method, decided.downgradeReason, h),
-            h.p([], [`Decision recorded: ${decided.status}.`]),
+            h.p(
+              [
+                h.Class(
+                  decided.downgradeReason === null
+                    ? "text-sm text-gray-700"
+                    : "mt-3 text-sm text-gray-700",
+                ),
+              ],
+              [`Decision recorded: ${decided.status}.`],
+            ),
           ],
+          h,
         ),
     }),
   );
@@ -201,7 +281,10 @@ const stageView = (
 
 const applyFlow = (model: Model, job: CanonicalJob, h: HtmlBuilder<Message>): Html => {
   if (model.session._tag === "Anonymous") {
-    return h.p([h.Class("hint")], ["Enter a session token above to shortlist, draft, or apply."]);
+    return h.p(
+      [h.Class("text-sm text-gray-500")],
+      ["Enter a session token above to shortlist, draft, or apply."],
+    );
   }
   const record = Applications.find(model.applications, job.id);
   const pending: RequestStatus = Option.match(record, {
@@ -211,14 +294,18 @@ const applyFlow = (model: Model, job: CanonicalJob, h: HtmlBuilder<Message>): Ht
   const stage = Option.flatMap(record, (r) => r.stage);
 
   return h.div(
-    [h.Class("apply-flow")],
+    [h.Class("space-y-4")],
     [
       pending._tag === "Failed" ? renderProblem(pending.problem, h) : h.empty,
       Option.match(stage, {
         onNone: () =>
-          h.button(
-            [h.Disabled(pending._tag === "Pending"), h.OnClick(SaveJobClicked({ jobId: job.id }))],
-            [pending._tag === "Pending" ? "Shortlisting…" : "Shortlist this job"],
+          button(
+            {
+              label: pending._tag === "Pending" ? "Shortlisting…" : "Shortlist this job",
+              isDisabled: pending._tag === "Pending",
+              onClick: SaveJobClicked({ jobId: job.id }),
+            },
+            h,
           ),
         onSome: (s) => stageView(job.id, s, pending, h),
       }),
@@ -228,13 +315,13 @@ const applyFlow = (model: Model, job: CanonicalJob, h: HtmlBuilder<Message>): Ht
 
 export const jobDetailView = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.div(
-    [h.Class("page")],
+    [h.Class(pageClass)],
     [
       AsyncData.matchDataSplitEmpty(model.jobDetail, {
-        onIdle: () => h.p([], ["No job selected."]),
-        onLoading: () => h.p([], ["Loading job…"]),
+        onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["No job selected."]),
+        onLoading: () => h.p([h.Class("text-sm text-gray-500")], ["Loading job…"]),
         onFailure: (problem) => renderProblem(problem, h),
-        onData: (job) => h.div([], [jobBody(job, h), applyFlow(model, job, h)]),
+        onData: (job) => h.div([h.Class("space-y-6")], [jobBody(job, h), applyFlow(model, job, h)]),
       }),
     ],
   );

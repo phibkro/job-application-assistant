@@ -6,44 +6,73 @@ import { FeedDismissClicked, FeedRequested, Navigated } from "../Message.ts";
 import type { Message } from "../Message.ts";
 import { PageJobDetail } from "../Model.ts";
 import type { Model } from "../Model.ts";
-import { renderProblem } from "./Shared.ts";
+import { button, card, pageClass, renderProblem, sectionHeading } from "./Shared.ts";
 
 const feedItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
   h.keyed("li")(
     job.id,
-    [h.Class("job-item")],
+    [h.Class("flex items-center justify-between gap-4 py-3")],
     [
-      h.strong([], [job.title]),
-      h.span([], [` — ${job.employerName} — ${job.location}`]),
-      h.button([h.OnClick(Navigated({ to: PageJobDetail({ jobId: job.id }) }))], ["View"]),
-      h.button(
+      h.div(
+        [h.Class("min-w-0")],
         [
-          h.OnClick(
-            FeedDismissClicked({ jobId: job.id, verdict: "not_interested", reason: Option.none() }),
+          h.p([h.Class("truncate font-medium text-gray-900")], [job.title]),
+          h.p(
+            [h.Class("truncate text-sm text-gray-500")],
+            [`${job.employerName} — ${job.location}`],
           ),
         ],
-        ["Dismiss"],
+      ),
+      h.div(
+        [h.Class("flex shrink-0 gap-2")],
+        [
+          button(
+            {
+              label: "View",
+              variant: "secondary",
+              onClick: Navigated({ to: PageJobDetail({ jobId: job.id }) }),
+            },
+            h,
+          ),
+          button(
+            {
+              label: "Dismiss",
+              variant: "ghost",
+              onClick: FeedDismissClicked({
+                jobId: job.id,
+                verdict: "not_interested",
+                reason: Option.none(),
+              }),
+            },
+            h,
+          ),
+        ],
       ),
     ],
   );
 
 export const feedView = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.div(
-    [h.Class("page")],
+    [h.Class(pageClass)],
     [
-      h.h2([], ["Fresh feed"]),
-      h.p([], ["Vacancies you have not already been offered."]),
-      h.button([h.OnClick(FeedRequested())], ["Refresh"]),
+      sectionHeading("Fresh feed", h),
+      h.p([h.Class("text-sm text-gray-500")], ["Vacancies you have not already been offered."]),
+      button({ label: "Refresh", variant: "secondary", onClick: FeedRequested() }, h),
       AsyncData.matchDataSplitEmpty(model.feedResults, {
-        onIdle: () => h.p([], ["Not loaded yet."]),
-        onLoading: () => h.p([], ["Loading…"]),
+        onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["Not loaded yet."]),
+        onLoading: () => h.p([h.Class("text-sm text-gray-500")], ["Loading…"]),
         onFailure: (problem) => renderProblem(problem, h),
         onData: (page) =>
           page.data.length === 0
-            ? h.p([], ["Nothing new since your last check."])
-            : h.ul(
-                [h.Class("job-list")],
-                page.data.map((job) => feedItem(job, h)),
+            ? h.p([h.Class("text-sm text-gray-500")], ["Nothing new since your last check."])
+            : card(
+                [
+                  h.ul(
+                    [h.Class("divide-y divide-gray-100")],
+                    page.data.map((job) => feedItem(job, h)),
+                  ),
+                ],
+                h,
               ),
       }),
     ],
