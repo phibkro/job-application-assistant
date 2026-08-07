@@ -49,17 +49,17 @@ export const makeFresh =
 export const makeMarkOffered =
   (database: DatabaseShape) =>
   (profile: ProfileId, through: Sequence): Effect.Effect<void> =>
-    database.transaction(
-      Effect.gen(function* () {
-        const freshnessRows = yield* database.query<FreshnessRow>(SELECT_FRESHNESS_BY_PROFILE, [
-          profile,
-        ]);
-        const now = DateTime.formatIso(yield* DateTime.now);
+    Effect.gen(function* () {
+      const freshnessRows = yield* database.query<FreshnessRow>(SELECT_FRESHNESS_BY_PROFILE, [
+        profile,
+      ]);
+      const now = DateTime.formatIso(yield* DateTime.now);
 
-        if (freshnessRows[0] === undefined) {
-          yield* database.run(INSERT_FRESHNESS, [profile, through, now]);
-        } else if (through > freshnessRows[0].seenThrough) {
-          yield* database.run(UPDATE_FRESHNESS, [through, now, profile]);
-        }
-      }),
-    );
+      // One statement either way, so there is nothing for a batch to hold
+      // together: a single write is already all-or-nothing.
+      if (freshnessRows[0] === undefined) {
+        yield* database.run(INSERT_FRESHNESS, [profile, through, now]);
+      } else if (through > freshnessRows[0].seenThrough) {
+        yield* database.run(UPDATE_FRESHNESS, [through, now, profile]);
+      }
+    });

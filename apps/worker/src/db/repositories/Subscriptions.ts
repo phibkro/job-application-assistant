@@ -7,24 +7,19 @@ import { columnsOf, decodeRow, deleteStatement, encodeVariant, insertStatement }
 const TABLE = "subscriptions";
 
 /**
- * One entitlement record per profile, same gap as `Answers`/`Freshness`:
- * the schema carries no `PRIMARY KEY`/`UNIQUE` on `profileId`, so `upsert`
- * enforces the "one row" invariant with delete-then-insert inside a
- * transaction rather than `ON CONFLICT`, which would need a unique index
- * that does not exist.
+ * One entitlement record per profile, now enforced by `PRIMARY KEY
+ * (profileId)` in the generated schema rather than by this function alone.
+ * `upsert` still deletes then inserts, as one batch: it replaces a row
+ * without first asking whether one exists.
  */
 export const upsert = (subscription: Subscription): Effect.Effect<void, never, Database> =>
   Effect.gen(function* () {
     const db = yield* Database;
     const encoded = yield* encodeVariant<Subscription>(Subscription as never)(subscription);
-    yield* db.transaction(
-      Effect.gen(function* () {
-        const del = deleteStatement(TABLE, { profileId: encoded.profileId as string });
-        yield* db.run(del.sql, del.bindings);
-        const ins = insertStatement(TABLE, columnsOf(Subscription as never), encoded);
-        yield* db.run(ins.sql, ins.bindings);
-      }),
-    );
+    yield* db.atomic([
+      deleteStatement(TABLE, { profileId: encoded.profileId as string }),
+      insertStatement(TABLE, columnsOf(Subscription as never), encoded),
+    ]);
   });
 
 export const findByProfile = (

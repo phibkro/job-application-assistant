@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { Database } from "../services/Database.ts";
+import type { Write } from "../services/Database.ts";
 import { sha256Hex } from "./hash.ts";
 
 /**
@@ -262,8 +263,14 @@ export const fakeDatabaseLayer = (state: FakeState): Layer.Layer<Database> =>
       Effect.sync(() => runQuery(state, opOf(sql), bindings) as ReadonlyArray<A>),
     run: (sql: string, bindings: ReadonlyArray<unknown>) =>
       Effect.sync(() => runCommand(state, opOf(sql), bindings)),
-    // The fake has no rollback story; every test that needs transactional
-    // atomicity is exercised against the real Database in the persistence
-    // slot's own tests, not here.
-    transaction: (effect) => effect,
+    // Applied in order, with no rollback: this fake is a plain in-memory
+    // store mutated synchronously, so there is no partial state for another
+    // reader to observe. Real batch semantics are exercised against the
+    // persistence slot's own layers.
+    atomic: (writes: ReadonlyArray<Write>) =>
+      Effect.sync(() => {
+        for (const write of writes) {
+          runCommand(state, opOf(write.sql), write.bindings);
+        }
+      }),
   });

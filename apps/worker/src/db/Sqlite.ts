@@ -2,9 +2,9 @@ import { Database as BunSqlite } from "bun:sqlite";
 import * as node_fs from "node:fs";
 import * as node_path from "node:path";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import { Database } from "../services/Database.ts";
+import type { Write } from "../services/Database.ts";
 import { normalizeBinding } from "./Binding.ts";
 
 /**
@@ -27,13 +27,11 @@ const bind = (bindings: ReadonlyArray<unknown>) => bindings.map(normalizeBinding
  * `BEGIN`/`COMMIT`/`ROLLBACK`) rather than whatever behaviour a mock happened
  * to be told to have.
  *
- * `bun:sqlite` is synchronous end to end, which is what makes `transaction`
- * here strictly stronger than the D1-backed layer's: it can hold an open
- * `BEGIN` across arbitrary application code — including a read that observes
- * an earlier write in the same transaction — because there is no network hop
- * between statements. D1 has no such primitive (see `Live.ts`'s docstring);
- * this layer does not share that limitation, so a test written against it
- * proves the domain logic, not D1's constraints.
+ * `atomic` is a real `BEGIN`/`COMMIT` around the given writes. It could hold
+ * a transaction open across arbitrary application code — `bun:sqlite` is
+ * synchronous end to end — but it deliberately does not offer that, because
+ * D1 cannot, and a test layer stronger than production is how a passing test
+ * hides a live bug. Both layers now implement the same narrow promise.
  */
 export const layerSqlite = (location: string = ":memory:"): Layer.Layer<Database> =>
   Layer.sync(Database, () => {
@@ -55,24 +53,24 @@ export const layerSqlite = (location: string = ":memory:"): Layer.Layer<Database
         db.query(sql).run(...bind(bindings));
       });
 
-    // All-or-nothing via a real SQL transaction: BEGIN before the wrapped
-    // effect, COMMIT on success, ROLLBACK on any failure or defect. The
-    // original Exit (error, defect, or interruption) is re-raised unchanged
-    // after the rollback so the caller sees exactly what would have happened
-    // without the wrapper — `transaction` adds atomicity, not new failure
-    // modes, matching the frozen `E` in `Database.transaction`'s signature.
-    const transaction = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-      Effect.flatMap(
-        Effect.sync(() => db.exec("BEGIN")),
-        () =>
-          Effect.flatMap(Effect.exit(effect), (exit) =>
-            Effect.flatMap(
-              Effect.sync(() => db.exec(Exit.isSuccess(exit) ? "COMMIT" : "ROLLBACK")),
-              () =>
-                Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause),
-            ),
-          ),
-      );
+    // All-or-nothing over the given list. Every write runs between BEGIN and
+    // COMMIT; anything SQLite rejects rolls the whole list back before the
+    // defect propagates, so a partial batch is not a state a caller can see.
+    const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
+      writes.length === 0
+        ? Effect.void
+        : Effect.sync(() => {
+            db.exec("BEGIN");
+            try {
+              for (const write of writes) {
+                db.query(write.sql).run(...bind(write.bindings));
+              }
+              db.exec("COMMIT");
+            } catch (cause) {
+              db.exec("ROLLBACK");
+              throw cause;
+            }
+          });
 
-    return Database.of({ query, run, transaction });
+    return Database.of({ query, run, atomic });
   });

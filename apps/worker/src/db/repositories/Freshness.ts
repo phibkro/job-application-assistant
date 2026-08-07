@@ -8,24 +8,18 @@ const TABLE = "freshness";
 
 /**
  * One high-water mark per profile ("Freshness.ts": "held per profile rather
- * than per search"), but `db/schema.sql` declares no `PRIMARY KEY`/`UNIQUE`
- * on `profileId` — the model has no way to express that constraint, so the
- * generated snapshot doesn't either. `upsert` enforces "at most one row per
- * profile" the way `Answers.upsert` does: delete then insert, inside one
- * transaction.
+ * than per search"). `db/schema.sql` now declares `PRIMARY KEY (profileId)`,
+ * so a second row is rejected by the table rather than merely avoided here;
+ * `upsert` still deletes then inserts, as one batch, because that is how it
+ * replaces a mark without needing to know whether one exists.
  */
 export const upsert = (freshness: Freshness): Effect.Effect<void, never, Database> =>
   Effect.gen(function* () {
     const db = yield* Database;
     const encoded = yield* encodeVariant<Freshness>(Freshness as never)(freshness);
-    yield* db.transaction(
-      Effect.gen(function* () {
-        const del = deleteStatement(TABLE, { profileId: encoded.profileId as string });
-        yield* db.run(del.sql, del.bindings);
-        const ins = insertStatement(TABLE, columnsOf(Freshness as never), encoded);
-        yield* db.run(ins.sql, ins.bindings);
-      }),
-    );
+    const removal = deleteStatement(TABLE, { profileId: encoded.profileId as string });
+    const insertion = insertStatement(TABLE, columnsOf(Freshness as never), encoded);
+    yield* db.atomic([removal, insertion]);
   });
 
 export const findByProfile = (

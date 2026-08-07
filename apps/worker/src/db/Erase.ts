@@ -22,20 +22,17 @@ import * as Sessions from "./repositories/Sessions.ts";
  * — left as-is here rather than this slot inventing a purge scope the
  * domain didn't declare.
  *
- * No foreign key currently ties these tables together (`db/schema.sql`
- * declares none), so there is no DB-enforced ordering constraint yet. Still
- * deletes `sessions` before `answers`: a session is what a caller
- * authenticates with, so revoking access first and removing the underlying
- * profile data second is the safer order if this sweep is ever interrupted
- * partway through.
+ * Both deletes travel as one batch, in that order. D1 runs a batch
+ * sequentially and commits it as one transaction, so the ordering still
+ * matters for nothing observable — but stating it costs nothing and says
+ * which way round is safe: a session is what a caller authenticates with, so
+ * access goes before the data it protects.
  */
 export const eraseProfile = (profileId: ProfileId): Effect.Effect<void, never, Database> =>
   Effect.gen(function* () {
     const db = yield* Database;
-    yield* db.transaction(
-      Effect.gen(function* () {
-        yield* Sessions.deleteByProfile(profileId);
-        yield* Answers.deleteByProfile(profileId);
-      }),
-    );
+    yield* db.atomic([
+      Sessions.deleteByProfileWrite(profileId),
+      Answers.deleteByProfileWrite(profileId),
+    ]);
   });

@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import type { Write } from "../services/Database.ts";
 import type { DatabaseShape } from "./databaseShape.ts";
 import type { CanonicalJobRow, OccurrenceRow } from "./rows.ts";
 import {
@@ -177,11 +178,16 @@ export const makeTestDatabase = (): DatabaseShape => {
       }
     });
 
-  return { query, run, transaction };
-};
+  // Applied in order, with no rollback to fake: this store is a plain
+  // in-memory map mutated synchronously, so no reader can observe a partial
+  // batch. Real batch semantics belong to the layers in `db/`, and
+  // `live.test.ts` exercises this slot against one of them.
+  const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
+    Effect.sync(() => {
+      for (const write of writes) {
+        Effect.runSync(run(write.sql, write.bindings));
+      }
+    });
 
-// No real transactional isolation to fake: this store is a plain in-memory
-// map mutated synchronously, so there is no concurrent writer for a
-// rollback to protect against within one test. Module-scoped rather than
-// closing over `makeTestDatabase`'s state, since it needs none of it.
-const transaction = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => effect;
+  return { query, run, atomic };
+};

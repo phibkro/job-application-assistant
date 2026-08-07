@@ -97,7 +97,7 @@ export const layer = Layer.effect(
     const set = (profile: ProfileId, value: Profile): Effect.Effect<Profile> =>
       Effect.gen(function* () {
         const now = new Date().toISOString();
-        yield* db.transaction(writeProfile(db, profile, value, now));
+        yield* writeProfile(db, profile, value, now);
         return value;
       });
 
@@ -113,7 +113,7 @@ export const layer = Layer.effect(
       question: QuestionKey,
       value: string,
       asked: { readonly label: string; readonly shape: AnswerShape },
-    ): Effect.Effect<void> => db.transaction(upsertAnswer(db, profile, question, value, asked));
+    ): Effect.Effect<void> => upsertAnswer(db, profile, question, value, asked);
 
     const unanswered = (
       profile: ProfileId,

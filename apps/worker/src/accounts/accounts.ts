@@ -175,7 +175,7 @@ export const layer = Layer.effect(
         const now = new Date();
         const nowIso = now.toISOString();
         const purgeAfter = new Date(now.getTime() + ERASURE_GRACE_PERIOD_MS).toISOString();
-        yield* db.transaction(writeErasureRequested(db, profile, nowIso, purgeAfter, nowIso));
+        yield* writeErasureRequested(db, profile, nowIso, purgeAfter, nowIso);
       });
 
     return { authenticate, profileOf, requestErasure };

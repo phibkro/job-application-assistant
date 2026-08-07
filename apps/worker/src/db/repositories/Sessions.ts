@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import { Session } from "@job-index/domain/Access";
 import type { ProfileId } from "@job-index/domain/Ids";
 import { Database } from "../../services/Database.ts";
+import type { Write } from "../../services/Database.ts";
 import {
   columnsOf,
   decodeRow,
@@ -60,9 +61,17 @@ export const findByProfile = (
   });
 
 /** Erasure support. */
+/**
+ * The statement, not its execution, so a caller that must erase several
+ * tables together can batch them. The table name stays in the repository
+ * that owns it.
+ */
+export const deleteByProfileWrite = (profileId: ProfileId): Write =>
+  deleteStatement(TABLE, { profileId });
+
 export const deleteByProfile = (profileId: ProfileId): Effect.Effect<void, never, Database> =>
   Effect.gen(function* () {
     const db = yield* Database;
-    const stmt = deleteStatement(TABLE, { profileId });
+    const stmt = deleteByProfileWrite(profileId);
     yield* db.run(stmt.sql, stmt.bindings);
   });
