@@ -33,6 +33,7 @@ import { CanonicalJobRecord, OccurrenceRecord } from "../../packages/domain/src/
 import { Session } from "../../packages/domain/src/Access.ts"
 import { Principal } from "../../packages/domain/src/Principal.ts"
 import { ProfileRecord } from "../../packages/domain/src/Profile.ts"
+import { CatalogRecord } from "../../packages/domain/src/Source.ts"
 import { Subscription } from "../../packages/domain/src/Subscription.ts"
 
 const ROOT = path.resolve(import.meta.dirname, "../..")
@@ -101,6 +102,15 @@ const columnTypes: Record<string, string> = {
   sequence: "INTEGER NOT NULL",
   expiresAt: "INTEGER NOT NULL",
   // Timestamps and optionals.
+  platform: "TEXT NOT NULL",
+  category: "TEXT NOT NULL",
+  listingsUrl: "TEXT NOT NULL",
+  tierTag: "TEXT NOT NULL CHECK (tierTag IN ('Feed', 'Scripted', 'Agent', 'Unknown'))",
+  policyTag: "TEXT NOT NULL DEFAULT 'Unreviewed' CHECK (policyTag IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed'))",
+  priority: "TEXT NOT NULL",
+  confidence: "TEXT NOT NULL",
+  verifiedAt: "TEXT NOT NULL",
+  requiresPremium: "INTEGER NOT NULL DEFAULT 0 CHECK (requiresPremium IN (0,1))",
   createdAt: "TEXT NOT NULL",
   updatedAt: "TEXT NOT NULL",
   changedAt: "TEXT NOT NULL",
@@ -179,6 +189,13 @@ const tables: Record<string, TableSpec> = {
     primaryKey: ["principalId"],
     unique: [["apiKeyHash"]],
     indexes: [["profileId"]],
+  },
+  source_catalog: {
+    model: CatalogRecord,
+    primaryKey: ["id"],
+    // Acquisition asks "which platforms are at this tier"; policy asks about
+    // one platform by id. Only the first needs an index.
+    indexes: [["tierTag"]],
   },
   canonical_jobs: {
     model: CanonicalJobRecord,

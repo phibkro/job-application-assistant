@@ -2,6 +2,7 @@ import * as Layer from "effect/Layer";
 import { layer as applicationsLayer } from "./applications.ts";
 import { layer as entitlementsLayer } from "./entitlements.ts";
 import { layer as policyLayer } from "./policy.ts";
+import { layer as savedJobsLayer } from "./savedJobsService.ts";
 
 /**
  * `Applications`, `Entitlements`, and `Policy`, wired together.
@@ -14,9 +15,13 @@ import { layer as policyLayer } from "./policy.ts";
  * that only needs `Entitlements` (a future scheduling slot, say) can still
  * take this `layer` alone rather than reassembling the three by hand.
  *
+ * `SavedJobs` joins them because it is the same table and the same lifecycle:
+ * a saved job is what `prepare` takes as its argument, and two owners on
+ * `saved_jobs` would be one too many.
+ *
  * Still required from outside: `Database`, `Corpus`, `Profiles`, `Drafting`
  * — every one of them a different slot's own layer.
  */
 export const layer = applicationsLayer.pipe(
-  Layer.provideMerge(Layer.mergeAll(entitlementsLayer, policyLayer)),
+  Layer.provideMerge(Layer.mergeAll(entitlementsLayer, policyLayer, savedJobsLayer)),
 );

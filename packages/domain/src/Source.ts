@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import * as Model from "effect/unstable/schema/Model";
 import { PlatformId } from "./Ids.ts";
 
 /**
@@ -64,3 +65,31 @@ export const Observation = Schema.Struct({
   reachable: Schema.Boolean,
 });
 export type Observation = typeof Observation.Type;
+
+/**
+ * The stored catalogue row.
+ *
+ * `tier` and `policy` are flattened to their tags, the way `canonical_jobs`
+ * stores a job's status: both are unions of empty variants, so the tag is the
+ * whole value, and a plain column can be compared and indexed while a JSON
+ * blob cannot. The mapping back to the tagged unions lives with the reader.
+ *
+ * `Unreviewed` is the policy default in the column as well as in the domain.
+ * A platform that nobody has assessed must not be automatable because a row
+ * was written carelessly.
+ */
+export class CatalogRecord extends Model.Class<CatalogRecord>("CatalogRecord")({
+  id: PlatformId,
+  platform: Schema.String,
+  category: Schema.String,
+  listingsUrl: Schema.String,
+  tierTag: Schema.Literals(["Feed", "Scripted", "Agent", "Unknown"]),
+  policyTag: Schema.Literals(["Allowed", "AssistedOnly", "Prohibited", "Unreviewed"]),
+  requiresPremium: Model.BooleanSqlite,
+  priority: Schema.String,
+  confidence: Schema.String,
+  notes: Schema.String,
+  verifiedAt: Schema.String,
+  createdAt: Model.DateTimeInsert,
+  updatedAt: Model.DateTimeUpdate,
+}) {}

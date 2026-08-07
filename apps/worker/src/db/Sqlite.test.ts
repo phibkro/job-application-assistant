@@ -37,6 +37,7 @@ describe("layerSqlite", () => {
       "profiles",
       "saved_jobs",
       "sessions",
+      "source_catalog",
       "submissions",
       "subscriptions",
     ]);

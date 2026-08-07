@@ -110,6 +110,25 @@ CREATE TABLE IF NOT EXISTS principals (
 
 CREATE INDEX IF NOT EXISTS idx_principals_profileId ON principals (profileId);
 
+CREATE TABLE IF NOT EXISTS source_catalog (
+  id TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  category TEXT NOT NULL,
+  listingsUrl TEXT NOT NULL,
+  tierTag TEXT NOT NULL CHECK (tierTag IN ('Feed', 'Scripted', 'Agent', 'Unknown')),
+  policyTag TEXT NOT NULL DEFAULT 'Unreviewed' CHECK (policyTag IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed')),
+  requiresPremium INTEGER NOT NULL DEFAULT 0 CHECK (requiresPremium IN (0,1)),
+  priority TEXT NOT NULL,
+  confidence TEXT NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  verifiedAt TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_catalog_tierTag ON source_catalog (tierTag);
+
 CREATE TABLE IF NOT EXISTS canonical_jobs (
   id TEXT NOT NULL,
   canonicalKey TEXT NOT NULL,

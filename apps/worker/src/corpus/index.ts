@@ -6,6 +6,7 @@ import { makeChangedSince, makeGet } from "./queries.ts";
 import { makeObserve } from "./observe.ts";
 import { makeCloseAbsent } from "./close.ts";
 import { makeFresh, makeMarkOffered } from "./freshness.ts";
+import { layer as judgementsLayer } from "./judgements.ts";
 import { makeSearch } from "./search.ts";
 
 export {
@@ -23,7 +24,7 @@ export {
  * nothing further from its environment — which is exactly what the frozen
  * `Corpus` tag promises: `Effect.Effect<A>` with no `R`.
  */
-export const layer = Layer.effect(
+const corpusLayer = Layer.effect(
   Corpus,
   Effect.gen(function* () {
     const database = yield* Database;
@@ -38,3 +39,10 @@ export const layer = Layer.effect(
     });
   }),
 );
+
+/**
+ * The corpus and the feedback about it. `Judgements` ships here rather than
+ * in its own slot because a dismissal is the feed's answer to what the corpus
+ * offered — the two are read together or not at all.
+ */
+export const layer = Layer.mergeAll(corpusLayer, judgementsLayer);
