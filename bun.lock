@@ -38,6 +38,10 @@
       "name": "@job-index/worker",
       "version": "0.0.0",
     },
+    "packages/adapters": {
+      "name": "@job-index/adapters",
+      "version": "0.0.0",
+    },
     "packages/domain": {
       "name": "@job-index/domain",
       "version": "0.0.0",
@@ -91,6 +95,8 @@
     "@foldkit/ui": ["@foldkit/ui@0.139.0", "", { "dependencies": { "@floating-ui/dom": "^1.7.6" }, "peerDependencies": { "effect": "4.0.0-beta.103", "foldkit": "^0" } }, "sha512-6Bhu1/vHrhyg8W2qxmIDC60ZXHvagcsRiQnvniY7ycf5gaKoDDnb2mkWKRn1fEPuhX3NdzHxNcek4dTuUE16QQ=="],
 
     "@istanbuljs/schema": ["@istanbuljs/schema@0.1.6", "", {}, "sha512-+Sg6GCR/wy1oSmQDFq4LQDAhm3ETKnorxN+y5nbLULOR3P0c14f2Wurzj3/xqPXtasLFfHd5iRFQ7AJt4KH2cw=="],
+
+    "@job-index/adapters": ["@job-index/adapters@workspace:packages/adapters"],
 
     "@job-index/domain": ["@job-index/domain@workspace:packages/domain"],
 

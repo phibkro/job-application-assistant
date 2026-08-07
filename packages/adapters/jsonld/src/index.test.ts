@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Effect from "effect/Effect";
 import type { PlatformId } from "../../../domain/src/Ids.ts";
-import { SourceAdapter } from "../../../../apps/worker/src/services/Acquisition.ts";
+import { SourceAdapter } from "../../src/SourceAdapter.ts";
 import { layer } from "./index.ts";
 
 const PLATFORM = "example-careers" as PlatformId;

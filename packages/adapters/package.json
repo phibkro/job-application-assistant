@@ -1,0 +1,12 @@
+{
+  "name": "@job-index/adapters",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./nav": "./nav/src/index.ts",
+    "./jsonld": "./jsonld/src/index.ts",
+    "./shared/*": "./shared/src/*.ts",
+    "./*": "./src/*.ts"
+  }
+}

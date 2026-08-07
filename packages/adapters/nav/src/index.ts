@@ -2,8 +2,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type { PlatformId } from "../../../domain/src/Ids.ts";
 import { SourceUnavailable } from "../../../domain/src/Failure.ts";
-import { SourceAdapter } from "../../../../apps/worker/src/services/Acquisition.ts";
-import type { AcquiredPage } from "../../../../apps/worker/src/services/Acquisition.ts";
+import { SourceAdapter } from "../../src/SourceAdapter.ts";
+import type { AcquiredPage } from "../../src/SourceAdapter.ts";
 import { decodeDetail, decodeFeedPage, NAV_SOURCE_ID, summaryListing } from "./decode.ts";
 
 // The catalogue seed (migrations/0007_source_catalog_seed.sql) names this
@@ -41,30 +41,30 @@ const fetchJson = (url: string): Effect.Effect<unknown, SourceUnavailable> =>
  * feed summary: that silent substitution is the exact defect `DecodeFailed`'s
  * doc comment describes, and the reason it now fails loudly instead.
  */
-export const layer = Layer.succeed(
-  SourceAdapter,
-  SourceAdapter.of({
-    supports: (platform) => Effect.succeed(platform === NAV_PLATFORM_ID),
-    page: (_platform, cursor) =>
-      Effect.gen(function* () {
-        const feedJson = yield* fetchJson(resolveUrl(cursor));
-        const page = yield* decodeFeedPage(feedJson);
-        const activeItems = page.items.filter((item) => item.active);
+export const adapter: SourceAdapter["Service"] = {
+  supports: (platform) => Effect.succeed(platform === NAV_PLATFORM_ID),
+  page: (_platform, cursor) =>
+    Effect.gen(function* () {
+      const feedJson = yield* fetchJson(resolveUrl(cursor));
+      const page = yield* decodeFeedPage(feedJson);
+      const activeItems = page.items.filter((item) => item.active);
 
-        const listings = yield* Effect.forEach(activeItems, (item) =>
-          item.detailUrl === undefined
-            ? summaryListing(item)
-            : Effect.flatMap(fetchJson(resolveUrl(item.detailUrl)), (detailJson) =>
-                decodeDetail(detailJson, item),
-              ),
-        );
+      const listings = yield* Effect.forEach(activeItems, (item) =>
+        item.detailUrl === undefined
+          ? summaryListing(item)
+          : Effect.flatMap(fetchJson(resolveUrl(item.detailUrl)), (detailJson) =>
+              decodeDetail(detailJson, item),
+            ),
+      );
 
-        return {
-          listings,
-          cursor: page.nextUrl ?? cursor,
-          more: page.nextUrl !== undefined,
-          via: "feed",
-        } satisfies AcquiredPage;
-      }),
-  }),
-);
+      return {
+        listings,
+        cursor: page.nextUrl ?? cursor,
+        more: page.nextUrl !== undefined,
+        via: "feed",
+      } satisfies AcquiredPage;
+    }),
+};
+
+/** For code that wants `SourceAdapter` provided directly, such as this module's own tests. */
+export const layer = Layer.succeed(SourceAdapter, adapter);
