@@ -48,3 +48,18 @@ export const Erasure = Schema.Union([
   Schema.TaggedStruct("Purged", { at: Schema.String }),
 ]);
 export type Erasure = typeof Erasure.Type;
+
+/**
+ * How long a purge sweep must wait after a request before it may delete the
+ * row: the gap between `Requested.at` and `Requested.purgeAfter`.
+ *
+ * DEFAULT TAKEN, not sourced: WS-0012 lists "erasure and retention policy —
+ * what deletion means, and after how long" as an operator decision, and
+ * nothing in the frozen contracts states a duration. Thirty days matches
+ * common GDPR-erasure grace windows and is easy to change in one place; it is
+ * a placeholder for an answer no slot can source on its own, not a policy
+ * claim. It lives beside `Erasure` rather than in whichever slot happens to
+ * compute the first `purgeAfter`, because a grace period is a policy every
+ * writer of that field must agree on, not an implementation detail of one.
+ */
+export const ERASURE_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
