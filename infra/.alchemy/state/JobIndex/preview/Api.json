@@ -1,5 +1,5 @@
 {
-  "status": "created",
+  "status": "updated",
   "fqn": "Api",
   "logicalId": "Api",
   "instanceId": "1e3c54ff8ff3df01825a62a4d49d6d54",
@@ -67,8 +67,8 @@
     ],
     "crons": [],
     "hash": {
-      "assets": "cab7ca17b4860a8df7a17b23101949ca5f18ffc26dbb2a09ddab32c41f784bd9",
-      "bundle": "8bd392e9ed94cf7b5f3381e5700585cb70c572d8fe30e5b829ffaf0a80512756"
+      "assets": "82a3d1de945a2d6cc097be84d6af92994d28cc7287f3bf0315afe2f28f10d8af",
+      "bundle": "a2d1e47893673f470789141512ea563ef64bfe466e3627a75115552766215100"
     }
   },
   "bindings": [
@@ -78,6 +78,7 @@
         "bindings": [
           {
             "type": "d1",
+            "databaseId": "4b7d1a99-51d5-466f-8e0b-e10195e49231",
             "name": "DB"
           }
         ]

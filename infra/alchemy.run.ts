@@ -85,6 +85,11 @@ const secretBindings = () => {
     "LINKEDIN_CLIENT_SECRET",
     "CLOUDFLARE_ACCOUNT_ID",
     "BROWSER_RENDERING_TOKEN",
+    // Telemetry goes out over OTLP, so the vendor is a URL and a header
+    // rather than an SDK — see apps/worker/src/runtime/Telemetry.ts. Absent
+    // values leave the exporter off; the service runs either way.
+    "OTLP_ENDPOINT",
+    "OTLP_AUTH_HEADER",
   ]) {
     const value = process.env[name];
     if (value && value.trim().length > 0) {
