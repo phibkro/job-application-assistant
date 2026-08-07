@@ -50,9 +50,23 @@ for cron in (
 ):
     assert cron in infra, cron
 
-# Migrations are applied by the same step that declares the database, so the
-# Worker is never live against an unmigrated schema.
-assert 'migrationsDir: "../migrations"' in infra
+# Every stage's database gets its schema from somewhere, and the two stages get
+# it from different places on purpose.
+#
+# The Rust stages apply the ten ordered migrations in the same step that
+# declares the database, so the Worker is never live against an unmigrated
+# schema. The TypeScript stage must NOT apply them: it starts on a new
+# database with nothing back-filled, and applying both leaves a database
+# matching neither — `CREATE TABLE IF NOT EXISTS` keeps the legacy shape and
+# the generated snapshot's next index fails against it. That is not
+# hypothetical; it is how the first preview deploy failed.
+assert 'migrationsDir: TYPESCRIPT ? undefined : "../migrations"' in infra
+
+# ...so the TypeScript stage's schema has to come from its own deploy step.
+# Without this the conditional above would be a silent way to deploy against
+# an empty database.
+deploy_preview = (ROOT / "scripts/deploy-preview.sh").read_text()
+assert "db/schema.sql" in deploy_preview
 
 justfile = (ROOT / "justfile").read_text()
 for recipe in ["deploy-staging:", "deploy-production:", "admin-key:", "cargo test --workspace --lib"]:

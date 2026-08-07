@@ -1,0 +1,210 @@
+{
+  "status": "created",
+  "fqn": "Api",
+  "logicalId": "Api",
+  "instanceId": "1e3c54ff8ff3df01825a62a4d49d6d54",
+  "resourceType": "Cloudflare.Worker",
+  "props": {
+    "name": "job-index-preview",
+    "main": "../.preview/worker.js",
+    "assets": {
+      "directory": "../apps/web/dist",
+      "config": {
+        "notFoundHandling": "single-page-application",
+        "runWorkerFirst": [
+          "/api/*"
+        ]
+      }
+    },
+    "compatibility": {
+      "date": "2026-05-25"
+    },
+    "url": true,
+    "env": {
+      "DB": {
+        "databaseId": "4b7d1a99-51d5-466f-8e0b-e10195e49231",
+        "databaseName": "job-index-preview-db",
+        "jurisdiction": "default",
+        "accountId": "d2319ba5e93bf509a478951e90496374",
+        "migrationsHashes": {},
+        "importHashes": {}
+      },
+      "ENVIRONMENT": "preview",
+      "ALLOW_DEMO_MUTATIONS": "true",
+      "ALLOW_NAV_SYNC_WITHOUT_TOKEN": "true",
+      "NAV_USE_PUBLIC_TOKEN": "true",
+      "NAV_SYNC_ENABLED": "false",
+      "NAV_DETAIL_FETCH_LIMIT": "40",
+      "NAV_MAX_PAGES_PER_RUN": "4",
+      "NAV_MAX_OBSERVATIONS_PER_RUN": "600",
+      "NAV_MAX_DURATION_MS": "20000",
+      "NAV_LEASE_TTL_MS": "90000"
+    },
+    "crons": [],
+    "observability": {
+      "enabled": true,
+      "logs": {
+        "enabled": true,
+        "invocationLogs": true
+      }
+    },
+    "isExternal": true
+  },
+  "attr": {
+    "workerId": "job-index-preview",
+    "workerName": "job-index-preview",
+    "logpush": false,
+    "url": "https://job-index-preview.philib-krogh-d23.workers.dev",
+    "tags": [
+      "alchemy:stack:JobIndex",
+      "alchemy:stage:preview",
+      "alchemy:id:Api"
+    ],
+    "durableObjectNamespaces": {},
+    "accountId": "d2319ba5e93bf509a478951e90496374",
+    "domains": [
+      "https://job-index-preview.philib-krogh-d23.workers.dev"
+    ],
+    "crons": [],
+    "hash": {
+      "assets": "cab7ca17b4860a8df7a17b23101949ca5f18ffc26dbb2a09ddab32c41f784bd9",
+      "bundle": "8bd392e9ed94cf7b5f3381e5700585cb70c572d8fe30e5b829ffaf0a80512756"
+    }
+  },
+  "bindings": [
+    {
+      "sid": "DB",
+      "data": {
+        "bindings": [
+          {
+            "type": "d1",
+            "name": "DB"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "ENVIRONMENT",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "ENVIRONMENT",
+            "text": "preview"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "ALLOW_DEMO_MUTATIONS",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "ALLOW_DEMO_MUTATIONS",
+            "text": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "ALLOW_NAV_SYNC_WITHOUT_TOKEN",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "ALLOW_NAV_SYNC_WITHOUT_TOKEN",
+            "text": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_USE_PUBLIC_TOKEN",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_USE_PUBLIC_TOKEN",
+            "text": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_SYNC_ENABLED",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_SYNC_ENABLED",
+            "text": "false"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_DETAIL_FETCH_LIMIT",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_DETAIL_FETCH_LIMIT",
+            "text": "40"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_MAX_PAGES_PER_RUN",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_MAX_PAGES_PER_RUN",
+            "text": "4"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_MAX_OBSERVATIONS_PER_RUN",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_MAX_OBSERVATIONS_PER_RUN",
+            "text": "600"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_MAX_DURATION_MS",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_MAX_DURATION_MS",
+            "text": "20000"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_LEASE_TTL_MS",
+      "data": {
+        "bindings": [
+          {
+            "type": "plain_text",
+            "name": "NAV_LEASE_TTL_MS",
+            "text": "90000"
+          }
+        ]
+      }
+    }
+  ],
+  "providerVersion": 0,
+  "downstream": [],
+  "removalPolicy": "destroy"
+}

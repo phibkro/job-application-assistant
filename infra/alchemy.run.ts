@@ -41,6 +41,24 @@ const STAGE = process.env.ALCHEMY_STAGE ?? "staging";
 const PRODUCTION = STAGE === "production";
 
 /**
+ * The `preview` stage runs the TypeScript service; every other stage still
+ * runs the Rust one.
+ *
+ * This is what a strangler migration looks like in an infrastructure file:
+ * the replacement gets a deployment of its own, with its own database and its
+ * own name, so it can be exercised against real Cloudflare without touching
+ * what serves today. `staging` and `production` keep pointing at the Rust
+ * worker until each route group is cut over — the point of the migration is
+ * that the old service keeps working while the new one earns its place.
+ *
+ * The preview stage also runs no crons. Ingestion has no TypeScript
+ * implementation yet, and a scheduled trigger that fires into a service which
+ * cannot serve it would look like a broken deployment rather than an absent
+ * feature.
+ */
+const TYPESCRIPT = STAGE === "preview";
+
+/**
  * Production is published in two phases so a cron-enabled version can never
  * run before its credentials exist: the first deploy omits triggers and
  * disables synchronization, the second activates them. scripts/deploy.sh sets
@@ -128,12 +146,37 @@ export default Alchemy.Stack(
       name: `job-index-${STAGE}-db`,
       // Norwegian vacancies read from Norway.
       primaryLocationHint: "weur",
-      migrationsDir: "../migrations",
+      // The Rust service's ten ordered migrations, and only for the stages
+      // that run it. The TypeScript service starts on a new database from the
+      // generated snapshot (`db/schema.sql`, applied by
+      // `scripts/deploy-preview.sh`): nothing is back-filled, so there is no
+      // earlier shape to migrate from, and applying both leaves a database
+      // that matches neither — a `CREATE TABLE IF NOT EXISTS` quietly keeps
+      // the legacy shape and the next index fails against it. Found by
+      // deploying: "no such column: profileId".
+      migrationsDir: TYPESCRIPT ? undefined : "../migrations",
     });
 
     const api = yield* Cloudflare.Worker("Api", {
       name: `job-index-${STAGE}`,
-      main: "../crates/job-index-worker/build/index.js",
+      // Both are pre-built artifacts, not sources: `just build` produces the
+      // Rust one, `scripts/deploy-preview.sh` bundles the TypeScript one with
+      // the same command the local preview uses, so what deploys is what was
+      // run locally.
+      main: TYPESCRIPT ? "../.preview/worker.js" : "../crates/job-index-worker/build/index.js",
+      // The interface ships beside the API on one origin. Unmatched paths
+      // fall back to the app shell because the interface routes client-side;
+      // `/api/*` runs the Worker first so the asset router cannot shadow an
+      // endpoint with the shell.
+      assets: TYPESCRIPT
+        ? {
+            directory: "../apps/web/dist",
+            config: {
+              notFoundHandling: "single-page-application",
+              runWorkerFirst: ["/api/*"],
+            },
+          }
+        : undefined,
       compatibility: { date: "2026-05-25" },
       url: true,
       env: {
@@ -141,7 +184,7 @@ export default Alchemy.Stack(
         ...environmentVars,
         ...secretBindings(),
       },
-      crons: CRONS,
+      crons: TYPESCRIPT ? [] : CRONS,
       observability: {
         enabled: true,
         logs: { enabled: true, invocationLogs: true },

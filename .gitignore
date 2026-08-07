@@ -3,6 +3,8 @@
 
 # Local databases and runtime state
 /.preview/
+/.alchemy/bundles/
+dev/.wrangler/
 *.db
 *.db-shm
 *.db-wal

@@ -75,6 +75,10 @@ dev:
 preview:
   ./scripts/dispatch.sh _preview
 
+# Deploy the TypeScript service to its own Cloudflare stage (not a cutover).
+deploy-preview:
+  ./scripts/dispatch.sh _deploy-preview
+
 # Deploy the disposable staging environment and run destructive smoke tests.
 deploy:
   ./scripts/dispatch.sh _deploy-staging
@@ -149,6 +153,9 @@ _migrate-local: _setup
 
 _preview: _setup
   ./scripts/preview.sh
+
+_deploy-preview: _setup
+  ./scripts/deploy-preview.sh
 
 _dev: _setup _migrate-local
   wrangler dev --config wrangler.local.jsonc --local --persist-to .wrangler/state

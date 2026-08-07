@@ -1,0 +1,7 @@
+{
+  "url": "https://job-index-preview.philib-krogh-d23.workers.dev",
+  "worker": "job-index-preview",
+  "database": "job-index-preview-db",
+  "databaseId": "4b7d1a99-51d5-466f-8e0b-e10195e49231",
+  "stage": "preview"
+}
