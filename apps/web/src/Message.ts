@@ -1,8 +1,10 @@
 import * as S from "effect/Schema";
+import { Navigation } from "foldkit";
 import { m } from "foldkit/message";
 import { CanonicalJob } from "@job-index/domain/Job";
-import { JobPage, Page, Problem } from "./Model.ts";
+import { JobPage, Problem } from "./Model.ts";
 import * as ProfileMessage from "./profile/Message.ts";
+import { Route } from "./Route.ts";
 
 /**
  * The application's Message union.
@@ -16,8 +18,20 @@ import * as ProfileMessage from "./profile/Message.ts";
 export const Decision = S.Literals(["Approve", "Rework", "Decline"]);
 export type Decision = typeof Decision.Type;
 
-// Navigation
-export const Navigated = m("Navigated", { to: Page });
+// Navigation — the runtime's own URL-request/URL-change split (see
+// `Runtime.RoutingConfig`). `UrlRequested` fires for a click the runtime
+// intercepted (an in-app `<a>`, same-origin or not) and only ever decides
+// *whether* to push a new URL or leave the site; `UrlChanged` fires once
+// the address bar has actually changed — by that push, by the back/forward
+// buttons, or by a cold load — and is the one place a `Route` becomes the
+// Model's `page`. Nothing dispatches a page change directly.
+export const UrlRequested = m("UrlRequested", { request: Navigation.UrlRequest });
+export const UrlChanged = m("UrlChanged", { route: Route });
+/** The sole completion Message for `PushUrl`/`LoadUrl`: both leave the
+ *  visible change already applied (the browser's own history/location APIs
+ *  did it synchronously), so, like `StorageSynced`, there is nothing left
+ *  for `update` to do with the result. */
+export const UrlPushed = m("UrlPushed");
 
 // Session
 export const SessionTokenInputChanged = m("SessionTokenInputChanged", { value: S.String });
@@ -106,7 +120,9 @@ export const DecisionSucceeded = m("DecisionSucceeded", {
 export const DecisionFailed = m("DecisionFailed", { jobId: S.String, problem: Problem });
 
 export const Message = S.Union([
-  Navigated,
+  UrlRequested,
+  UrlChanged,
+  UrlPushed,
   SessionTokenInputChanged,
   SessionTokenSubmitted,
   SessionCleared,

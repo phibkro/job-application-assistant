@@ -1,6 +1,6 @@
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
-import { AsyncData, Command } from "foldkit";
+import { AsyncData, Command, Url } from "foldkit";
 import type { Update } from "foldkit";
 import { evo } from "foldkit/struct";
 import * as Applications from "./Applications.ts";
@@ -15,6 +15,8 @@ import {
   type Model,
   PageBrowse,
   PageFeed,
+  PageJobDetail,
+  PageNotFound,
   PageProfile,
   type Problem,
   RequestFailed,
@@ -25,6 +27,7 @@ import {
   initialModel,
 } from "./Model.ts";
 import * as ProfileSubmodel from "./profile/index.ts";
+import * as Route from "./Route.ts";
 import { settle } from "./Settle.ts";
 
 export type UpdateReturn = Update.Return<Model, Message>;
@@ -43,23 +46,54 @@ export const update = (model: Model, message: Message): UpdateReturn =>
   Match.value(message).pipe(
     withReturnType,
     Match.tagsExhaustive({
-      Navigated: ({ to }) => {
-        const withPage = evo(model, { page: () => to });
-        return Match.value(to).pipe(
+      // The runtime intercepted a link click and is asking what to do with
+      // it. Internal never touches the Model directly — it only pushes the
+      // URL, and `UrlChanged` (fired by that very push, see `Commands.PushUrl`)
+      // is what actually moves `page`. External is a full navigation: there
+      // is no SPA state left to update.
+      UrlRequested: ({ request }) =>
+        Match.value(request).pipe(
           withReturnType,
           Match.tagsExhaustive({
-            Browse: () => {
+            Internal: ({ url }) => [model, [Commands.PushUrl({ href: Url.toString(url) })]],
+            External: ({ href }) => [model, [Commands.LoadUrl({ href })]],
+          }),
+        ),
+
+      // The address bar now reads `route` — a push this app made, the
+      // back/forward buttons, or a cold load (`main.ts`'s `init` dispatches
+      // this too, so a fresh tab and a client-side navigation load data the
+      // same way). This is the only place `page` changes, so it can never
+      // drift from the last URL the runtime actually saw.
+      UrlChanged: ({ route }) =>
+        Match.value(route).pipe(
+          withReturnType,
+          Match.tagsExhaustive({
+            Browse: ({ term, location, status }) => {
+              const withPage = evo(model, {
+                page: () => PageBrowse(),
+                browseQuery: () => ({ term, location, status }),
+              });
               const [browseResults, cmds] = ensureLoaded(
                 withPage.browseResults,
-                Commands.FetchJobs({ ...withPage.browseQuery, cursor: Option.none() }),
+                Commands.FetchJobs({ term, location, status, cursor: Option.none() }),
               );
               return [evo(withPage, { browseResults: () => browseResults }), cmds];
             },
+            // Always refetches, unlike every other arm here: a deep link
+            // straight to a job's detail page is the one entry a previous
+            // screen never had the chance to warm the cache for, so
+            // `ensureLoaded`'s "already have it" guard would be wrong for
+            // exactly the case this route exists to serve.
             JobDetail: ({ jobId }) => [
-              evo(withPage, { jobDetail: () => AsyncData.Loading() }),
+              evo(model, {
+                page: () => PageJobDetail({ jobId }),
+                jobDetail: () => AsyncData.Loading(),
+              }),
               [Commands.FetchJob({ jobId })],
             ],
             Feed: () => {
+              const withPage = evo(model, { page: () => PageFeed() });
               const [feedResults, cmds] = ensureLoaded(withPage.feedResults, Commands.FetchFeed());
               return [evo(withPage, { feedResults: () => feedResults }), cmds];
             },
@@ -69,6 +103,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
             // `update` — the `Requested` arm is where "start loading" is
             // actually defined, so this only decides *whether* to fire it.
             Profile: () => {
+              const withPage = evo(model, { page: () => PageProfile() });
               if (!AsyncData.isIdle(withPage.profile.profile)) return [withPage, []];
               const [nextProfile, profileCommands] = ProfileSubmodel.update(
                 withPage.profile,
@@ -81,9 +116,11 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                 ),
               ];
             },
+            NotFound: ({ path }) => [evo(model, { page: () => PageNotFound({ path }) }), []],
           }),
-        );
-      },
+        ),
+
+      UrlPushed: () => [model, []],
 
       // SESSION
 
@@ -133,9 +170,17 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         [],
       ],
 
+      // A submitted search is the one moment the box values become "what's
+      // displayed" rather than just what's mid-typed, so it is also the one
+      // moment they earn a place in the address bar — pushed alongside the
+      // fetch, not derived from the fetch's result, since the search is
+      // shareable the instant it runs, not once it resolves.
       BrowseSearchSubmitted: () => [
         evo(model, { browseResults: () => AsyncData.Loading() }),
-        [Commands.FetchJobs({ ...model.browseQuery, cursor: Option.none() })],
+        [
+          Commands.FetchJobs({ ...model.browseQuery, cursor: Option.none() }),
+          Commands.PushUrl({ href: Route.href(Route.RouteBrowse(model.browseQuery)) }),
+        ],
       ],
 
       BrowseNextPageRequested: () => {

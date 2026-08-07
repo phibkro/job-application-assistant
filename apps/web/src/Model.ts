@@ -44,13 +44,19 @@ const PageMeta = S.Struct({ limit: S.Number, nextCursor: S.NullOr(S.String) });
 export const JobPage = S.Struct({ data: S.Array(CanonicalJob), meta: PageMeta });
 export type JobPage = typeof JobPage.Type;
 
-// PAGE — which screen is showing. Not URL-backed: this slot builds the loop,
-// not a router, so navigation is Model state like any other.
+// PAGE — which screen is showing. URL-backed: `Route.ts` parses the
+// address bar into a `Route` and `update.ts`'s `UrlChanged` handler is the
+// only place that turns one into a `Page`, so this field is always in step
+// with the last URL the runtime saw, never a second copy of it.
 export const PageBrowse = ts("Browse", {});
 export const PageJobDetail = ts("JobDetail", { jobId: S.String });
 export const PageFeed = ts("Feed", {});
 export const PageProfile = ts("Profile", {});
-export const Page = S.Union([PageBrowse, PageJobDetail, PageFeed, PageProfile]);
+// Not named `NotFound` — that tag is already `RequestStatus.ts`'s Problem
+// variant, re-exported from this module; a second binding of the same name
+// would collide at the import site even though the two unions never mix.
+export const PageNotFound = ts("NotFound", { path: S.String });
+export const Page = S.Union([PageBrowse, PageJobDetail, PageFeed, PageProfile, PageNotFound]);
 export type Page = typeof Page.Type;
 
 // SESSION

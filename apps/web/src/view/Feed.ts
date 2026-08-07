@@ -2,11 +2,11 @@ import * as Option from "effect/Option";
 import { AsyncData } from "foldkit";
 import type { HtmlBuilder, Html } from "foldkit/html";
 import type { CanonicalJob } from "@job-index/domain/Job";
-import { FeedDismissClicked, FeedRequested, Navigated } from "../Message.ts";
+import { FeedDismissClicked, FeedRequested } from "../Message.ts";
 import type { Message } from "../Message.ts";
-import { PageJobDetail } from "../Model.ts";
 import type { Model } from "../Model.ts";
-import { button, card, pageClass, renderProblem, sectionHeading } from "./Shared.ts";
+import * as Route from "../Route.ts";
+import { button, card, linkButton, pageClass, renderProblem, sectionHeading } from "./Shared.ts";
 
 const feedItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
   h.keyed("li")(
@@ -26,11 +26,11 @@ const feedItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
       h.div(
         [h.Class("flex shrink-0 gap-2")],
         [
-          button(
+          linkButton(
             {
               label: "View",
               variant: "secondary",
-              onClick: Navigated({ to: PageJobDetail({ jobId: job.id }) }),
+              href: Route.href(Route.RouteJobDetail({ jobId: job.id })),
             },
             h,
           ),
