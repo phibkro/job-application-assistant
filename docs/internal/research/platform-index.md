@@ -4,7 +4,14 @@ The original research identified 109 active listing surfaces across 17 categorie
 
 The source workbook is stored at:
 
-- [`research/input/norway_oslo_job_platform_index.xlsx`](../../../research/input/norway_oslo_job_platform_index.xlsx)
+- [`research/input/platform-index.csv`](../../../research/input/platform-index.csv) — the active index
+- [`research/input/platform-legacy.csv`](../../../research/input/platform-legacy.csv) — platforms superseded, and what replaced them
+- [`research/input/search-stack.csv`](../../../research/input/search-stack.csv)
+
+These were one `.xlsx` until 2026-08-07. The tier and automation-policy columns
+decide which platforms this service may collect from and submit to, which makes
+them a policy record: a change to one has to be reviewable, and a binary diffs
+as "binary files differ".
 
 ## Integration principle
 

@@ -1,6 +1,6 @@
 -- Source catalog: the researched platform index as queryable state.
 --
--- The index lived in research/input/norway_oslo_job_platform_index.xlsx, which
+-- The index lives in research/input/platform-index.csv, which
 -- no running code could read. Ingestion needs three facts per platform before
 -- it touches it: how a machine may read its listings, whether that platform
 -- permits automated submission, and whether reaching it costs an agent run.
