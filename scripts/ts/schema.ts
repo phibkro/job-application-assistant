@@ -29,6 +29,11 @@ import {
 } from "../../packages/domain/src/Applications.ts"
 import { DeliveryPlatform, Submission } from "../../packages/domain/src/Delivery.ts"
 import { Freshness, Judgement } from "../../packages/domain/src/Freshness.ts"
+import {
+  IngestionFailure,
+  IngestionRun,
+  SourceState,
+} from "../../packages/domain/src/Ingestion.ts"
 import { CanonicalJobRecord, OccurrenceRecord } from "../../packages/domain/src/Job.ts"
 import { Session } from "../../packages/domain/src/Access.ts"
 import { Principal } from "../../packages/domain/src/Principal.ts"
@@ -114,6 +119,24 @@ const columnTypes: Record<string, string> = {
   createdAt: "TEXT NOT NULL",
   updatedAt: "TEXT NOT NULL",
   changedAt: "TEXT NOT NULL",
+  // Ingestion: source_state, ingestion_runs, ingestion_failures.
+  cursor: "TEXT NOT NULL",
+  cursorBefore: "TEXT NOT NULL",
+  cursorAfter: "TEXT NOT NULL",
+  seenExternalIds: "TEXT NOT NULL DEFAULT '[]'",
+  resolvedSourceId: "TEXT",
+  leaseOwner: "TEXT",
+  // Nullable: unlike every other INTEGER above, "no lease" is a real state.
+  leaseExpiresAt: "INTEGER",
+  startedAt: "TEXT NOT NULL",
+  occurredAt: "TEXT NOT NULL",
+  pages: "INTEGER NOT NULL",
+  observations: "INTEGER NOT NULL",
+  canonicalChanges: "INTEGER NOT NULL",
+  highestSequence: "INTEGER NOT NULL",
+  stoppedReason: "TEXT NOT NULL",
+  durationMs: "INTEGER NOT NULL",
+  failureTag: "TEXT NOT NULL",
   publishedAt: "TEXT NOT NULL",
   firstSeenAt: "TEXT NOT NULL",
   lastSeenAt: "TEXT NOT NULL",
@@ -233,6 +256,23 @@ const tables: Record<string, TableSpec> = {
   platform_policies: {
     model: PlatformPolicyRecord,
     primaryKey: ["platformId"],
+  },
+  source_state: {
+    model: SourceState,
+    primaryKey: ["platformId"],
+  },
+  ingestion_runs: {
+    model: IngestionRun,
+    // A log: each invocation is history, not a row to overwrite — the same
+    // reason `judgements` has no key.
+    appendOnly: "rowid",
+    // "How has this source behaved over time" is the query; startedAt orders it.
+    indexes: [["platformId", "startedAt"]],
+  },
+  ingestion_failures: {
+    model: IngestionFailure,
+    appendOnly: "rowid",
+    indexes: [["platformId", "occurredAt"]],
   },
 }
 

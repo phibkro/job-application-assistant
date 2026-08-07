@@ -15,6 +15,15 @@ export interface Env {
   readonly DB: D1Database;
   /** `staging` or `production`; whatever the deploy set, reported as-is. */
   readonly ENVIRONMENT: string;
+  /**
+   * NAV's bearer token, whichever kind `scripts/refresh-nav-token.sh` wrote
+   * (public experiment or NAV-issued private consumer). Optional, not
+   * validated here: a deployment that has not configured it yet should still
+   * start — NAV ingestion then fails per-request as `SourceUnavailable`
+   * (a 401), landing in the ingestion failure ledger like any other
+   * connector problem, rather than the whole Worker refusing to boot.
+   */
+  readonly NAV_API_TOKEN?: string;
 }
 
 export class EnvironmentIncomplete extends Data.TaggedError("EnvironmentIncomplete")<{
@@ -53,5 +62,9 @@ export const decodeEnv = (env: unknown): Env => {
     throw new EnvironmentIncomplete({ missing });
   }
 
-  return { DB: bag.DB as D1Database, ENVIRONMENT: bag.ENVIRONMENT as string };
+  return {
+    DB: bag.DB as D1Database,
+    ENVIRONMENT: bag.ENVIRONMENT as string,
+    NAV_API_TOKEN: isNonEmptyString(bag.NAV_API_TOKEN) ? bag.NAV_API_TOKEN : undefined,
+  };
 };
