@@ -84,6 +84,7 @@ describe("the Authenticated middleware", () => {
         observe: () => Effect.die("unused"),
         get: () => Effect.die("unused"),
         changedSince: () => Effect.die("unused"),
+        search: () => Effect.die("unused"),
         fresh: () => Effect.succeed([]),
         markOffered: () => Effect.die("unused"),
         closeAbsent: () => Effect.die("unused"),

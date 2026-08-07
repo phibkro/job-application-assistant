@@ -4,6 +4,7 @@ import type {
 } from "@job-index/domain/Job";
 import type { CanonicalJob } from "@job-index/domain/Job";
 import type { CanonicalJobId, OccurrenceId, SourceId, Sequence } from "@job-index/domain/Ids";
+import { normalizeText } from "./identity.ts";
 import { CANONICAL_JOB_FIELDS, OCCURRENCE_FIELDS } from "./sql.ts";
 
 /**
@@ -58,6 +59,9 @@ export const rowFromCanonicalJob = (job: CanonicalJob, canonicalKey: string): Ca
   sequence: job.sequence,
   changedAt: job.changedAt,
   sources: JSON.stringify(job.sources),
+  titleNormalized: normalizeText(job.title),
+  employerNameNormalized: normalizeText(job.employerName),
+  locationNormalized: normalizeText(job.location),
 });
 
 /** One occurrence record, whichever direction it is flowing. */

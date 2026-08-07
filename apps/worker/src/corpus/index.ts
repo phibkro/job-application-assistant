@@ -6,6 +6,7 @@ import { makeChangedSince, makeGet } from "./queries.ts";
 import { makeObserve } from "./observe.ts";
 import { makeCloseAbsent } from "./close.ts";
 import { makeFresh, makeMarkOffered } from "./freshness.ts";
+import { makeSearch } from "./search.ts";
 
 export {
   normalize,
@@ -30,6 +31,7 @@ export const layer = Layer.effect(
       observe: makeObserve(database),
       get: makeGet(database),
       changedSince: makeChangedSince(database),
+      search: makeSearch(database),
       fresh: makeFresh(database),
       markOffered: makeMarkOffered(database),
       closeAbsent: makeCloseAbsent(database),

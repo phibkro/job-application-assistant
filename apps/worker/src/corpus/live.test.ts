@@ -131,4 +131,66 @@ describe("corpus on a real SQLite engine", () => {
     expect(after.changed).toHaveLength(1);
     expect(after.changed[0]?.status._tag).toBe("Active");
   });
+
+  describe("search", () => {
+    it("term matches title or employer, location matches location, status matches statusTag — alone and combined", async () => {
+      const baker = normalize(
+        raw({ externalId: "1", title: "Baker", employerName: "Bakery AS", location: "Trondheim" }),
+      );
+      const barista = normalize(
+        raw({
+          externalId: "2",
+          title: "Barista",
+          employerName: "Cafe Bakery AS",
+          location: "Bergen",
+        }),
+      );
+      const cleaner = normalize(
+        raw({ externalId: "3", title: "Cleaner", employerName: "Renhold AS", location: "Oslo" }),
+      );
+      const found = await run(
+        Effect.gen(function* () {
+          const corpus = yield* Corpus;
+          yield* corpus.observe(baker);
+          yield* corpus.observe(barista);
+          yield* corpus.observe(cleaner);
+          yield* corpus.closeAbsent("nav" as SourceId, ["2", "3"]); // closes `baker`
+          return {
+            byTerm: yield* corpus.search({ term: "bakery" }, 0 as never, 10),
+            byLocation: yield* corpus.search({ location: "oslo" }, 0 as never, 10),
+            byStatus: yield* corpus.search({ status: "Closed" }, 0 as never, 10),
+            combined: yield* corpus.search({ term: "bakery", location: "bergen" }, 0 as never, 10),
+          };
+        }),
+      );
+      expect(found.byTerm.map((job) => job.title).toSorted()).toEqual(["Baker", "Barista"]);
+      expect(found.byLocation.map((job) => job.title)).toEqual(["Cleaner"]);
+      expect(found.byStatus.map((job) => job.title)).toEqual(["Baker"]);
+      expect(found.combined.map((job) => job.title)).toEqual(["Barista"]);
+    });
+
+    it("term does not match description, so a description word finds nothing", async () => {
+      const listing = normalize(raw({ description: "Requires a valid driving license." }));
+      const found = await run(
+        Effect.gen(function* () {
+          const corpus = yield* Corpus;
+          yield* corpus.observe(listing);
+          return yield* corpus.search({ term: "license" }, 0 as never, 10);
+        }),
+      );
+      expect(found).toEqual([]);
+    });
+
+    it("search is case- and diacritic-insensitive: a lowercase term finds an upper-cased æøå location", async () => {
+      const listing = normalize(raw({ location: "ØSTFOLD" }));
+      const found = await run(
+        Effect.gen(function* () {
+          const corpus = yield* Corpus;
+          yield* corpus.observe(listing);
+          return yield* corpus.search({ location: "østfold" }, 0 as never, 10);
+        }),
+      );
+      expect(found).toHaveLength(1);
+    });
+  });
 });

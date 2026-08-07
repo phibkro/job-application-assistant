@@ -1,7 +1,27 @@
 import type * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
-import type { CanonicalJob, NormalizedListing, ObservationOutcome } from "@job-index/domain/Job";
+import type {
+  CanonicalJob,
+  JobStatus,
+  NormalizedListing,
+  ObservationOutcome,
+} from "@job-index/domain/Job";
 import type { CanonicalJobId, ProfileId, Sequence, SourceId } from "@job-index/domain/Ids";
+
+/**
+ * `listJobs`'s filter: `term` against title/employer, `location` against
+ * location, `status` against the canonical's own status — each optional,
+ * and folded the same way at match time that `search` folds them at write
+ * time (see `corpus/search.ts`). All three absent is not a value this type
+ * can express as "search with nothing", which is deliberate: see `search`
+ * below for why that case is a different method rather than a different
+ * argument.
+ */
+export interface JobFilter {
+  readonly term?: string;
+  readonly location?: string;
+  readonly status?: JobStatus["_tag"];
+}
 
 /**
  * The canonical corpus, and what each person has already been offered.
@@ -19,6 +39,20 @@ export class Corpus extends Context.Service<
     readonly get: (id: CanonicalJobId) => Effect.Effect<CanonicalJob | undefined>;
     readonly changedSince: (
       sequence: Sequence,
+      limit: number,
+    ) => Effect.Effect<ReadonlyArray<CanonicalJob>>;
+    /**
+     * `changedSince`'s filtered counterpart, walked with the same
+     * `sequence` cursor so a caller pages either one identically. Kept
+     * separate rather than making `changedSince`'s filter always-optional:
+     * an always-optional argument makes "no filter" a value every call site
+     * must remember to pass, where a second method makes it a call site
+     * that cannot exist — and it is `changedSince`'s plain scan, unchanged,
+     * that keeps the unfiltered listing exactly as fast as it already was.
+     */
+    readonly search: (
+      filter: JobFilter,
+      cursor: Sequence,
       limit: number,
     ) => Effect.Effect<ReadonlyArray<CanonicalJob>>;
     /** Vacancies this profile has not been offered, newest first. */
