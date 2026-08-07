@@ -26,13 +26,16 @@ describe("layerSqlite", () => {
     );
     expect(rows.map((r) => r.name)).toEqual([
       "answers",
+      "applications",
       "canonical_jobs",
       "delivery_platforms",
       "freshness",
       "judgements",
       "occurrences",
+      "platform_policies",
       "principals",
       "profiles",
+      "saved_jobs",
       "sessions",
       "submissions",
       "subscriptions",

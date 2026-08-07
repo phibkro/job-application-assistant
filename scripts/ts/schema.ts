@@ -22,6 +22,11 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { Answer } from "../../packages/domain/src/Answer.ts"
+import {
+  ApplicationRecord,
+  PlatformPolicyRecord,
+  SavedJob,
+} from "../../packages/domain/src/Applications.ts"
 import { DeliveryPlatform, Submission } from "../../packages/domain/src/Delivery.ts"
 import { Freshness, Judgement } from "../../packages/domain/src/Freshness.ts"
 import { CanonicalJobRecord, OccurrenceRecord } from "../../packages/domain/src/Job.ts"
@@ -66,6 +71,15 @@ const columnTypes: Record<string, string> = {
   tokenHash: "TEXT NOT NULL",
   apiKeyHash: "TEXT NOT NULL",
   statusTag: "TEXT NOT NULL CHECK (statusTag IN ('Active', 'Closed'))",
+  savedJobId: "TEXT NOT NULL",
+  note: "TEXT NOT NULL DEFAULT ''",
+  method: "TEXT NOT NULL CHECK (method IN ('assisted', 'automated'))",
+  status: "TEXT NOT NULL CHECK (status IN ('ready', 'submitted', 'rejected', 'interview', 'offer', 'withdrawn'))",
+  letter: "TEXT NOT NULL",
+  generator: "TEXT NOT NULL",
+  downgradeReason: "TEXT",
+  notes: "TEXT NOT NULL DEFAULT ''",
+  policy: "TEXT NOT NULL CHECK (policy IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed'))",
   // JSON-encoded structures.
   shape: "TEXT NOT NULL",
   tier: "TEXT NOT NULL",
@@ -178,6 +192,22 @@ const tables: Record<string, TableSpec> = {
     // would double-count provenance and break absence detection.
     unique: [["sourceId", "externalId"]],
     indexes: [["canonicalJobId"], ["sourceId", "active"]],
+  },
+  saved_jobs: {
+    model: SavedJob,
+    primaryKey: ["id"],
+    // Bookmarking the same vacancy twice replaces the note, not the row.
+    unique: [["profileId", "canonicalJobId"]],
+    indexes: [["profileId"]],
+  },
+  applications: {
+    model: ApplicationRecord,
+    primaryKey: ["id"],
+    indexes: [["profileId"], ["savedJobId"]],
+  },
+  platform_policies: {
+    model: PlatformPolicyRecord,
+    primaryKey: ["platformId"],
   },
 }
 
