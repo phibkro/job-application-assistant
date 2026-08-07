@@ -58,13 +58,22 @@ const resolveSpecifier = (fromFile: string, specifier: string): string | undefin
   return found === undefined ? undefined : path.relative(ROOT, found);
 };
 
+/**
+ * Comments are not code, and this file proved it: its own docstring shows an
+ * example import, which the first version reported as a missing file. A gate
+ * whose first two failures were both false positives is a gate on its way to
+ * being switched off.
+ */
+const withoutComments = (text: string): string =>
+  text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
 const tracked = trackedFiles();
 const sources = [...tracked].filter((file) => file.endsWith(".ts") && !file.endsWith(".d.ts"));
 
 const problems: Array<string> = [];
 
 for (const file of sources) {
-  const text = fs.readFileSync(path.join(ROOT, file), "utf8");
+  const text = withoutComments(fs.readFileSync(path.join(ROOT, file), "utf8"));
   const seen = new Set<string>();
   for (const pattern of SPECIFIERS) {
     for (const match of text.matchAll(pattern)) {
