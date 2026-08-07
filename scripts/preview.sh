@@ -22,7 +22,8 @@ mkdir -p .preview
 bun build apps/worker/src/index.ts \
   --outfile=.preview/worker.js \
   --target=browser --format=esm \
-  --conditions=workerd --conditions=worker
+  --conditions=workerd --conditions=worker \
+  --external "cloudflare:*"
 
 echo "==> applying the generated schema and seed to the local database"
 wrangler d1 execute job-index-preview --local --config "$CONFIG" --file db/schema.sql >/dev/null

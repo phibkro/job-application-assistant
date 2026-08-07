@@ -7,8 +7,24 @@ import { makeFakeD1 } from "../db/FakeD1.ts";
 import { normalize } from "../corpus/index.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { Profiles } from "../services/Accounts.ts";
+import type { Env } from "./Env.ts";
 import { appLayer } from "../index.ts";
 import { services } from "./Layers.ts";
+
+/**
+ * Never actually called by anything these tests exercise — `SourceLease`
+ * only reaches `Ingestion.collect`, which no test here reaches through
+ * `appLayer`/`services` — but `Env` requires it, so building one is what
+ * keeps this file type-checking against the same `Env` a real deploy has to
+ * satisfy.
+ */
+const fakeSourceLeaseNamespace = (): Env["SOURCE_LEASE"] => ({
+  idFromName: (name: string) => name,
+  get: () => ({
+    acquire: () => Promise.reject(new Error("not exercised by these tests")),
+    release: () => Promise.reject(new Error("not exercised by these tests")),
+  }),
+});
 
 /**
  * The wiring, exercised rather than inspected.
@@ -24,7 +40,7 @@ import { services } from "./Layers.ts";
  * the production entry was caught importing a Bun-only test layer.
  */
 const withEnv = <A>(effect: Effect.Effect<A, never, Corpus | Profiles>): Promise<A> => {
-  const env = { DB: makeFakeD1(), ENVIRONMENT: "test" };
+  const env = { DB: makeFakeD1(), SOURCE_LEASE: fakeSourceLeaseNamespace(), ENVIRONMENT: "test" };
   return Effect.runPromise(Effect.provide(effect, services(env)));
 };
 
@@ -66,7 +82,13 @@ describe("the service graph, over a D1 binding", () => {
 
 /** A fresh worker per call: each gets its own binding, as an isolate would. */
 const handlerFor = (environment: string) =>
-  HttpRouter.toWebHandler(appLayer({ DB: makeFakeD1(), ENVIRONMENT: environment })).handler;
+  HttpRouter.toWebHandler(
+    appLayer({
+      DB: makeFakeD1(),
+      SOURCE_LEASE: fakeSourceLeaseNamespace(),
+      ENVIRONMENT: environment,
+    }),
+  ).handler;
 
 describe("the worker's operational routes", () => {
   it("reports health in the shape the smoke suites assert", async () => {

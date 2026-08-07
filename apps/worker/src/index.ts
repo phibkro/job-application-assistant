@@ -13,6 +13,17 @@ import type { TelemetryConfig } from "./runtime/Telemetry.ts";
 import { Ingestion } from "./services/Ingestion.ts";
 import type { RunBudget } from "./services/Ingestion.ts";
 import { SourceCatalog } from "./services/SourceCatalog.ts";
+import { SourceLeaseObject } from "./ingestion/SourceLeaseObject.ts";
+
+/**
+ * Cloudflare finds a Durable Object class by name against a top-level export
+ * of the Worker's *main* module — `infra/alchemy.run.ts` and
+ * `dev/preview.wrangler.jsonc` both bind `SOURCE_LEASE` to `className:
+ * "SourceLeaseObject"`, and this is the export that name has to resolve
+ * against. It is otherwise unused here: nothing in this file calls it
+ * directly, `env.SOURCE_LEASE` is how a request reaches it.
+ */
+export { SourceLeaseObject };
 
 /**
  * The Worker entry point.
@@ -113,16 +124,18 @@ let handler: ((request: Request) => Promise<Response>) | undefined;
  * Default bounds for a scheduled run. Generous relative to a single
  * scheduled-event invocation's CPU/wall-clock allowance, but still bounded —
  * `Ingestion.ts`'s own doc comment states why every one of these exists.
- * `leaseTtlMs` is well past `maxDurationMs`: a run's lease must outlive its
- * own walk, plus slack for retries and for the gap between "the lease is
- * acquired" and "the first page fetch actually starts", or a run could have
- * its own lease expire and get stolen out from under it before it finishes.
+ * `leaseRecoveryMs` no longer has to "outlive the walk plus slack or get
+ * stolen out from under it" — a `SourceLease` Durable Object admits one
+ * collector at a time by construction, not by comparing this value against
+ * a clock. It only bounds how long a genuinely crashed run — one that never
+ * reaches `release` — blocks its source before the object's own recovery
+ * alarm reclaims the lease on its behalf.
  */
 const DEFAULT_RUN_BUDGET: RunBudget = {
   maxPages: 50,
   maxObservations: 2000,
   maxDurationMs: 25_000,
-  leaseTtlMs: 5 * 60 * 1000,
+  leaseRecoveryMs: 5 * 60 * 1000,
 };
 
 /**

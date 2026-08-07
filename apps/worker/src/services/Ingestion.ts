@@ -15,7 +15,14 @@ export interface RunBudget {
   readonly maxPages: number;
   readonly maxObservations: number;
   readonly maxDurationMs: number;
-  readonly leaseTtlMs: number;
+  /**
+   * How long a crashed run — one that never reaches `release` — blocks its
+   * source before `SourceLease`'s recovery alarm reclaims it on the run's
+   * behalf. Not a value any caller compares a clock against; it only ever
+   * reaches the Durable Object that owns the comparison. See
+   * `SourceLease.acquire`.
+   */
+  readonly leaseRecoveryMs: number;
 }
 
 export interface RunReport {

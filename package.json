@@ -17,7 +17,7 @@
     "check": "bun run fmt:check && bun run lint && bun run imports:check && bun run typecheck && bun run schema:check && bun run bundle:check && bun run coverage",
     "schema": "bun run scripts/ts/schema.ts --emit",
     "schema:check": "bun run scripts/ts/schema.ts",
-    "bundle:check": "bun build apps/worker/src/index.ts --target=browser --conditions=workerd --conditions=worker > /dev/null",
+    "bundle:check": "bun build apps/worker/src/index.ts --target=browser --conditions=workerd --conditions=worker --external \"cloudflare:*\" > /dev/null",
     "imports:check": "bun run scripts/ts/tracked-imports.ts"
   },
   "dependencies": {

@@ -23,7 +23,8 @@ mkdir -p .preview
 bun build apps/worker/src/index.ts \
   --outfile=.preview/worker.js \
   --target=browser --format=esm \
-  --conditions=workerd --conditions=worker
+  --conditions=workerd --conditions=worker \
+  --external "cloudflare:*"
 
 echo "==> applying infrastructure"
 (cd infra && ALCHEMY_STAGE="$STAGE" bun alchemy deploy --stage "$STAGE" --yes)

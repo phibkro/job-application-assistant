@@ -157,7 +157,10 @@ const environmentVars = {
   NAV_MAX_PAGES_PER_RUN: "4",
   NAV_MAX_OBSERVATIONS_PER_RUN: "600",
   NAV_MAX_DURATION_MS: "20000",
-  NAV_LEASE_TTL_MS: "90000",
+  // How long a crashed run blocks NAV before its `SourceLease` Durable
+  // Object's recovery alarm reclaims it — not a value anything compares
+  // against a clock, unlike its D1-lease-era predecessor `NAV_LEASE_TTL_MS`.
+  NAV_LEASE_RECOVERY_MS: "90000",
 } as const;
 
 /**
@@ -207,6 +210,20 @@ export default Alchemy.Stack(
         })
       : undefined;
 
+    // One Durable Object per source, admitting one `Ingestion.collect` run
+    // at a time for it — see `apps/worker/src/ingestion/SourceLeaseObject.ts`.
+    // Declared for the TypeScript stage only, same reasoning as `email`: the
+    // Rust worker has no TypeScript ingestion to serialize. `className`
+    // names the class `apps/worker/src/index.ts` exports, which is not the
+    // same string as the binding key below (`SOURCE_LEASE`, what
+    // `apps/worker/src/runtime/Env.ts` reads) — Alchemy diffs this against
+    // its own state to compute the Cloudflare migration a first-time DO
+    // class requires (`new_sqlite_classes`); there is nothing to hand-write
+    // here.
+    const sourceLease = TYPESCRIPT
+      ? Cloudflare.DurableObjectNamespace("SourceLease", { className: "SourceLeaseObject" })
+      : undefined;
+
     const api = yield* Cloudflare.Worker("Api", {
       name: `job-index-${STAGE}`,
       // Both are pre-built artifacts, not sources: `just build` produces the
@@ -235,6 +252,7 @@ export default Alchemy.Stack(
       env: {
         DB: database,
         ...(email === undefined ? {} : { EMAIL: email }),
+        ...(sourceLease === undefined ? {} : { SOURCE_LEASE: sourceLease }),
         ...environmentVars,
         // The sender is configuration, not a secret: it appears in the
         // From header of every message this service sends.

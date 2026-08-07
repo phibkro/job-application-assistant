@@ -10,6 +10,18 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "job-index-preview", "database_id": "local" }
   ],
+  // One Durable Object per source, admitting one `Ingestion.collect` run at
+  // a time for it. `class_name` must match what `apps/worker/src/index.ts`
+  // exports — Cloudflare finds the class by name against the bundled main
+  // module, not by any binding key.
+  "durable_objects": {
+    "bindings": [{ "name": "SOURCE_LEASE", "class_name": "SourceLeaseObject" }]
+  },
+  // Wrangler requires an explicit migration the first time a Durable Object
+  // class appears — `infra/alchemy.run.ts` computes the equivalent
+  // automatically by diffing its own state, but this file is hand-maintained
+  // local config, so it is declared here directly.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SourceLeaseObject"] }],
   "assets": {
     "directory": "../apps/web/dist",
     "binding": "ASSETS",
