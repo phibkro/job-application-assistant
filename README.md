@@ -124,9 +124,9 @@ scheduled handler.
 
 ## License
 
-Job Index is licensed under **GNU Affero General Public License v3.0 or later**
-(`AGPL-3.0-or-later`). See [LICENSE](LICENSE).
+Job Index is **proprietary**. Copyright (c) 2026 Philip B. Krogh, all rights
+reserved. See [LICENSE](LICENSE).
 
-A public operator running a modified network version must offer its
-corresponding source to users of that deployment. Configure a visible source
-link before production release.
+Possession of this source grants no right to use it. `packages/better-auth-effect-adapter`
+is the exception: it carries its own MIT licence, because it is written to be
+published. See [licensing](docs/public/reference/licensing.md).

@@ -184,4 +184,15 @@ Rollback redeploys the prior Worker to the same environment-specific D1 database
 
 ## Amendments
 
-None.
+### 2026-08-07 — the AGPL source-offer gate is removed with the licence
+
+The project relicensed from `AGPL-3.0-or-later` to proprietary. The production
+gate requiring an HTTPS corresponding-source URL existed to satisfy AGPL §13;
+with no such obligation it would advertise source that is not published, so the
+requirement and its preflight assertions are gone.
+
+The rest of this RFC stands. The private NAV credential and administrative
+bearer token gates protect production rather than a licence term, and remain.
+
+The body above is left as written: it records what was decided at the time.
+

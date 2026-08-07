@@ -63,7 +63,7 @@ assert health == {
     "environment": "production",
 }, health
 assert about["service"] == "job-index", about
-assert about["license"] == "AGPL-3.0-or-later", about
+assert about["license"] == "proprietary", about
 assert about["environment"] == "production", about
 assert about["source_code_url"] == expected_source, about
 assert isinstance(v1_jobs["data"], list), v1_jobs
@@ -78,7 +78,6 @@ assert outbox_status == "403", outbox_status
 
 print("Production smoke assertions passed:")
 print("  production landing page, health, and read API respond")
-print("  AGPL corresponding-source URL is visible")
 print("  legacy unbounded reads and demo mutations are disabled")
 print("  operational NAV routes require authentication")
 print("  owned searches require an API principal")

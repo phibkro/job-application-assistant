@@ -81,7 +81,6 @@ deploy = (ROOT / "scripts/deploy.sh").read_text()
 assert 'environment="${1:-staging}"' in deploy
 assert "Production requires a NAV-issued private consumer token" in deploy
 assert "Production requires ADMIN_SYNC_TOKEN" in deploy
-assert "Production requires JOB_INDEX_SOURCE_CODE_URL" in deploy
 assert "smoke-production.sh" in deploy
 assert "smoke.sh" in deploy
 assert "JOB_INDEX_DEV_VARS_FILE" in deploy

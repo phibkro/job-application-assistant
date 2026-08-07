@@ -81,14 +81,8 @@ assert_preflight_failure \
   "Production ADMIN_SYNC_TOKEN must contain at least 32 characters." \
   env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=too-short
 
-assert_preflight_failure \
-  "Production requires JOB_INDEX_SOURCE_CODE_URL" \
-  env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=0123456789abcdefghijklmnopqrstuvwxyz
-
-assert_preflight_failure \
-  "The URL must use https://" \
-  env NAV_PRIVATE_API_TOKEN="${private_token}" \
-      ADMIN_SYNC_TOKEN=0123456789abcdefghijklmnopqrstuvwxyz \
-      JOB_INDEX_SOURCE_CODE_URL=http://example.invalid/source
+# The source-URL preflight assertions are gone with the AGPL obligation that
+# required them. The credential gates above stay: those protect production,
+# not a licence term.
 
 echo "Production deployment preflight tests passed without invoking Wrangler."

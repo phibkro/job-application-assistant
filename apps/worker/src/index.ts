@@ -55,7 +55,7 @@ const operationalRoutes = (env: Env): Layer.Layer<never, never, HttpRouter.HttpR
       "/api/about",
       HttpServerResponse.jsonUnsafe({
         service: "job-index",
-        license: "AGPL-3.0-or-later",
+        license: "proprietary",
         environment: env.ENVIRONMENT,
       }),
     ),

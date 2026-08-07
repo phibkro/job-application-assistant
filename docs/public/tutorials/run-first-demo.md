@@ -103,7 +103,7 @@ just admin-key
 
 A NAV-issued private consumer key can be stored with `just nav-key`; staging uploads it automatically when present.
 
-Production is deliberately separate and requires private NAV credentials, an administrator credential, and the public AGPL source URL:
+Production is deliberately separate and requires private NAV credentials and an administrator credential:
 
 ```sh
 just nav-key

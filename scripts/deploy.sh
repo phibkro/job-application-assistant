@@ -85,11 +85,12 @@ PYTOKEN
     echo "Production ADMIN_SYNC_TOKEN must contain at least 32 characters." >&2
     exit 1
   fi
-  if [[ ! "${source_code_url}" =~ ^https:// ]]; then
-    echo "Production requires JOB_INDEX_SOURCE_CODE_URL or SOURCE_CODE_URL in .dev.vars." >&2
-    echo "The URL must use https:// and expose the corresponding AGPL source." >&2
-    exit 1
-  fi
+  # A corresponding-source URL used to be required here: the AGPL obliges a
+  # network deployment to offer its source. The licence is proprietary now, so
+  # the obligation is gone and advertising a source URL would point at source
+  # that is not published. If SOURCE_CODE_URL is still set it is passed through
+  # untouched — some deployments may want to link an internal repository — but
+  # nothing requires it.
 fi
 
 # A browser login is opened only when no API token or OAuth session exists.

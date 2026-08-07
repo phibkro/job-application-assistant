@@ -26,6 +26,6 @@ The core crate has no Worker, database, HTTP or asynchronous-runtime dependency.
 
 ## Deployment
 
-`./deploy` enters the pinned Nix shell and deploys the disposable staging environment after full verification. `./deploy-production` uses the isolated production database and `wrangler.production.deploy.jsonc`, requires private NAV and administrator credentials plus an HTTPS AGPL source URL, and runs only non-destructive remote smoke checks.
+`./deploy` enters the pinned Nix shell and deploys the disposable staging environment after full verification. `./deploy-production` uses the isolated production database and `wrangler.production.deploy.jsonc`, requires private NAV and administrator credentials, and runs only non-destructive remote smoke checks.
 
 Detailed deployment: [`docs/internal/architecture/deployment.md`](../docs/internal/architecture/deployment.md)

@@ -16,6 +16,5 @@
 - [ ] Scheduled saved-search sweep advances due cursors without a client request.
 - [ ] Webhook signature, at-least-once deduplication, retry, dead state, and replay behavior verified.
 - [ ] Delivered outbox retention purge is dry-run reviewed and bounded.
-- [ ] AGPL corresponding-source URL is visible.
 - [ ] Independent security review accepts the R3 authentication, ownership, SSRF, and production-mutation boundaries.
 - [ ] Independent G5 review accepts the release.

@@ -110,7 +110,7 @@ pub async fn health(_request: Request, context: RouteContext<()>) -> Result<Resp
 pub async fn about(_request: Request, context: RouteContext<()>) -> Result<Response> {
     Response::from_json(&AboutResponse {
         service: "job-index",
-        license: "AGPL-3.0-or-later",
+        license: "proprietary",
         environment: environment_name(&context),
         source_code_url: optional_environment_var(&context, "SOURCE_CODE_URL"),
     })

@@ -4,7 +4,7 @@
     "title": "Job Index API",
     "version": "1.0.0",
     "license": {
-      "name": "AGPL-3.0-or-later"
+      "name": "proprietary"
     }
   },
   "servers": [

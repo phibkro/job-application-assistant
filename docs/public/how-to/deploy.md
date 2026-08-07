@@ -43,7 +43,7 @@ Configure a strong administrative bearer token. The command generates one when
 just admin-key
 ```
 
-Provide the public corresponding-source URL required by the AGPL network use
+Optionally provide a source URL for the deployment
 case:
 
 ```sh

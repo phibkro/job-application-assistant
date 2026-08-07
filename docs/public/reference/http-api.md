@@ -14,7 +14,7 @@ Returns process health and the explicit environment identity without querying D1
 
 ### `GET /api/about`
 
-Returns the AGPL license, environment identity, and configured corresponding-source URL.
+Returns the licence, environment identity, and configured source URL if one is set.
 Production deployment requires the URL to use HTTPS.
 
 ### `GET /api/jobs`

@@ -29,7 +29,7 @@
     "just qualification",
     "just soak"
   ],
-  "license": "AGPL-3.0-or-later",
+  "license": "proprietary",
   "features": [
     "fixture canonicalization and replay demo",
     "live NAV bounded multi-page ingestion",
@@ -42,7 +42,7 @@
     "deterministic NAV HTTP contract stub",
     "real Worker D1 adversarial ingestion smoke tests",
     "non-destructive production smoke suite",
-    "production private credential and AGPL source-offer gates",
+    "production private credential gates",
     "production preflight gates before Cloudflare mutation",
     "two-phase production publication before cron activation",
     "constant-time administrative bearer-token comparison",

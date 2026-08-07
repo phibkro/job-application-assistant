@@ -207,6 +207,12 @@ Roll out behind a disabled-by-default source configuration in staging. Enable on
 
 ## Amendments
 
+### 2026-08-07 — AGPL references are historical
+
+The project is proprietary as of 2026-08-07. Where this RFC requires a
+corresponding-source link as acceptance evidence, that requirement lapsed with
+the licence; see RFC 0008's amendment. Nothing else here changes.
+
 ### 2026-08-05 — first-class NAV private consumer keys
 
 NAV's production credential is a signed bearer JWT issued after consumer registration, not a client-secret exchange performed by this service. The operator configures it with `just nav-key`; the command validates feed access and stores it in ignored local secret state. Public-token refresh must never replace a private credential, including a token with no expiry claim. Verified deployment uploads the same credential as the Worker `NAV_API_TOKEN` secret. The public rotating token remains an experiment and fallback path only.

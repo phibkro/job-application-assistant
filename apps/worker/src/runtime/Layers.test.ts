@@ -83,7 +83,7 @@ describe("the worker's operational routes", () => {
     const response = await handlerFor("production")(new Request("https://example.com/api/about"));
     expect(await response.json()).toEqual({
       service: "job-index",
-      license: "AGPL-3.0-or-later",
+      license: "proprietary",
       environment: "production",
     });
   });
