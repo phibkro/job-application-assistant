@@ -5,6 +5,7 @@ import { ProfileId } from "@job-index/domain/Ids";
 import type { Profile } from "@job-index/domain/Profile";
 import { Database } from "../services/Database.ts";
 import {
+  emptyProfile,
   readProfileRow,
   toDomainErasure,
   toDomainProfile,
@@ -88,6 +89,9 @@ describe("writeProfile / readProfileRow", () => {
     );
     expect(toDomainProfile(row!)).toEqual(updated);
     expect(toDomainErasure(row)._tag).toBe("Requested");
+    // createdAt marks the row's first write, not its most recent one.
+    expect(row?.createdAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(row?.updatedAt).toBe("2026-01-03T00:00:00.000Z");
   });
 });
 
@@ -100,14 +104,9 @@ describe("toDomainErasure", () => {
     const state = emptyState();
     state.profiles.push({
       profileId,
-      headline: "",
-      summary: "",
-      location: "",
-      languages: "",
-      skills: "[]",
-      experience: "[]",
-      education: "[]",
+      cv: JSON.stringify(emptyProfile),
       erasure: JSON.stringify({ _tag: "NotARealTag" }),
+      createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
     const row = await run(

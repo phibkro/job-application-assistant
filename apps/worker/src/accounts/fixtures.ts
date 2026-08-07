@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import { Database } from "../services/Database.ts";
 import type { Write } from "../services/Database.ts";
 import { sha256Hex } from "./hash.ts";
+import type { ProfileRow } from "./profileRow.ts";
 
 /**
  * The in-test double for `Database`, owned by this slot per the brief ("do
@@ -23,23 +24,13 @@ export interface SeedSession {
 }
 
 export interface SeedPrincipal {
-  readonly id: string;
+  readonly principalId: string;
   readonly profileId: string;
   readonly apiKeyHash: string;
+  readonly revokedAt: string | null;
 }
 
-export interface SeedProfileRow {
-  readonly profileId: string;
-  readonly headline: string;
-  readonly summary: string;
-  readonly location: string;
-  readonly languages: string;
-  readonly skills: string;
-  readonly experience: string;
-  readonly education: string;
-  readonly erasure: string;
-  readonly updatedAt: string;
-}
+export type SeedProfileRow = ProfileRow;
 
 export interface SeedAnswer {
   readonly profileId: string;
@@ -100,7 +91,7 @@ const runQuery = (
     }
     case "profileForPrincipal": {
       const [principalId] = bindings as [string];
-      const row = state.principals.find((principal) => principal.id === principalId);
+      const row = state.principals.find((principal) => principal.principalId === principalId);
       return row === undefined ? [] : [{ profileId: row.profileId }];
     }
     case "findProfileRow": {
@@ -136,82 +127,24 @@ const runQuery = (
 const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknown>): void => {
   switch (op) {
     case "insertProfile": {
-      const [
-        profileId,
-        headline,
-        summary,
-        location,
-        languages,
-        skills,
-        experience,
-        education,
-        erasure,
-        updatedAt,
-      ] = bindings as [
-        string,
-        string,
-        string,
-        string,
-        string,
+      const [profileId, cv, erasure, createdAt, updatedAt] = bindings as [
         string,
         string,
         string,
         string,
         string,
       ];
-      state.profiles.push({
-        profileId,
-        headline,
-        summary,
-        location,
-        languages,
-        skills,
-        experience,
-        education,
-        erasure,
-        updatedAt,
-      });
+      state.profiles.push({ profileId, cv, erasure, createdAt, updatedAt });
       return;
     }
     case "updateProfile": {
-      const [
-        headline,
-        summary,
-        location,
-        languages,
-        skills,
-        experience,
-        education,
-        erasure,
-        updatedAt,
-        profileId,
-      ] = bindings as [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ];
+      const [cv, erasure, updatedAt, profileId] = bindings as [string, string, string, string];
       const index = state.profiles.findIndex((profile) => profile.profileId === profileId);
       if (index === -1)
         throw new Error(`fake Database: updateProfile with no existing row for ${profileId}`);
-      state.profiles[index] = {
-        profileId,
-        headline,
-        summary,
-        location,
-        languages,
-        skills,
-        experience,
-        education,
-        erasure,
-        updatedAt,
-      };
+      const existing = state.profiles[index];
+      if (existing === undefined) throw new Error("unreachable: index came from findIndex");
+      state.profiles[index] = { ...existing, cv, erasure, updatedAt };
       return;
     }
     case "insertAnswer": {

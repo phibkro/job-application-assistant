@@ -6,6 +6,7 @@ import { ProfileId, PrincipalId } from "@job-index/domain/Ids";
 import { Accounts } from "../services/Accounts.ts";
 import { layer } from "./accounts.ts";
 import { emptyState, fakeDatabaseLayer, hashFor, type FakeState } from "./fixtures.ts";
+import { emptyProfile } from "./profileRow.ts";
 
 const profileId = Schema.decodeUnknownSync(ProfileId)("profile-1");
 const principal = (raw: string) => Schema.decodeUnknownSync(PrincipalId)(raw);
@@ -44,7 +45,7 @@ describe("authenticate", () => {
   it("resolves a valid API key to an ApiKey credential", async () => {
     const state = emptyState();
     const apiKeyHash = await hashFor("api-key-1");
-    state.principals.push({ id: "principal-2", profileId, apiKeyHash });
+    state.principals.push({ principalId: "principal-2", profileId, apiKeyHash, revokedAt: null });
 
     const credential = await run(
       state,
@@ -102,6 +103,25 @@ describe("authenticate", () => {
     expect(credential).toBeUndefined();
   });
 
+  /** Security property: a revoked API key authenticates as nothing, and the row is retained. */
+  it("resolves a revoked API key to nothing", async () => {
+    const state = emptyState();
+    const apiKeyHash = await hashFor("revoked-api-key");
+    state.principals.push({
+      principalId: "principal-2",
+      profileId,
+      apiKeyHash,
+      revokedAt: new Date().toISOString(),
+    });
+
+    const credential = await run(
+      state,
+      withAccounts((accounts) => accounts.authenticate("revoked-api-key")),
+    );
+    expect(credential).toBeUndefined();
+    expect(state.principals).toHaveLength(1);
+  });
+
   /** Security property: what a lookup finds is stored hashed, never as the secret that was presented. */
   it("never stores the presented secret as the row's own content", async () => {
     const state = emptyState();
@@ -149,7 +169,12 @@ describe("profileOf", () => {
 
   it("resolves the profile behind an ApiKey credential", async () => {
     const state = emptyState();
-    state.principals.push({ id: "principal-2", profileId, apiKeyHash: "irrelevant-here" });
+    state.principals.push({
+      principalId: "principal-2",
+      profileId,
+      apiKeyHash: "irrelevant-here",
+      revokedAt: null,
+    });
 
     const resolved = await run(
       state,
@@ -183,18 +208,13 @@ describe("profileOf", () => {
     });
     state.profiles.push({
       profileId,
-      headline: "",
-      summary: "",
-      location: "",
-      languages: "",
-      skills: "[]",
-      experience: "[]",
-      education: "[]",
+      cv: JSON.stringify(emptyProfile),
       erasure: JSON.stringify({
         _tag: "Requested",
         at: "2026-01-01T00:00:00.000Z",
         purgeAfter: "2026-01-31T00:00:00.000Z",
       }),
+      createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
 
