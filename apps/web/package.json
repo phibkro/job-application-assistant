@@ -6,7 +6,18 @@
   "exports": {
     "./*": "./src/*.ts"
   },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
   "dependencies": {
+    "@foldkit/ui": "0.139.0",
+    "clsx": "2.1.1",
     "foldkit": "0.139.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "tailwindcss": "4.3.3",
+    "vite": "8.2.1"
   }
 }

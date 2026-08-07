@@ -1,0 +1,6 @@
+# Bun's isolated linker drops a nested node_modules here whenever this
+# workspace's peer-dependency resolution (@foldkit/ui pinning a different
+# `effect` beta than the root) diverges from the hoisted root tree. Build
+# output from `vite build` lands in dist/. Neither is source.
+/node_modules/
+/dist/

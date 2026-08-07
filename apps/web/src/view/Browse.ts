@@ -12,7 +12,16 @@ import {
 import type { Message } from "../Message.ts";
 import { PageJobDetail } from "../Model.ts";
 import type { Model } from "../Model.ts";
-import { renderProblem } from "./Shared.ts";
+import {
+  button,
+  card,
+  inputField,
+  pageClass,
+  renderProblem,
+  sectionHeading,
+  selectField,
+  srOnlyLabelClass,
+} from "./Shared.ts";
 
 const statusLabel = (job: CanonicalJob): string =>
   job.status._tag === "Active" ? "Active" : `Closed ${job.status.closedAt}`;
@@ -20,63 +29,114 @@ const statusLabel = (job: CanonicalJob): string =>
 const jobListItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
   h.keyed("li")(
     job.id,
-    [h.Class("job-item")],
+    [h.Class("flex items-center justify-between gap-4 py-3")],
     [
-      h.strong([], [job.title]),
-      h.span([], [` — ${job.employerName} — ${job.location} — ${statusLabel(job)}`]),
-      h.button([h.OnClick(Navigated({ to: PageJobDetail({ jobId: job.id }) }))], ["View"]),
+      h.div(
+        [h.Class("min-w-0")],
+        [
+          h.p([h.Class("truncate font-medium text-gray-900")], [job.title]),
+          h.p(
+            [h.Class("truncate text-sm text-gray-500")],
+            [`${job.employerName} — ${job.location} — ${statusLabel(job)}`],
+          ),
+        ],
+      ),
+      button(
+        {
+          label: "View",
+          variant: "secondary",
+          onClick: Navigated({ to: PageJobDetail({ jobId: job.id }) }),
+        },
+        h,
+      ),
     ],
   );
 
 export const browseView = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.div(
-    [h.Class("page")],
+    [h.Class(pageClass)],
     [
-      h.h2([], ["Browse"]),
+      sectionHeading("Browse", h),
       h.form(
-        [h.Class("search-form"), h.OnSubmit(BrowseSearchSubmitted())],
         [
-          h.input([
-            h.Value(model.browseQuery.term),
-            h.Placeholder("Search term"),
-            h.OnInput((value) => BrowseTermChanged({ value })),
-          ]),
-          h.input([
-            h.Value(model.browseQuery.location),
-            h.Placeholder("Location"),
-            h.OnInput((value) => BrowseLocationChanged({ value })),
-          ]),
-          h.select(
-            [
-              h.Value(model.browseQuery.status),
-              h.OnChange((value) => BrowseStatusChanged({ value })),
-            ],
-            [
-              h.option([h.Value("")], ["Any status"]),
-              h.option([h.Value("Active")], ["Active"]),
-              h.option([h.Value("Closed")], ["Closed"]),
-            ],
+          h.Class("grid gap-3 sm:grid-cols-[2fr_2fr_1fr_auto] sm:items-end"),
+          h.OnSubmit(BrowseSearchSubmitted()),
+        ],
+        [
+          inputField(
+            {
+              id: "browse-term",
+              label: "Search term",
+              labelClassName: srOnlyLabelClass,
+              value: model.browseQuery.term,
+              placeholder: "Search term",
+              onInput: (value) => BrowseTermChanged({ value }),
+            },
+            h,
           ),
-          h.button([h.Type("submit")], ["Search"]),
+          inputField(
+            {
+              id: "browse-location",
+              label: "Location",
+              labelClassName: srOnlyLabelClass,
+              value: model.browseQuery.location,
+              placeholder: "Location",
+              onInput: (value) => BrowseLocationChanged({ value }),
+            },
+            h,
+          ),
+          selectField(
+            {
+              id: "browse-status",
+              label: "Status",
+              labelClassName: srOnlyLabelClass,
+              value: model.browseQuery.status,
+              onChange: (value) => BrowseStatusChanged({ value }),
+              options: [
+                { value: "", label: "Any status" },
+                { value: "Active", label: "Active" },
+                { value: "Closed", label: "Closed" },
+              ],
+            },
+            h,
+          ),
+          button({ label: "Search", type: "submit" }, h),
         ],
       ),
       AsyncData.matchDataSplitEmpty(model.browseResults, {
-        onIdle: () => h.p([], ["Search to see results."]),
-        onLoading: () => h.p([], ["Loading…"]),
+        onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["Search to see results."]),
+        onLoading: () => h.p([h.Class("text-sm text-gray-500")], ["Loading…"]),
         onFailure: (problem) => renderProblem(problem, h),
         onData: (page) =>
           h.div(
-            [],
+            [h.Class("space-y-4")],
             [
               page.data.length === 0
-                ? h.p([], ["No matching jobs."])
-                : h.ul(
-                    [h.Class("job-list")],
-                    page.data.map((job) => jobListItem(job, h)),
+                ? h.p([h.Class("text-sm text-gray-500")], ["No matching jobs."])
+                : card(
+                    [
+                      h.ul(
+                        [h.Class("divide-y divide-gray-100")],
+                        page.data.map((job) => jobListItem(job, h)),
+                      ),
+                    ],
+                    h,
                   ),
               page.meta.nextCursor === null
                 ? h.empty
-                : h.button([h.OnClick(BrowseNextPageRequested())], ["Load more"]),
+                : h.div(
+                    [h.Class("flex justify-center")],
+                    [
+                      button(
+                        {
+                          label: "Load more",
+                          variant: "secondary",
+                          onClick: BrowseNextPageRequested(),
+                        },
+                        h,
+                      ),
+                    ],
+                  ),
             ],
           ),
       }),
