@@ -111,4 +111,84 @@ describe("profile (authenticated)", () => {
     expect(await res.json()).toEqual({ question: "notice-period" });
     expect(seenAsked).toEqual({ label: "notice-period", shape: { _tag: "Text" } });
   });
+
+  it("exportProfile returns both a JSON and a Markdown rendering of the stored profile", async () => {
+    const profile: Profile = { ...blankProfile, headline: "Baker", skills: ["sourdough"] };
+    const { handler } = buildHandler({
+      accounts: authedAs(alice),
+      profiles: Layer.succeed(Profiles, {
+        get: () => Effect.succeed(profile),
+        set: () => Effect.die("unused"),
+        answers: () => Effect.die("unused"),
+        answer: () => Effect.die("unused"),
+        unanswered: () => Effect.die("unused"),
+      }),
+    });
+    const res = await handler(
+      new Request("http://localhost/api/v1/me/profile/export", { headers: authHeaders }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(JSON.parse(body.json)).toEqual(profile);
+    expect(body.markdown).toContain("# Baker");
+    expect(body.markdown).toContain("sourdough");
+  });
+
+  it("importProfile decodes the JSON text and writes it through Profiles.set", async () => {
+    let seen: unknown;
+    const { handler } = buildHandler({
+      accounts: authedAs(alice),
+      profiles: Layer.succeed(Profiles, {
+        get: () => Effect.die("unused"),
+        set: (profile, value) => {
+          seen = { profile, value };
+          return Effect.succeed(value);
+        },
+        answers: () => Effect.die("unused"),
+        answer: () => Effect.die("unused"),
+        unanswered: () => Effect.die("unused"),
+      }),
+    });
+    const imported = { ...blankProfile, headline: "Warehouse operative" };
+    const res = await handler(
+      new Request("http://localhost/api/v1/me/profile/import", {
+        method: "PUT",
+        headers: { ...authHeaders, "content-type": "application/json" },
+        body: JSON.stringify({ json: JSON.stringify(imported) }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(imported);
+    expect(seen).toEqual({ profile: alice, value: imported });
+  });
+
+  /** A typo'd field must fail loudly, naming it, rather than silently importing a partial profile. */
+  it("importProfile rejects JSON with an unrecognised field, naming it, and never calls Profiles.set", async () => {
+    let setCalled = false;
+    const { handler } = buildHandler({
+      accounts: authedAs(alice),
+      profiles: Layer.succeed(Profiles, {
+        get: () => Effect.die("unused"),
+        set: () => {
+          setCalled = true;
+          return Effect.die("should not be called");
+        },
+        answers: () => Effect.die("unused"),
+        answer: () => Effect.die("unused"),
+        unanswered: () => Effect.die("unused"),
+      }),
+    });
+    const malformed = { ...blankProfile, hobby: "chess" };
+    const res = await handler(
+      new Request("http://localhost/api/v1/me/profile/import", {
+        method: "PUT",
+        headers: { ...authHeaders, "content-type": "application/json" },
+        body: JSON.stringify({ json: JSON.stringify(malformed) }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toMatch(/hobby/);
+    expect(setCalled).toBe(false);
+  });
 });

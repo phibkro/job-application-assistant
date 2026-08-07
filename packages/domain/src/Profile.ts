@@ -60,3 +60,82 @@ export class ProfileRecord extends Model.Class<ProfileRecord>("ProfileRecord")({
   createdAt: Model.DateTimeInsert,
   updatedAt: Model.DateTimeUpdate,
 }) {}
+
+/**
+ * The profile as portable JSON text.
+ *
+ * Goes through `Profile`'s own encoder rather than `JSON.stringify` on the
+ * value directly, so if the schema ever grows a field that encodes
+ * differently from how it is held in memory, export follows without a second
+ * definition to keep in sync with the first.
+ */
+export const toJson = (profile: Profile): string =>
+  JSON.stringify(Schema.encodeSync(Profile)(profile), null, 2);
+
+/**
+ * The inverse of `toJson`, and the only sanctioned way back in.
+ *
+ * `onExcessProperty: "error"` is what makes this strict rather than merely
+ * typed: the default schema decode drops a key it does not recognise, which
+ * would turn a typo'd field or a future export version into a silent partial
+ * replacement of someone's CV. Failing here instead means the thrown
+ * `SchemaError`'s message names the offending key, which is what a person
+ * editing the file by hand needs in order to fix it. Invalid JSON syntax
+ * fails the same way, with `JSON.parse`'s own message.
+ */
+export const fromJson = (json: string): Profile =>
+  Schema.decodeUnknownSync(Profile, { onExcessProperty: "error" })(JSON.parse(json));
+
+/**
+ * The profile rendered as Markdown a person can read, paste into an
+ * application, or keep in a repository.
+ *
+ * Complete rather than composed: nothing is reordered against a job and
+ * nothing is truncated, because an export that quietly drops entries is not
+ * the export a person can leave the service with. `composeCv` (in the
+ * worker's `drafting` module) renders a different product — one entry's CV
+ * ranked and trimmed for a specific advert — and stays there, next to the
+ * ranking it depends on; this function has no job to rank against and
+ * nothing to trim for.
+ *
+ * Every section is conditional on having something to say, so a sparse
+ * profile reads as a short document rather than a scaffold of empty
+ * headings and dangling bullets.
+ */
+export const toMarkdown = (profile: Profile): string => {
+  const sections: Array<string> = [];
+
+  const headline = profile.headline.trim();
+  const location = profile.location.trim();
+  const header = [headline !== "" ? `# ${headline}` : "", location].filter((line) => line !== "");
+  if (header.length > 0) sections.push(header.join("\n"));
+
+  const summary = profile.summary.trim();
+  if (summary !== "") sections.push(`## Summary\n\n${summary}`);
+
+  if (profile.experience.length > 0) {
+    const entries = profile.experience.map((entry) => {
+      const highlights = entry.highlights
+        .filter((highlight) => highlight.trim() !== "")
+        .map((highlight) => `- ${highlight.trim()}`);
+      return [
+        `### ${entry.title.trim()} — ${entry.employer.trim()} (${entry.period.trim()})`,
+        ...highlights,
+      ].join("\n");
+    });
+    sections.push(["## Experience", ...entries].join("\n\n"));
+  }
+
+  const skills = profile.skills.filter((skill) => skill.trim() !== "");
+  if (skills.length > 0) sections.push(`## Skills\n\n${skills.join(", ")}`);
+
+  const education = profile.education.filter((entry) => entry.trim() !== "");
+  if (education.length > 0) {
+    sections.push(`## Education\n\n${education.map((entry) => `- ${entry}`).join("\n")}`);
+  }
+
+  const languages = profile.languages.trim();
+  if (languages !== "") sections.push(`## Languages\n\n${languages}`);
+
+  return sections.join("\n\n");
+};

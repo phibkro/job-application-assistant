@@ -2,11 +2,16 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { QuestionKey } from "@job-index/domain/Answer";
-import { api, CurrentPrincipal } from "../Api.ts";
+import { fromJson, toJson, toMarkdown } from "@job-index/domain/Profile";
+import { api, CurrentPrincipal, InvalidProfileJson } from "../Api.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { Entitlements, type Capability } from "../services/Entitlements.ts";
 
 const decodeQuestionKey = Schema.decodeUnknownSync(QuestionKey);
+
+/** `fromJson` throws `SchemaError` or `JSON.parse`'s `SyntaxError`; both carry the actionable text in `.message`. */
+const describeImportFailure = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 const ALL_CAPABILITIES: ReadonlyArray<Capability> = [
   "model-drafting",
@@ -56,6 +61,25 @@ export const layer = HttpApiBuilder.group(api, "profile", (handlers) =>
           shape: payload.shape ?? { _tag: "Text" },
         });
         return { question: params.question };
+      }),
+    )
+    .handle("exportProfile", () =>
+      Effect.gen(function* () {
+        const profiles = yield* Profiles;
+        const principal = yield* CurrentPrincipal;
+        const profile = yield* profiles.get(principal.profileId);
+        return { json: toJson(profile), markdown: toMarkdown(profile) };
+      }),
+    )
+    .handle("importProfile", ({ payload }) =>
+      Effect.gen(function* () {
+        const profiles = yield* Profiles;
+        const principal = yield* CurrentPrincipal;
+        const profile = yield* Effect.try({
+          try: () => fromJson(payload.json),
+          catch: (error) => new InvalidProfileJson({ message: describeImportFailure(error) }),
+        });
+        return yield* profiles.set(principal.profileId, profile);
       }),
     ),
 );
