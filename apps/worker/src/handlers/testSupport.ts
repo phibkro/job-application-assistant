@@ -35,6 +35,7 @@ const defaultCorpus = Layer.succeed(Corpus, {
   observe: unstubbed("Corpus", "observe"),
   get: unstubbed("Corpus", "get"),
   changedSince: unstubbed("Corpus", "changedSince"),
+  search: unstubbed("Corpus", "search"),
   fresh: unstubbed("Corpus", "fresh"),
   markOffered: unstubbed("Corpus", "markOffered"),
   closeAbsent: unstubbed("Corpus", "closeAbsent"),

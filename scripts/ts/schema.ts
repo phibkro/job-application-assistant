@@ -62,6 +62,9 @@ const columnTypes: Record<string, string> = {
   employerName: "TEXT NOT NULL",
   location: "TEXT NOT NULL",
   description: "TEXT NOT NULL",
+  titleNormalized: "TEXT NOT NULL",
+  employerNameNormalized: "TEXT NOT NULL",
+  locationNormalized: "TEXT NOT NULL",
   detail: "TEXT NOT NULL DEFAULT ''",
   outcome: "TEXT NOT NULL",
   verdict: "TEXT NOT NULL",
@@ -183,7 +186,12 @@ const tables: Record<string, TableSpec> = {
     // The canonical key *is* the deduplication rule; two rows sharing one
     // would be two canonical jobs for a single vacancy.
     unique: [["canonicalKey"]],
-    indexes: [["sequence"]],
+    // `sequence` alone backs the plain change-stream cursor (`changedSince`).
+    // `(statusTag, sequence)` backs a status-filtered search page: an
+    // equality prefix plus a range is exactly what a B-tree index accelerates
+    // — unlike the `LIKE '%...%'` term/location predicates, whose leading
+    // wildcard no index can prune, so none is declared for those columns.
+    indexes: [["sequence"], ["statusTag", "sequence"]],
   },
   occurrences: {
     model: OccurrenceRecord,

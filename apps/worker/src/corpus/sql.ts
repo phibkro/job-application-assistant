@@ -96,6 +96,50 @@ export const DEACTIVATE_OCCURRENCE = `UPDATE occurrences SET active = 0 WHERE id
  */
 export const COUNT_ACTIVE_OCCURRENCES = `SELECT COUNT(*) AS activeCount FROM occurrences WHERE canonicalJobId = ? AND active = 1`;
 
+/**
+ * `search`'s WHERE clause, composed per request from which of
+ * term/location/status the caller supplied. Still a fixed, enumerable
+ * shape — three optional predicates is eight variants, not an open-ended
+ * builder — it just cannot be one named constant the way the statements
+ * above are, since which predicates apply is itself the input.
+ *
+ * `sequence > ?` plus `ORDER BY sequence ASC` is the same cursor
+ * `SELECT_CANONICAL_JOBS_CHANGED_SINCE` walks, and for the same reason:
+ * `sequence` is assigned once per write (`SELECT_NEXT_SEQUENCE`) and is
+ * therefore already unique across the table, so it is a total order on its
+ * own — no second tiebreak column is needed to keep two rows from ever
+ * comparing equal.
+ *
+ * `titleNormalized`/`employerNameNormalized`/`locationNormalized` are
+ * folded once at observe time (see `rows.ts`); `corpus/search.ts` folds an
+ * incoming term/location the same way before binding it, so the `LIKE`
+ * comparison is between two already-folded strings and never asks SQLite's
+ * ASCII-only case folding to do anything with `Ø`/`ø`.
+ */
+export const SEARCH_CANONICAL_JOBS = (filter: {
+  readonly term: boolean;
+  readonly location: boolean;
+  readonly status: boolean;
+}): string => {
+  const predicates = ["sequence > ?"];
+  if (filter.term) {
+    predicates.push(
+      "(titleNormalized LIKE ? ESCAPE '\\' OR employerNameNormalized LIKE ? ESCAPE '\\')",
+    );
+  }
+  if (filter.location) {
+    predicates.push("locationNormalized LIKE ? ESCAPE '\\'");
+  }
+  if (filter.status) {
+    predicates.push("statusTag = ?");
+  }
+  return selectFrom(
+    "canonical_jobs",
+    CANONICAL_JOB_FIELDS,
+    `WHERE ${predicates.join(" AND ")} ORDER BY sequence ASC LIMIT ?`,
+  );
+};
+
 export const SELECT_FRESHNESS_BY_PROFILE = `SELECT profileId, seenThrough, updatedAt FROM freshness WHERE profileId = ?`;
 
 export const INSERT_FRESHNESS = `INSERT INTO freshness (profileId, seenThrough, updatedAt) VALUES (?, ?, ?)`;

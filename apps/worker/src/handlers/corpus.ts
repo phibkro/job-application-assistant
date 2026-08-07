@@ -2,19 +2,23 @@ import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import type { AcquisitionTier } from "@job-index/domain/Source";
 import { api, NotFound } from "../Api.ts";
-import { Corpus } from "../services/Corpus.ts";
+import { Corpus, type JobFilter } from "../services/Corpus.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
-import { decodeCanonicalJobId, decodeCursor, decodeLimit, nextCursorOf } from "./wire.ts";
+import {
+  decodeCanonicalJobId,
+  decodeCursor,
+  decodeEnum,
+  decodeLimit,
+  nextCursorOf,
+} from "./wire.ts";
 
 /**
- * `listJobs`'s `term`/`location`/`status` query params have nothing to
- * filter against: `Corpus` exposes `get`, `changedSince`, `fresh`,
- * `markOffered`, `closeAbsent` — a change stream and a per-profile
- * freshness read, no full-text or field search. `changedSince` backs the
- * pagination (`cursor` is its `Sequence`, stringified); the three filters
- * are accepted and currently ignored rather than silently mis-paginated by
- * an in-memory filter that would shrink a page without adjusting `limit`.
- * See the handoff report for the fuller note.
+ * `listJobs`'s `term`/`location`/`status` filter via `Corpus.search`; all
+ * three absent (after trimming empty strings) keeps `changedSince`'s plain
+ * sequence scan — the same query this endpoint already ran, so an
+ * unfiltered request stays exactly as fast as before search existed. See
+ * `services/Corpus.ts`'s `JobFilter` and `corpus/search.ts` for why the two
+ * are separate methods and how the filter is matched.
  */
 export const layer = HttpApiBuilder.group(api, "corpus", (handlers) =>
   handlers
@@ -23,7 +27,11 @@ export const layer = HttpApiBuilder.group(api, "corpus", (handlers) =>
         const corpus = yield* Corpus;
         const limit = decodeLimit(query.limit);
         const cursor = decodeCursor(query.cursor);
-        const data = yield* corpus.changedSince(cursor, limit);
+        const filter = decodeJobFilter(query);
+        const data =
+          filter === undefined
+            ? yield* corpus.changedSince(cursor, limit)
+            : yield* corpus.search(filter, cursor, limit);
         return { data, meta: { limit, nextCursor: nextCursorOf(data, limit) } };
       }),
     )
@@ -46,6 +54,36 @@ export const layer = HttpApiBuilder.group(api, "corpus", (handlers) =>
       }),
     ),
 );
+
+const decodeStatus = decodeEnum("Active", "Closed");
+
+/** `""` and `undefined` both mean "not given"; a trimmed empty term is not a query. */
+const nonEmpty = (raw: string | undefined): string | undefined => {
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+/**
+ * `undefined` when `term`/`location`/`status` are all absent — the caller
+ * checks this to choose `changedSince` over `search`. `status` is decoded
+ * only when present: absent means "no filter", same as `term`/`location`,
+ * but a *present, unrecognized* value fails loudly via `decodeEnum` rather
+ * than silently matching everything, since `listJobs` declares no error to
+ * reject it with instead (see `Api.ts`).
+ */
+const decodeJobFilter = (query: {
+  readonly term?: string;
+  readonly location?: string;
+  readonly status?: string;
+}): JobFilter | undefined => {
+  const term = nonEmpty(query.term);
+  const location = nonEmpty(query.location);
+  const status = query.status === undefined ? undefined : decodeStatus(query.status);
+  return term === undefined && location === undefined && status === undefined
+    ? undefined
+    : { term, location, status };
+};
 
 /**
  * The wire's `tier` is a bare string; the domain's is a tagged union. An

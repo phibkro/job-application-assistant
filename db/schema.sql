@@ -125,11 +125,16 @@ CREATE TABLE IF NOT EXISTS canonical_jobs (
   sequence INTEGER NOT NULL,
   changedAt TEXT NOT NULL,
   sources TEXT NOT NULL DEFAULT '[]',
+  titleNormalized TEXT NOT NULL,
+  employerNameNormalized TEXT NOT NULL,
+  locationNormalized TEXT NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (canonicalKey)
 );
 
 CREATE INDEX IF NOT EXISTS idx_canonical_jobs_sequence ON canonical_jobs (sequence);
+
+CREATE INDEX IF NOT EXISTS idx_canonical_jobs_statusTag_sequence ON canonical_jobs (statusTag, sequence);
 
 CREATE TABLE IF NOT EXISTS occurrences (
   id TEXT NOT NULL,

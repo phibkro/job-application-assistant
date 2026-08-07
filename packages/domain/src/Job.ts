@@ -107,6 +107,18 @@ export class CanonicalJobRecord extends Model.Class<CanonicalJobRecord>("Canonic
   changedAt: Schema.String,
   /** JSON array of `SourceId`: provenance, which no single column can hold. */
   sources: Model.JsonFromString(Schema.Array(SourceId)),
+  /**
+   * `title`/`employerName`/`location`, case- and diacritic-folded at write
+   * time by `corpus/identity.ts`'s `normalizeText` (the same fold identity
+   * derivation already uses). SQLite's `LIKE`/`LOWER()` only fold ASCII
+   * case, so an unfolded `ØSTFOLD` and a search for `østfold` would not
+   * match, and D1 ships no ICU collation to ask instead. Folding once at
+   * observe time also means a search scans a plain column rather than
+   * evaluating a function over every row on every request.
+   */
+  titleNormalized: Schema.String,
+  employerNameNormalized: Schema.String,
+  locationNormalized: Schema.String,
 }) {}
 
 /**

@@ -44,6 +44,7 @@ describe("feed (authenticated)", () => {
         observe: () => Effect.die("unused"),
         get: () => Effect.die("unused"),
         changedSince: () => Effect.die("unused"),
+        search: () => Effect.die("unused"),
         fresh: (profile, limit) => {
           seenProfile = profile;
           return Effect.succeed([job].slice(0, limit));
