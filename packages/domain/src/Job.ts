@@ -27,9 +27,13 @@ export const JobStatus = Schema.Union([
 export type JobStatus = typeof JobStatus.Type;
 
 /**
- * A raw listing with identity derived. The derivation must remain byte-identical
- * to the Rust implementation: these ids partition the whole corpus, so a change
- * in how they are computed silently re-partitions it.
+ * A raw listing with identity derived.
+ *
+ * The derivation need not match any previous implementation: the corpus is a
+ * cache and can be rebuilt from sources, so the new service starts on a new
+ * database. What the derivation must be is *stable within a deployment* — these
+ * ids partition the corpus, so changing how they are computed after data exists
+ * silently re-partitions it.
  */
 export const NormalizedListing = Schema.Struct({
   occurrenceId: OccurrenceId,
