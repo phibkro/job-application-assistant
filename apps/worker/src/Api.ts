@@ -77,6 +77,20 @@ export class ForbiddenByPlatform extends Schema.TaggedError<ForbiddenByPlatform>
 ) {}
 
 /**
+ * Returned when an imported profile's JSON fails to decode.
+ *
+ * Distinct from the framework's own payload-shape errors: this is a
+ * previously-exported (or hand-edited) file failing `Profile.fromJson`, and
+ * `message` carries that decoder's own explanation of what was wrong, so the
+ * person importing it knows what to fix rather than just that it failed.
+ */
+export class InvalidProfileJson extends Schema.TaggedError<InvalidProfileJson>()(
+  "InvalidProfileJson",
+  { message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
+/**
  * Who the request is for, once the token has been checked.
  *
  * Provided by the middleware rather than re-derived per handler: an endpoint
@@ -206,6 +220,28 @@ const profile = HttpApiGroup.make("profile")
       }),
       success: Schema.Struct({ question: Schema.String }),
       error: Unauthorized,
+    }),
+    /**
+     * The CV, portable: JSON for re-import, Markdown for a person to read.
+     * Both are complete renderings of the same `Profile` `me` already
+     * returns — this exists because neither format is available from `me`
+     * today, not because the data differs.
+     */
+    HttpApiEndpoint.get("exportProfile", "/api/v1/me/profile/export", {
+      success: Schema.Struct({ json: Schema.String, markdown: Schema.String }),
+      error: Unauthorized,
+    }),
+    /**
+     * A replacement, not a merge — the same contract `setProfile` already
+     * has. What differs is the input: a person's previously-exported (or
+     * hand-edited) JSON text rather than an already-decoded `Profile`, so it
+     * is decoded strictly here and fails loudly rather than silently
+     * dropping a field a typo introduced.
+     */
+    HttpApiEndpoint.put("importProfile", "/api/v1/me/profile/import", {
+      payload: Schema.Struct({ json: Schema.String }),
+      success: Profile,
+      error: [Unauthorized, InvalidProfileJson],
     }),
   )
   .middleware(Authenticated);
