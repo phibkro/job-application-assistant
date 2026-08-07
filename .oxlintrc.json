@@ -26,5 +26,77 @@
     ".wrangler",
     ".artifacts",
     "crates"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "apps/worker/src/**",
+        "packages/adapters/**"
+      ],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "Date",
+            "message": "Ambient clock read. Use `yield* DateTime.now` (effect/DateTime) inside an Effect, not `new Date()`/`Date.now()` — see apps/worker/src/corpus/observe.ts."
+          },
+          {
+            "name": "crypto",
+            "message": "Ambient id/random read. Use the `Ids` service (apps/worker/src/services/Ids.ts), not `crypto.randomUUID()` directly."
+          },
+          {
+            "name": "fetch",
+            "message": "Ambient network call. Take `HttpClient` (effect/unstable/http/HttpClient) as a constructor argument, not the global `fetch` — see packages/adapters/nav/src/index.ts."
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "apps/worker/src/runtime/**",
+        "apps/worker/src/ingestion/SourceLeaseObject.ts"
+      ],
+      "rules": {
+        "no-restricted-globals": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/worker/src/accounts/hash.ts"
+      ],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          { "name": "Date", "message": "Ambient clock read. Use `yield* DateTime.now`." },
+          { "name": "fetch", "message": "Ambient network call. Take `HttpClient` instead." }
+        ]
+      }
+    },
+    {
+      "files": [
+        "apps/worker/src/**/decide.ts"
+      ],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "crypto",
+            "message": "Ambient id/random read. Use the `Ids` service, not `crypto.randomUUID()` directly."
+          },
+          {
+            "name": "fetch",
+            "message": "Ambient network call. Take `HttpClient` as a constructor argument instead."
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "**/*.test.ts"
+      ],
+      "rules": {
+        "no-restricted-globals": "off"
+      }
+    }
   ]
 }

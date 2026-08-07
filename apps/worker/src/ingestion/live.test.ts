@@ -12,6 +12,7 @@ import { layerSqlite } from "../db/Sqlite.ts";
 import { Acquisition } from "../services/Acquisition.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { Database } from "../services/Database.ts";
+import { Ids } from "../services/Ids.ts";
 import { Ingestion } from "../services/Ingestion.ts";
 import type { RunBudget } from "../services/Ingestion.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
@@ -154,6 +155,7 @@ const testLayer = (
     Layer.succeed(Acquisition, fakeAcquisition(script)),
     Layer.succeed(SourceCatalog, fakeCatalog(startCursor)),
     Layer.succeed(SourceLease, sourceLease),
+    Layer.succeed(Ids, { next: Effect.sync(() => crypto.randomUUID()) }),
   );
   const withCorpus = Layer.provideMerge(corpusLayer, deps);
   return Layer.provideMerge(ingestionLayer, withCorpus);
@@ -333,6 +335,7 @@ describe("Ingestion.collect on a real SQLite engine", () => {
         Layer.succeed(Acquisition, blockingAcquisition),
         Layer.succeed(SourceCatalog, fakeCatalog("start")),
         Layer.succeed(SourceLease, sourceLease),
+        Layer.succeed(Ids, { next: Effect.sync(() => crypto.randomUUID()) }),
       );
       const layer = Layer.provideMerge(ingestionLayer, Layer.provideMerge(corpusLayer, deps));
 

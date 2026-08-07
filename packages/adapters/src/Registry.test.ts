@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import type { PlatformId } from "@job-index/domain/Ids";
-import { adapter as navAdapter } from "@job-index/adapters/nav";
+import { make as makeNavAdapter } from "@job-index/adapters/nav";
 import type { SourceAdapter } from "./SourceAdapter.ts";
 import { resolve } from "./Registry.ts";
 import type { Registration } from "./Registry.ts";
@@ -12,24 +14,34 @@ const NAV_PLATFORM_ID = "arbeidsplassen-nav" as PlatformId;
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(new URL(`../../../fixtures/nav/${name}`, import.meta.url), "utf8"));
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+/** A `HttpClient` that never reaches a socket — see `nav/src/index.test.ts`'s `clientOf`. */
+const clientOf = (respond: (url: string) => Response): HttpClient.HttpClient =>
+  HttpClient.make((request, url) =>
+    Effect.succeed(HttpClientResponse.fromWeb(request, respond(url.toString()))),
+  );
+
+// Only `supports` is exercised on this instance by the tests below — neither
+// asks it for a page, so its client never has to answer one.
+const inertNavAdapter = makeNavAdapter(
+  clientOf((url) => {
+    throw new Error(`unexpected request in test: ${url}`);
+  }),
+  undefined,
+);
 
 describe("resolve", () => {
   it("dispatches to the reference NAV adapter for its registered tier and platform", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
+    const navAdapter = makeNavAdapter(
+      clientOf((url) => {
         if (url.endsWith("/api/v1/feed?last=true")) {
           return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
         }
         if (url.endsWith("/api/v1/feedentry/active-vacancy-1")) {
           return new Response(JSON.stringify(fixture("detail-active.json")), { status: 200 });
         }
-        throw new Error(`unexpected fetch in test: ${url}`);
+        throw new Error(`unexpected request in test: ${url}`);
       }),
+      undefined,
     );
     const registrations: ReadonlyArray<Registration> = [{ tier: "Feed", adapter: navAdapter }];
 
@@ -42,7 +54,7 @@ describe("resolve", () => {
   });
 
   it("fails with AdapterUnavailable when no registration matches the tier", async () => {
-    const registrations: ReadonlyArray<Registration> = [{ tier: "Feed", adapter: navAdapter }];
+    const registrations: ReadonlyArray<Registration> = [{ tier: "Feed", adapter: inertNavAdapter }];
 
     const exit = await Effect.runPromiseExit(
       resolve(registrations, "Scripted", NAV_PLATFORM_ID, "cursor"),
@@ -66,7 +78,7 @@ describe("resolve", () => {
         Effect.succeed({ listings: [], cursor: "done", more: false, via: "feed" as const }),
     };
     const registrations: ReadonlyArray<Registration> = [
-      { tier: "Feed", adapter: navAdapter },
+      { tier: "Feed", adapter: inertNavAdapter },
       { tier: "Feed", adapter: fallback },
     ];
 

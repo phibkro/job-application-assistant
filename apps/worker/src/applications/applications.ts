@@ -9,6 +9,7 @@ import { Database } from "../services/Database.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
+import { Ids } from "../services/Ids.ts";
 import { Policy } from "../services/Policy.ts";
 import { ApplicationMissing } from "@job-index/domain/Failure";
 import { Applications } from "../services/Applications.ts";
@@ -46,6 +47,7 @@ export const layer = Layer.effect(
     const drafting = yield* Drafting;
     const entitlements = yield* Entitlements;
     const policy = yield* Policy;
+    const ids = yield* Ids;
     const withDb = withDatabase(database);
 
     const prepare: ApplicationsShape["prepare"] = (user, savedJob, requested) =>
@@ -95,7 +97,7 @@ export const layer = Layer.effect(
 
         const now = yield* DateTime.now;
         const application = new ApplicationRecord({
-          id: crypto.randomUUID() as ApplicationId,
+          id: (yield* ids.next) as ApplicationId,
           profileId: user,
           savedJobId: savedJob,
           canonicalJobId: saved.canonicalJobId,

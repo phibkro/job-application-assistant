@@ -10,6 +10,7 @@ import { LeaseHeld } from "@job-index/domain/Failure";
 import type { Acquisition } from "../services/Acquisition.ts";
 import type { Corpus } from "../services/Corpus.ts";
 import { Database } from "../services/Database.ts";
+import type { Ids } from "../services/Ids.ts";
 import type { SourceCatalog } from "../services/SourceCatalog.ts";
 import type { SourceLease } from "../services/SourceLease.ts";
 import type { RunBudget, RunReport } from "../services/Ingestion.ts";
@@ -27,6 +28,7 @@ type CorpusShape = Effect.Success<typeof Corpus>;
 type SourceCatalogShape = Effect.Success<typeof SourceCatalog>;
 type DatabaseShape = Effect.Success<typeof Database>;
 type SourceLeaseShape = Effect.Success<typeof SourceLease>;
+type IdsShape = Effect.Success<typeof Ids>;
 
 export interface CollectDeps {
   readonly database: DatabaseShape;
@@ -34,6 +36,7 @@ export interface CollectDeps {
   readonly corpus: CorpusShape;
   readonly sourceCatalog: SourceCatalogShape;
   readonly sourceLease: SourceLeaseShape;
+  readonly ids: IdsShape;
 }
 
 /** Bounded retry with backoff for a transient page failure — SQLite/D1 aside, the one place this slot reaches for `Schedule`. */
@@ -70,7 +73,7 @@ export const makeCollect =
   (deps: CollectDeps) =>
   (platform: PlatformId, budget: RunBudget): Effect.Effect<RunReport, LeaseHeld> =>
     Effect.gen(function* () {
-      const owner = crypto.randomUUID();
+      const owner = yield* deps.ids.next;
       const startedAt = yield* DateTime.now;
 
       // The Durable Object is the entire serialization story: single-

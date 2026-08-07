@@ -1,3 +1,4 @@
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -55,7 +56,7 @@ const upsertAnswer = (
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
     const existing = yield* findAnswerRow(db, profile, question);
-    const now = new Date().toISOString();
+    const now = DateTime.formatIso(yield* DateTime.now);
     if (existing === undefined) {
       yield* db.run(
         "-- accounts:insertAnswer\nINSERT INTO answers (profileId, question, label, shape, value, origin, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -96,7 +97,7 @@ export const layer = Layer.effect(
 
     const set = (profile: ProfileId, value: Profile): Effect.Effect<Profile> =>
       Effect.gen(function* () {
-        const now = new Date().toISOString();
+        const now = DateTime.formatIso(yield* DateTime.now);
         yield* writeProfile(db, profile, value, now);
         return value;
       });

@@ -25,6 +25,7 @@ import { Database } from "../services/Database.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { Applications } from "../services/Applications.ts";
+import { Ids } from "../services/Ids.ts";
 import type { Entitlements } from "../services/Entitlements.ts";
 import { Policy } from "../services/Policy.ts";
 import { SavedJobs as SavedJobsService } from "../services/SavedJobs.ts";
@@ -72,7 +73,12 @@ const profilesStub = Layer.succeed(Profiles, {
   unanswered: () => Effect.succeed([]),
 });
 
-const dataLayer = Layer.mergeAll(corpusLayer, draftingLayer, profilesStub).pipe(
+// The real generator, not a fixed stub: this file's assertions are on
+// `prepare`'s decision and persistence, never on the exact id it minted —
+// `savedJobsService.test.ts` is where a fixed `Ids` earns its keep.
+const idsLayer = Layer.succeed(Ids, { next: Effect.sync(() => crypto.randomUUID()) });
+
+const dataLayer = Layer.mergeAll(corpusLayer, draftingLayer, profilesStub, idsLayer).pipe(
   Layer.provideMerge(layerSqlite()),
 );
 
