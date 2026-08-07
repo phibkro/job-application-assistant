@@ -11,10 +11,10 @@ assigned), `blocked` (waiting on a decision or a credential).
 
 ```mermaid
 graph TD
-  C[contracts + gates<br/>done] --> P[persistence<br/>wave]
-  C --> CORP[corpus + freshness<br/>wave]
-  C --> ACC[accounts + profiles<br/>wave]
-  C --> WEB[interface<br/>wave]
+  C[contracts + gates<br/>done] --> P[persistence<br/>done]
+  C --> CORP[corpus + freshness<br/>done]
+  C --> ACC[accounts + profiles<br/>wave: schema alignment]
+  C --> WEB[interface<br/>done]
   C --> DRAFT[drafting<br/>done]
   C --> ADAPT[NAV + JSON-LD adapters<br/>done]
   C --> DEC[entitlement + policy<br/>done]
@@ -52,6 +52,24 @@ graph TD
   SOAK[seven-day soak<br/>after cutover] --> PROD
 ```
 
+## What wave 2 cost, and what it bought
+
+Six slots merged. Between them they reported ten contract defects, and the
+pattern is worth recording: every one was found by a writer meeting the
+contract from the outside, and none by the writer who froze it.
+
+Four are now closed — every table has a key, `canonical_jobs` and
+`occurrences` exist, `ClosedCanonical` is reachable through a sweep that takes
+what a run *saw*, and `Database` promises only the atomicity D1 can deliver.
+The last of those was a contract whose shape invited a bug, and it collected
+one from me before it was narrowed.
+
+The lesson the next wave should carry: a slot testing against its own fake
+proves its logic and nothing about the seam. Both the corpus and the accounts
+slot passed green while disagreeing with the real schema. Running a slot
+against the persistence layer's real SQLite engine is what turned that into a
+failing test, and it costs milliseconds.
+
 ## What the shape tells us
 
 **The fan-out is real and it is early.** Seven items depend only on the
@@ -82,7 +100,7 @@ that passed against fixtures and failed against reality.
 | Wave | Items | Why they can overlap |
 | --- | --- | --- |
 | 1 (done) | drafting, adapters | contracts only |
-| 2 (now) | persistence, corpus, accounts, interface | contracts only; each fakes the tags it consumes |
+| 2 (done) | persistence, corpus, accounts, interface | contracts only; each fakes the tags it consumes |
 | 3 | saved searches, applications, http implementation, erasure sweep, observability | one upstream service each |
 | 4 | agenda, handlers | several services |
 | 5 | composition, cutover | serial by nature |

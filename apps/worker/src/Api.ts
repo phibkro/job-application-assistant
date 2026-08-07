@@ -2,6 +2,10 @@ import * as Schema from "effect/Schema";
 import * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
+import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
+import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
+import * as Context from "effect/Context";
+import type { PrincipalId, ProfileId } from "@job-index/domain/Ids";
 import { CanonicalJob } from "@job-index/domain/Job";
 import { CatalogEntry } from "@job-index/domain/Source";
 import { Profile } from "@job-index/domain/Profile";
@@ -40,12 +44,51 @@ export class ForbiddenByPlatform extends Schema.TaggedError<ForbiddenByPlatform>
   { platform: Schema.String, policy: Schema.String },
 ) {}
 
+/**
+ * Who the request is for, once the token has been checked.
+ *
+ * Provided by the middleware rather than re-derived per handler: an endpoint
+ * that needs the caller asks for this, and one that does not cannot
+ * accidentally read a profile id from a query parameter.
+ */
+export class CurrentPrincipal extends Context.Service<
+  CurrentPrincipal,
+  { readonly principalId: PrincipalId; readonly profileId: ProfileId }
+>()("@job-index/CurrentPrincipal") {}
+
+/**
+ * Bearer token, checked once, in front of every group that speaks for a
+ * person.
+ *
+ * Declared here rather than left to each handler because "did anyone check
+ * the token" is not a question a reviewer should have to ask per endpoint.
+ * The scheme is also what the generated OpenAPI document advertises, so the
+ * document cannot claim an authentication story the code does not implement.
+ *
+ * A bearer token covers both callers: the interface holds a session token,
+ * an API client holds a key, and both arrive the same way. What differs is
+ * how they are issued, which is the accounts service's business, not the
+ * wire's.
+ */
+export class Authenticated extends HttpApiMiddleware.Service<
+  Authenticated,
+  { provides: CurrentPrincipal }
+>()("@job-index/Authenticated", {
+  error: Unauthorized,
+  security: { session: HttpApiSecurity.bearer },
+}) {}
+
 const PageMeta = Schema.Struct({
   limit: Schema.Number,
   nextCursor: Schema.NullOr(Schema.String),
 });
 
-const JobPage = Schema.Struct({
+/**
+ * One page of vacancies. Exported because the interface decodes it: a second
+ * hand-written copy of this shape in `apps/web` is exactly the drift that
+ * having one declaration is meant to prevent.
+ */
+export const JobPage = Schema.Struct({
   data: Schema.Array(CanonicalJob),
   meta: PageMeta,
 });
@@ -83,41 +126,45 @@ const corpus = HttpApiGroup.make("corpus").add(
  * per profile, so it needs the caller's identity and cannot be a query
  * parameter on a public read.
  */
-const feed = HttpApiGroup.make("feed").add(
-  HttpApiEndpoint.get("fresh", "/api/v1/me/feed", {
-    query: { limit: Schema.optional(Schema.String) },
-    success: JobPage,
-    error: Unauthorized,
-  }),
-  HttpApiEndpoint.post("dismiss", "/api/v1/me/feed/:id/dismiss", {
-    params: { id: Schema.String },
-    payload: Schema.Struct({ verdict: Schema.String, reason: Schema.optional(Schema.String) }),
-    success: Schema.Struct({ dismissed: Schema.String }),
-    error: Unauthorized,
-  }),
-);
+const feed = HttpApiGroup.make("feed")
+  .add(
+    HttpApiEndpoint.get("fresh", "/api/v1/me/feed", {
+      query: { limit: Schema.optional(Schema.String) },
+      success: JobPage,
+      error: Unauthorized,
+    }),
+    HttpApiEndpoint.post("dismiss", "/api/v1/me/feed/:id/dismiss", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ verdict: Schema.String, reason: Schema.optional(Schema.String) }),
+      success: Schema.Struct({ dismissed: Schema.String }),
+      error: Unauthorized,
+    }),
+  )
+  .middleware(Authenticated);
 
 /** The profile and its answers: everything an application is enriched from. */
-const profile = HttpApiGroup.make("profile").add(
-  HttpApiEndpoint.get("me", "/api/v1/me", {
-    success: Schema.Struct({
-      profile: Profile,
-      capabilities: Schema.Array(Schema.String),
+const profile = HttpApiGroup.make("profile")
+  .add(
+    HttpApiEndpoint.get("me", "/api/v1/me", {
+      success: Schema.Struct({
+        profile: Profile,
+        capabilities: Schema.Array(Schema.String),
+      }),
+      error: Unauthorized,
     }),
-    error: Unauthorized,
-  }),
-  HttpApiEndpoint.put("setProfile", "/api/v1/me/profile", {
-    payload: Profile,
-    success: Profile,
-    error: Unauthorized,
-  }),
-  HttpApiEndpoint.put("setAnswer", "/api/v1/me/answers/:question", {
-    params: { question: Schema.String },
-    payload: Schema.Struct({ value: Schema.String, label: Schema.optional(Schema.String) }),
-    success: Schema.Struct({ question: Schema.String }),
-    error: Unauthorized,
-  }),
-);
+    HttpApiEndpoint.put("setProfile", "/api/v1/me/profile", {
+      payload: Profile,
+      success: Profile,
+      error: Unauthorized,
+    }),
+    HttpApiEndpoint.put("setAnswer", "/api/v1/me/answers/:question", {
+      params: { question: Schema.String },
+      payload: Schema.Struct({ value: Schema.String, label: Schema.optional(Schema.String) }),
+      success: Schema.Struct({ question: Schema.String }),
+      error: Unauthorized,
+    }),
+  )
+  .middleware(Authenticated);
 
 /**
  * The application loop.
@@ -127,42 +174,44 @@ const profile = HttpApiGroup.make("profile").add(
  * forbids it, and the caller must be able to say why. That is a success with a
  * reason, not a failure.
  */
-const applications = HttpApiGroup.make("applications").add(
-  HttpApiEndpoint.post("save", "/api/v1/me/saved", {
-    payload: Schema.Struct({ jobId: Schema.String, note: Schema.optional(Schema.String) }),
-    success: Schema.Struct({ savedJobId: Schema.String }),
-    error: [Unauthorized, NotFound],
-  }),
-  HttpApiEndpoint.post("draft", "/api/v1/me/saved/:id/draft", {
-    params: { id: Schema.String },
-    payload: Schema.Struct({ generator: Schema.optional(Schema.String) }),
-    success: Schema.Struct({
-      cv: Schema.String,
-      letter: Schema.String,
-      generator: Schema.String,
+const applications = HttpApiGroup.make("applications")
+  .add(
+    HttpApiEndpoint.post("save", "/api/v1/me/saved", {
+      payload: Schema.Struct({ jobId: Schema.String, note: Schema.optional(Schema.String) }),
+      success: Schema.Struct({ savedJobId: Schema.String }),
+      error: [Unauthorized, NotFound],
     }),
-    error: [Unauthorized, NotFound, UpgradeRequired],
-  }),
-  HttpApiEndpoint.post("prepare", "/api/v1/me/saved/:id/apply", {
-    params: { id: Schema.String },
-    payload: Schema.Struct({ method: Schema.optional(Schema.String) }),
-    success: Schema.Struct({
-      applicationId: Schema.String,
-      method: Schema.String,
-      applicationUrl: Schema.String,
-      cv: Schema.String,
-      letter: Schema.String,
-      downgradeReason: Schema.NullOr(Schema.String),
+    HttpApiEndpoint.post("draft", "/api/v1/me/saved/:id/draft", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ generator: Schema.optional(Schema.String) }),
+      success: Schema.Struct({
+        cv: Schema.String,
+        letter: Schema.String,
+        generator: Schema.String,
+      }),
+      error: [Unauthorized, NotFound, UpgradeRequired],
     }),
-    error: [Unauthorized, NotFound, UpgradeRequired, ForbiddenByPlatform],
-  }),
-  HttpApiEndpoint.post("decide", "/api/v1/me/applications/:id/decision", {
-    params: { id: Schema.String },
-    /** approve · rework · decline — the human step in an automated run. */
-    payload: Schema.Struct({ decision: Schema.String, notes: Schema.optional(Schema.String) }),
-    success: Schema.Struct({ applicationId: Schema.String, status: Schema.String }),
-    error: [Unauthorized, NotFound],
-  }),
-);
+    HttpApiEndpoint.post("prepare", "/api/v1/me/saved/:id/apply", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ method: Schema.optional(Schema.String) }),
+      success: Schema.Struct({
+        applicationId: Schema.String,
+        method: Schema.String,
+        applicationUrl: Schema.String,
+        cv: Schema.String,
+        letter: Schema.String,
+        downgradeReason: Schema.NullOr(Schema.String),
+      }),
+      error: [Unauthorized, NotFound, UpgradeRequired, ForbiddenByPlatform],
+    }),
+    HttpApiEndpoint.post("decide", "/api/v1/me/applications/:id/decision", {
+      params: { id: Schema.String },
+      /** approve · rework · decline — the human step in an automated run. */
+      payload: Schema.Struct({ decision: Schema.String, notes: Schema.optional(Schema.String) }),
+      success: Schema.Struct({ applicationId: Schema.String, status: Schema.String }),
+      error: [Unauthorized, NotFound],
+    }),
+  )
+  .middleware(Authenticated);
 
 export const api = HttpApi.make("job-index").add(corpus, feed, profile, applications);

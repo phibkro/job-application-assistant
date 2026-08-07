@@ -21,6 +21,16 @@ import * as Redacted from "effect/Redacted";
  * worker-build output, whose entry imports the `.wasm` alongside it, so
  * `just build` (or `worker-build --release`) must run before a deploy.
  *
+ * This file still describes the Rust service, deliberately: the TypeScript
+ * replacement is being built beside it and has no entry point yet, and RFC
+ * 0015's migration keeps the Rust worker serving until each route group is
+ * cut over. Two things change at that point, together and not before —
+ * `main` points at the bundled TypeScript worker, and `migrationsDir` gives
+ * way to the generated `db/schema.sql`, applied to a new database. The corpus
+ * is a cache, so nothing is back-filled and the ten ordered migrations below
+ * collapse into that one snapshot. Repointing either half early would deploy
+ * a Worker against a schema it does not expect.
+ *
  * Stages map to the service's environments:
  *
  *   bun alchemy deploy --stage staging

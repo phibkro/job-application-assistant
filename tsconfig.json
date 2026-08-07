@@ -12,6 +12,9 @@
     "paths": {
       "@job-index/domain/*": [
         "packages/domain/src/*"
+      ],
+      "@job-index/worker/*": [
+        "apps/worker/src/*"
       ]
     },
     "types": [
