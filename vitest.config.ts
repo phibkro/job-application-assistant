@@ -17,6 +17,13 @@ export default defineConfig({
     alias: [
       { find: /^@job-index\/domain\/(.*)$/, replacement: from("./packages/domain/src/$1.ts") },
       { find: /^@job-index\/worker\/(.*)$/, replacement: from("./apps/worker/src/$1.ts") },
+      { find: "@job-index/adapters/nav", replacement: from("./packages/adapters/nav/src/index.ts") },
+      { find: "@job-index/adapters/jsonld", replacement: from("./packages/adapters/jsonld/src/index.ts") },
+      {
+        find: /^@job-index\/adapters\/shared\/(.*)$/,
+        replacement: from("./packages/adapters/shared/src/$1.ts"),
+      },
+      { find: /^@job-index\/adapters\/(.*)$/, replacement: from("./packages/adapters/src/$1.ts") },
     ],
   },
   test: {

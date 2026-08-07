@@ -15,6 +15,18 @@
       ],
       "@job-index/worker/*": [
         "apps/worker/src/*"
+      ],
+      "@job-index/adapters/nav": [
+        "packages/adapters/nav/src/index.ts"
+      ],
+      "@job-index/adapters/jsonld": [
+        "packages/adapters/jsonld/src/index.ts"
+      ],
+      "@job-index/adapters/shared/*": [
+        "packages/adapters/shared/src/*"
+      ],
+      "@job-index/adapters/*": [
+        "packages/adapters/src/*"
       ]
     },
     "types": [
