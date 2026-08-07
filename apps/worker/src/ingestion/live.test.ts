@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -8,7 +9,7 @@ import type { CatalogEntry } from "@job-index/domain/Source";
 import type { PlatformId, SourceId } from "@job-index/domain/Ids";
 import type { AcquiredPage } from "@job-index/adapters/SourceAdapter";
 import { Unauthorized } from "@job-index/domain/Failure";
-import { layerSqlite } from "../db/Sqlite.ts";
+import { layer as databaseLayer } from "../db/Live.ts";
 import { Acquisition } from "../services/Acquisition.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { Database } from "../services/Database.ts";
@@ -23,15 +24,16 @@ import { layer as ingestionLayer } from "./index.ts";
 import type { PageFailure } from "./failureDetail.ts";
 
 /**
- * `Ingestion.collect` against a real SQL engine running the generated
+ * `Ingestion.collect` against a real D1 binding running the generated
  * schema — `source_state`, `ingestion_runs`, `ingestion_failures`, and
- * `Corpus`'s own tables, all through `bun:sqlite`, the way
- * `corpus/live.test.ts` closed the same gap for the corpus slot: a fake
- * `Database` recognises a statement by object identity and can prove
- * nothing about the SQL. What this file cannot exercise is `Acquisition`
- * itself — a real NAV connection is `packages/adapters/nav`'s own concern —
- * so `Acquisition` and `SourceCatalog` are scripted fakes, and only
- * `Database`/`Corpus`/`Ingestion` are real.
+ * `Corpus`'s own tables, all through the binding this file's Worker was
+ * given (`vitest.workers.config.ts`), the way `corpus/live.test.ts` closed
+ * the same gap for the corpus slot: a fake `Database` recognises a statement
+ * by object identity and can prove nothing about the SQL. What this file
+ * cannot exercise is `Acquisition` itself — a real NAV connection is
+ * `packages/adapters/nav`'s own concern — so `Acquisition` and
+ * `SourceCatalog` are scripted fakes, and only `Database`/`Corpus`/
+ * `Ingestion` are real.
  */
 
 const PLATFORM = "test-platform" as PlatformId;
@@ -151,7 +153,7 @@ const testLayer = (
   sourceLease: SourceLease["Service"] = fakeSourceLease(),
 ) => {
   const deps = Layer.mergeAll(
-    layerSqlite(),
+    databaseLayer(env.DB),
     Layer.succeed(Acquisition, fakeAcquisition(script)),
     Layer.succeed(SourceCatalog, fakeCatalog(startCursor)),
     Layer.succeed(SourceLease, sourceLease),
@@ -167,7 +169,7 @@ const run = <A, E>(
   effect: Effect.Effect<A, E, Ingestion | Corpus | Database>,
 ): Promise<A> => Effect.runPromise(Effect.provide(effect, testLayer(script, startCursor)));
 
-describe("Ingestion.collect on a real SQLite engine", () => {
+describe("Ingestion.collect on a real D1 binding", () => {
   it("reaches the tail in one run, folds every listing, and closes nothing the first time (nothing was ever active before)", async () => {
     const script: PageScript = {
       start: { listings: [listing("1"), listing("2")], cursor: "page-2", more: true },
@@ -331,7 +333,7 @@ describe("Ingestion.collect on a real SQLite engine", () => {
       };
 
       const deps = Layer.mergeAll(
-        layerSqlite(),
+        databaseLayer(env.DB),
         Layer.succeed(Acquisition, blockingAcquisition),
         Layer.succeed(SourceCatalog, fakeCatalog("start")),
         Layer.succeed(SourceLease, sourceLease),

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type { RawListing } from "@job-index/domain/Job";
 import type { SourceId } from "@job-index/domain/Ids";
-import { layerSqlite } from "../db/Sqlite.ts";
+import { layer as databaseLayer } from "../db/Live.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { layer as corpusPersistenceLayer, normalize } from "../corpus/index.ts";
 import { buildHandler } from "./testSupport.ts";
@@ -12,8 +13,9 @@ type CorpusShape = Effect.Success<typeof Corpus>;
 
 /**
  * `listJobs` end to end: a real HTTP `Request` goes through the real API
- * router into the real `Corpus`, wired to a real SQLite engine running the
- * generated schema, and a real `Response` comes back.
+ * router into the real `Corpus`, wired to the real D1 binding this file's
+ * Worker was given (`vitest.workers.config.ts`) running the generated
+ * schema, and a real `Response` comes back.
  *
  * `corpus.test.ts` proves routing/decoding against a fake `Corpus` — it
  * cannot prove the search SQL is well-formed, because the fake never runs a
@@ -36,10 +38,10 @@ const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
 });
 
 /**
- * One resolved `Corpus`, backed by one `bun:sqlite` `:memory:` database, used
- * both to seed jobs directly (there is no HTTP write endpoint this slot owns)
- * and as the `Corpus` the HTTP handler runs against — so seeding and the
- * request that reads it back hit the same database.
+ * One resolved `Corpus`, backed by this file's real D1 binding, used both to
+ * seed jobs directly (there is no HTTP write endpoint this slot owns) and as
+ * the `Corpus` the HTTP handler runs against — so seeding and the request
+ * that reads it back hit the same database.
  */
 const buildRealHandler = () => {
   const corpus = Effect.runSync(
@@ -47,7 +49,7 @@ const buildRealHandler = () => {
       Effect.gen(function* () {
         return yield* Corpus;
       }),
-      corpusPersistenceLayer.pipe(Layer.provide(layerSqlite())),
+      corpusPersistenceLayer.pipe(Layer.provide(databaseLayer(env.DB))),
     ),
   );
   const { handler } = buildHandler({ corpus: Layer.succeed(Corpus, corpus) });

@@ -13,8 +13,12 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:workers": "nix shell nixpkgs#nodejs -c node node_modules/.bin/vitest run -c vitest.workers.config.ts",
+    "test:all": "bun run test && bun run test:workers",
     "coverage": "vitest run --coverage",
-    "check": "bun run fmt:check && bun run lint && bun run imports:check && bun run typecheck && bun run schema:check && bun run catalog:check && bun run bundle:check && bun run coverage",
+    "coverage:workers": "nix shell nixpkgs#nodejs -c node node_modules/.bin/vitest run -c vitest.workers.config.ts --coverage",
+    "coverage:all": "bun run coverage && bun run coverage:workers",
+    "check": "bun run fmt:check && bun run lint && bun run imports:check && bun run typecheck && bun run schema:check && bun run catalog:check && bun run bundle:check && bun run coverage:all",
     "schema": "bun run scripts/ts/schema.ts --emit",
     "schema:check": "bun run scripts/ts/schema.ts",
     "bundle:check": "bun build apps/worker/src/index.ts --target=browser --conditions=workerd --conditions=worker --external \"cloudflare:*\" > /dev/null",
@@ -26,6 +30,7 @@
     "effect": "4.0.0-beta.104"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.20.3",
     "@types/node": "^22",
     "@vitest/coverage-istanbul": "^4.1.10",
     "fast-check": "^4.9.0",

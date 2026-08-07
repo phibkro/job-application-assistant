@@ -1,0 +1,27 @@
+{
+  // Bindings only, for `vitest.workers.config.ts` (`@cloudflare/vitest-pool-workers`).
+  // Not `preview.wrangler.jsonc`: that file's `main` points at a *built*
+  // artifact (`.preview/worker.js`, produced by `just preview`'s bundling
+  // step) and adds an `assets` block for the interface — neither exists nor
+  // is wanted in a test run. This file's `main` points straight at the
+  // TypeScript entry point instead: the pool bundles it itself (esbuild,
+  // the same as `wrangler dev`), so there is nothing to pre-build and the
+  // worker under test is always the current source, never a stale artifact.
+  //
+  // The `d1_databases`/`durable_objects`/`migrations` shape below is not
+  // generated from `preview.wrangler.jsonc` — it is hand-kept in sync with
+  // it (convention, not generation). Both declare exactly the bindings
+  // `apps/worker/src/runtime/Env.ts` requires, so a drift would surface
+  // immediately as a failing `decodeEnv` in every workers-pool test.
+  "name": "job-index-test",
+  "main": "../apps/worker/src/index.ts",
+  "compatibility_date": "2026-05-25",
+  "vars": { "ENVIRONMENT": "test" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "job-index-test", "database_id": "test" }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "SOURCE_LEASE", "class_name": "SourceLeaseObject" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SourceLeaseObject"] }]
+}

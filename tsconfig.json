@@ -31,7 +31,8 @@
     },
     "types": [
       "node",
-      "vitest/importMeta"
+      "vitest/importMeta",
+      "@cloudflare/vitest-pool-workers/types"
     ]
   },
   "include": [
