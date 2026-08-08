@@ -111,6 +111,7 @@ const columnTypes: Record<string, string> = {
   platform: "TEXT NOT NULL",
   category: "TEXT NOT NULL",
   listingsUrl: "TEXT NOT NULL",
+  feedUrl: "TEXT",
   tierTag: "TEXT NOT NULL CHECK (tierTag IN ('Feed', 'Scripted', 'Agent', 'Unknown'))",
   policyTag: "TEXT NOT NULL DEFAULT 'Unreviewed' CHECK (policyTag IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed'))",
   priority: "TEXT NOT NULL",

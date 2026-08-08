@@ -95,8 +95,11 @@ export const makeCollect =
       // too is not a duplicate lookup of the same question, it's a different
       // one ("where do I start" vs "how do I read this platform").
       const catalog = yield* deps.sourceCatalog.list();
-      const startCursor =
-        catalog.find((entry: CatalogEntry) => entry.id === platform)?.listingsUrl ?? "";
+      // The feed URL when the catalogue records one, because a platform's
+      // machine-readable endpoint is frequently not its human one — starting
+      // at the human page fetches HTML and decodes nothing.
+      const entry = catalog.find((candidate: CatalogEntry) => candidate.id === platform);
+      const startCursor = entry?.feedUrl ?? entry?.listingsUrl ?? "";
 
       const existing = yield* Effect.provideService(
         SourceStateRepo.find(platform),

@@ -29,6 +29,7 @@ const entryOf = (row: Row): CatalogEntry => ({
   platform: row.platform,
   category: row.category,
   listingsUrl: row.listingsUrl,
+  ...(row.feedUrl === null || row.feedUrl === undefined ? {} : { feedUrl: row.feedUrl }),
   tier: { _tag: row.tierTag } as AcquisitionTier,
   policy: { _tag: row.policyTag } as AutomationPolicy,
   requiresPremium: row.requiresPremium === 1,

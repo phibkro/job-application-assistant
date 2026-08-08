@@ -113,9 +113,17 @@ const columns = {
   confidence: at("Confidence"),
   notes: at("Notes"),
   verifiedAt: at("Verified date"),
+  // Recorded by a person, because a probe cannot establish either. A platform
+  // publishing a documented feed is a fact about its documentation, and the
+  // endpoint it publishes is frequently not the page a person browses.
+  tier: at("Acquisition tier"),
+  feedUrl: at("Feed URL"),
 };
 
-const missing = Object.entries(columns).filter(([, index]) => index < 0);
+// The researched tier and feed URL are optional columns: an index that
+// predates them still generates, with every platform falling back to evidence.
+const OPTIONAL = new Set(["tier", "feedUrl"]);
+const missing = Object.entries(columns).filter(([name, index]) => index < 0 && !OPTIONAL.has(name));
 if (missing.length > 0) {
   throw new Error(`platform-index.csv is missing columns: ${missing.map(([n]) => n).join(", ")}`);
 }
@@ -140,9 +148,18 @@ for (const row of rows.slice(1)) {
   seen.add(id);
 
   const observed = observations[platform];
-  // No observation means nobody has established how to read it. `Unknown`
-  // makes ingestion refuse rather than guess — see `AcquisitionTier`.
-  const tierTag = TIERS[observed?.acquisition_tier ?? ""] ?? "Unknown";
+  // Research wins over evidence, and only here. A probe can show that a page
+  // needs a browser; it cannot show that a platform publishes an official
+  // feed, because that is a fact about documentation rather than about a
+  // response. Where the index says nothing, evidence decides, and where
+  // neither speaks the tier is `Unknown` — which makes ingestion refuse
+  // rather than guess. See `AcquisitionTier`.
+  const researched = columns.tier >= 0 ? cell(row, columns.tier) : "";
+  const tierTag =
+    (researched.length > 0 ? TIERS[researched.toLowerCase()] : undefined) ??
+    TIERS[observed?.acquisition_tier ?? ""] ??
+    "Unknown";
+  const feedUrl = columns.feedUrl >= 0 ? cell(row, columns.feedUrl) : "";
   tally[tierTag as keyof typeof tally] += 1;
 
   const record = {
@@ -152,6 +169,7 @@ for (const row of rows.slice(1)) {
     // The observed URL wins: the sheet records where a person found the
     // listings, the probe records what actually answered.
     listingsUrl: observed?.listings_url ?? cell(row, columns.listingsUrl),
+    feedUrl,
     tierTag,
     // Never derived from evidence. A person reads the terms, or it stays
     // `Unreviewed`, which forbids automated submission.

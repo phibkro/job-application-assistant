@@ -244,9 +244,12 @@ export default Alchemy.Stack(
         MAIL_FROM,
         ...secretBindings(),
       },
-      // Preview collects nothing on a schedule: it exists to be poked at, and
-      // a cron writing into it while someone reads it makes both confusing.
-      crons: STAGE === "preview" ? [] : CRONS,
+      // Preview collects on a schedule too, now that there is something to
+      // collect. It used to hold four invented vacancies, and a cron writing
+      // into a fixture set while someone read it would have confused both;
+      // with a real corpus, a preview that does not refresh is the confusing
+      // one. Every fifteen minutes is NAV's own cadence, not a guess.
+      crons: STAGE === "preview" ? ["0,15,30,45 * * * *"] : CRONS,
       observability: {
         enabled: true,
         logs: { enabled: true, invocationLogs: true },

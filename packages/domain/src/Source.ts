@@ -38,6 +38,13 @@ export const CatalogEntry = Schema.Struct({
   platform: Schema.String,
   category: Schema.String,
   listingsUrl: Schema.String,
+  /**
+   * Where a machine reads, when that is not where a person browses. NAV
+   * publishes an official feed at a different host from its job site, and
+   * ingestion starting at the human page would fetch a web page and decode
+   * nothing. Absent for platforms where the two coincide.
+   */
+  feedUrl: Schema.optional(Schema.String),
   tier: AcquisitionTier,
   policy: AutomationPolicy,
   /** Agent acquisition costs a browser run, so it is the paid capability. */
@@ -83,6 +90,7 @@ export class CatalogRecord extends Model.Class<CatalogRecord>("CatalogRecord")({
   platform: Schema.String,
   category: Schema.String,
   listingsUrl: Schema.String,
+  feedUrl: Model.FieldOption(Schema.String),
   tierTag: Schema.Literals(["Feed", "Scripted", "Agent", "Unknown"]),
   policyTag: Schema.Literals(["Allowed", "AssistedOnly", "Prohibited", "Unreviewed"]),
   requiresPremium: Model.BooleanSqlite,

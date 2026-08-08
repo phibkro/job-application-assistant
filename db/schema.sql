@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS source_catalog (
   platform TEXT NOT NULL,
   category TEXT NOT NULL,
   listingsUrl TEXT NOT NULL,
+  feedUrl TEXT,
   tierTag TEXT NOT NULL CHECK (tierTag IN ('Feed', 'Scripted', 'Agent', 'Unknown')),
   policyTag TEXT NOT NULL DEFAULT 'Unreviewed' CHECK (policyTag IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed')),
   requiresPremium INTEGER NOT NULL DEFAULT 0 CHECK (requiresPremium IN (0,1)),

@@ -55,9 +55,14 @@
       "NAV_MAX_OBSERVATIONS_PER_RUN": "600",
       "NAV_MAX_DURATION_MS": "20000",
       "NAV_LEASE_RECOVERY_MS": "90000",
-      "MAIL_FROM": "noreply@phibkro.org"
+      "MAIL_FROM": "noreply@phibkro.org",
+      "NAV_API_TOKEN": {
+        "__redacted__": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuYXYudGVhbS5hcmJlaWRzcGxhc3NlbkBuYXYubm8iLCJraWQiOiI5YTY2OTc2MS1hMmFhLTQ2YjQtOWZkNi0yYTQ5YmNjZjJmNjUiLCJpc3MiOiJuYXYtbm8iLCJhdWQiOiJmZWVkLWFwaS12MiIsImlhdCI6MTc4NDI4NTAxMywiZXhwIjoxNzg3MzA5MDEzfQ.0HmZO2zZxa4kxBCyjaJrARM_V_DryrTyBs176IRqL_Q"
+      }
     },
-    "crons": [],
+    "crons": [
+      "0,15,30,45 * * * *"
+    ],
     "observability": {
       "enabled": true,
       "logs": {
@@ -86,10 +91,12 @@
       "https://job-index.phibkro.org",
       "https://job-index-preview.philib-krogh-d23.workers.dev"
     ],
-    "crons": [],
+    "crons": [
+      "0,15,30,45 * * * *"
+    ],
     "hash": {
-      "assets": "9eaf5ead31dc7120208ed9b9ed5d7ddcb1025251874d7b4d9444e76743cae598",
-      "bundle": "2f48de4e98a85e0d8b37c06d1387dee8066516070d159e07aca99b335f15c9e1"
+      "assets": "2ba465aa4012634a33bbfc8ac0374131a1e03853ca81ddda84078da995481716",
+      "bundle": "b7b7001fd8e5d1ceb6f673b112827518e073500b3fb464bd6aba9984a6a51383"
     }
   },
   "bindings": [
@@ -260,6 +267,18 @@
             "type": "plain_text",
             "name": "MAIL_FROM",
             "text": "noreply@phibkro.org"
+          }
+        ]
+      }
+    },
+    {
+      "sid": "NAV_API_TOKEN",
+      "data": {
+        "bindings": [
+          {
+            "type": "secret_text",
+            "name": "NAV_API_TOKEN",
+            "text": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuYXYudGVhbS5hcmJlaWRzcGxhc3NlbkBuYXYubm8iLCJraWQiOiI5YTY2OTc2MS1hMmFhLTQ2YjQtOWZkNi0yYTQ5YmNjZjJmNjUiLCJpc3MiOiJuYXYtbm8iLCJhdWQiOiJmZWVkLWFwaS12MiIsImlhdCI6MTc4NDI4NTAxMywiZXhwIjoxNzg3MzA5MDEzfQ.0HmZO2zZxa4kxBCyjaJrARM_V_DryrTyBs176IRqL_Q"
           }
         ]
       }
