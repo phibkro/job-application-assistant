@@ -1,3 +1,7 @@
+# Build output from the deleted Rust service, in case a stale checkout
+# still has it. Nothing in this repository produces it any more.
+/target/
+
 # Local databases and runtime state
 node_modules/
 /.preview/
