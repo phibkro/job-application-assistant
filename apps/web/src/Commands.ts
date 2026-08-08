@@ -96,7 +96,7 @@ export const FetchJob = Command.define("FetchJob", {
  * The hover-to-prefetch call: the same `getJob` endpoint `FetchJob` uses,
  * fired early so the worker hydrates the vacancy before a click, and
  * discarded either way — `PrefetchSettled` carries nothing back, on purpose
- * (see `Message.ts`'s `BrowseJobHovered`). A failure here (the source is
+ * (see `Message.ts`'s `BrowseJobPressed`). A failure here (the source is
  * down, the id is stale) is not this person's problem: `JobDetail`'s own
  * route re-fetches on open regardless and shows its own error if that one
  * fails.

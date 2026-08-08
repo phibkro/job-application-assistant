@@ -214,7 +214,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       // "hovered", because there is nothing for the Model to remember: the
       // hydration this warms lives server-side, and `JobDetail`'s route
       // always re-fetches on open regardless (see `Route.ts`'s own comment).
-      BrowseJobHovered: ({ jobId }) => [model, [Commands.PrefetchJob({ jobId })]],
+      BrowseJobPressed: ({ jobId }) => [model, [Commands.PrefetchJob({ jobId })]],
 
       // JOB DETAIL
 

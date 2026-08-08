@@ -1,8 +1,9 @@
+import * as EffectOption from "effect/Option";
 import { AsyncData } from "foldkit";
 import type { HtmlBuilder, Html } from "foldkit/html";
 import type { CanonicalJob } from "@job-index/domain/Job";
 import {
-  BrowseJobHovered,
+  BrowseJobPressed,
   BrowseLocationChanged,
   BrowseNextPageRequested,
   BrowseSearchSubmitted,
@@ -32,9 +33,19 @@ const jobListItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
     job.id,
     [
       h.Class("flex items-center justify-between gap-4 py-3"),
-      // The cheapest intent signal: a hover asks the worker to hydrate this
-      // vacancy before anyone clicks. See `Message.ts`'s `BrowseJobHovered`.
-      h.OnMouseEnter(BrowseJobHovered({ jobId: job.id })),
+      // `pointerdown`, not `mousedown`: one event covers mouse, touch and pen,
+      // so a tap prefetches on the same signal a click does. Keyboard has no
+      // equivalent — focus fires on every tab-through, which is hover's
+      // problem wearing a different hat — so that path simply does not
+      // prefetch. See `Message.ts`'s `BrowseJobPressed`.
+      h.OnPointerDown((_pointerType, pressedButton) =>
+        // Primary button only. A right-click opens a context menu and a
+        // middle-click opens a background tab; neither is the press this is
+        // trying to get ahead of, and the decoder can simply decline.
+        pressedButton === 0
+          ? EffectOption.some(BrowseJobPressed({ jobId: job.id }))
+          : EffectOption.none(),
+      ),
     ],
     [
       h.div(
