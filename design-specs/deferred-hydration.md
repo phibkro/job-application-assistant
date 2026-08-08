@@ -42,10 +42,18 @@ vacancies nobody has looked at.
    marked unhydrated.
 2. **Someone browses or searches.** Both work entirely on what a feed page
    gave us. Nothing about the result list changes.
-3. **Someone hovers over a vacancy, or otherwise signals intent.** The
-   interface asks the worker to hydrate it. If the person then clicks, the
-   detail is usually already there; if they do not, one wasted request against
-   a source that publishes a feed for exactly this purpose.
+3. **Someone presses the pointer down on a vacancy.** The interface asks the
+   worker to hydrate it, without waiting for the click to complete.
+
+   Mousedown rather than hover, per the operator, and the reasoning is worth
+   keeping: hover fires constantly and speculatively — a pointer crossing a
+   list of eighty results hydrates most of them and means almost none of it.
+   A press is a decision. The gap between press and release is real latency to
+   hide (order of 100ms), and the only wasted request is from someone who
+   pressed and then changed their mind. Eager, but conservative.
+
+   Touch and keyboard need their own signal — `touchstart` and the focus that
+   precedes an Enter — or the fastest path is the one that never prefetches.
 4. **Someone opens a vacancy that is not hydrated yet.** The worker fetches
    the detail, stores it on the canonical row, and answers. Subsequent views
    of that vacancy — by anyone — need no fetch.
@@ -122,9 +130,9 @@ description is worse than an error.
 
 ## What is not here yet
 
-Prefetch policy beyond hover. Intent has other signals — scroll position,
-keyboard focus, a pointer moving toward a target — and this spec commits only
-to the cheapest one. Whether prefetching should be throttled, or skipped on a
+Prefetch policy beyond the press. Intent has other signals — scroll position,
+a pointer accelerating toward a target — and this spec commits only to the one
+that is almost never wrong. Whether prefetching should be throttled, or skipped on a
 metered connection, is a question for whoever measures it.
 
 Backfilling hydration for jobs nobody opens is deliberately absent. It would
@@ -137,7 +145,8 @@ reintroduce the cost this removes, and the corpus does not need it.
   would return results that depend on who happened to click what. If
   description search is wanted, it needs a different design: hydrate
   everything on a schedule, or a separate index.
-- **Is a wasted prefetch acceptable to the source?** Hovering costs NAV a
-  request for an advert the person may not open. Cheap and normal by web
-  convention; worth a decision before applying the same pattern to a platform
-  whose terms are less permissive than a public feed's.
+- **Is a wasted prefetch acceptable to the source?** Mousedown makes this
+  nearly moot — a press that never becomes a click is rare — but the question
+  returns in full if prefetching is ever widened to hover or to scroll
+  position. Worth deciding before applying any of it to a platform whose terms
+  are less permissive than a public feed's.
