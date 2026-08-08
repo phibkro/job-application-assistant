@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import { make as makeNavAdapter } from "@job-index/adapters/nav";
+import { retentionBoundary } from "@job-index/domain/Retention";
 import type { Accounts, Profiles } from "../services/Accounts.ts";
 import type { Applications } from "../services/Applications.ts";
 import type { Corpus } from "../services/Corpus.ts";
@@ -108,7 +109,12 @@ export const services = (env: Env): Layer.Layer<Services> => {
   const withApplications = Layer.provideMerge(applicationsLayer, leaves);
 
   const acquisition = acquisitionLayer([
-    { tier: "Feed", adapter: makeNavAdapter(httpClient, env.NAV_API_TOKEN) },
+    {
+      tier: "Feed",
+      // A fresh sweep starts at the retention boundary rather than at the
+      // feed's first entry: what we will not keep, we need not read.
+      adapter: makeNavAdapter(httpClient, env.NAV_API_TOKEN, retentionBoundary(new Date())),
+    },
   ]);
   const ingestion = ingestionLayer.pipe(
     Layer.provide(acquisition),

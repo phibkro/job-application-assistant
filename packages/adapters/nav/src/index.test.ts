@@ -119,4 +119,69 @@ describe("page", () => {
 
     expect(exit._tag).toBe("Failure");
   });
+
+  it("tells a fresh sweep where to start, and does not re-tell a resumed one", async () => {
+    const seen: Array<string | null> = [];
+    const respond = (url: string, headers: Headers): Response => {
+      seen.push(headers.get("if-modified-since"));
+      return new Response(
+        JSON.stringify(
+          url.includes("/feed/") ? fixture("detail-active.json") : fixture("feed-page.json"),
+        ),
+        { status: 200 },
+      );
+    };
+    const since = new Date("2025-08-08T00:00:00.000Z");
+    const adapter = make(clientOf(respond), "token", since);
+
+    await Effect.runPromise(
+      Effect.exit(adapter.page(NAV_PLATFORM_ID, "https://pam-stilling-feed.nav.no/api/v1/feed")),
+    );
+    // RFC 1123, because that is what the header is defined in. NAV accepts an
+    // ISO timestamp and ignores it, which looks exactly like it worked — the
+    // same shape as every query parameter one might guess at instead.
+    expect(seen[0]).toBe(since.toUTCString());
+
+    seen.length = 0;
+    await Effect.runPromise(Effect.exit(adapter.page(NAV_PLATFORM_ID, "/api/v1/feed/abc-123")));
+    // A cursor naming a page is already a position. Re-sending the boundary
+    // would rewind the walk to it on every run.
+    expect(seen[0]).toBeNull();
+  });
+
+  it("skips an advert that closed between the feed page and this sweep, rather than failing the page", async () => {
+    // What NAV actually returns for an entry the feed still lists as active
+    // but which has since closed: a status and nothing else. Every one of
+    // twenty-five sampled from a year-old page looked like this, and treating
+    // it as corruption stopped ingestion at page zero.
+    const client = clientOf((url) =>
+      url.includes("/feedentry/") || url.includes("/feed/")
+        ? new Response(
+            JSON.stringify({
+              uuid: "gone",
+              sistEndret: "2026-08-06T07:20:51+02:00",
+              status: "INACTIVE",
+            }),
+          )
+        : new Response(JSON.stringify(fixture("feed-page.json"))),
+    );
+
+    const page = await Effect.runPromise(
+      make(client, "token").page(NAV_PLATFORM_ID, "https://pam-stilling-feed.nav.no/api/v1/feed"),
+    );
+    expect(page.listings).toEqual([]);
+  });
+
+  it("still fails loudly when content is missing from something calling itself active", async () => {
+    const client = clientOf((url) =>
+      url.includes("/feedentry/") || url.includes("/feed/")
+        ? new Response(JSON.stringify({ uuid: "broken", status: "ACTIVE" }))
+        : new Response(JSON.stringify(fixture("feed-page.json"))),
+    );
+
+    const exit = await Effect.runPromiseExit(
+      make(client, "token").page(NAV_PLATFORM_ID, "https://pam-stilling-feed.nav.no/api/v1/feed"),
+    );
+    expect(JSON.stringify(exit)).toContain("DecodeFailed");
+  });
 });

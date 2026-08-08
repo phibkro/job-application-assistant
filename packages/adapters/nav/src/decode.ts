@@ -153,6 +153,34 @@ const formatWorkLocation = (location: NavSchema.WorkLocation): string | undefine
  * with no feed context at all — the fallbacks it would have fed simply do
  * not fire.
  */
+/**
+ * Whether a detail response is NAV saying "this advert is gone" rather than
+ * returning something malformed.
+ *
+ * A feed page records the status an entry had when the page was written. By
+ * the time a sweep reaches that entry — a year later, at the retention
+ * boundary — the advert may have closed, and NAV then answers with `{uuid,
+ * sistEndret, status}` and no `ad_content` at all. That is the lifecycle
+ * working, not a broken payload, and failing the page on it stops ingestion
+ * dead: every one of twenty-five active-in-feed entries sampled from a
+ * year-old page had since closed.
+ *
+ * The distinction is kept narrow on purpose. Missing content on an entry that
+ * still calls itself ACTIVE is exactly the corruption `DecodeFailed` exists to
+ * report, and still fails.
+ */
+export const isClosedSince = (input: unknown): boolean => {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+  const record = input as { ad_content?: unknown; status?: unknown };
+  return (
+    (record.ad_content === undefined || record.ad_content === null) &&
+    typeof record.status === "string" &&
+    record.status.toUpperCase() !== "ACTIVE"
+  );
+};
+
 export const decodeDetail = (
   input: unknown,
   summary?: FeedItem,
