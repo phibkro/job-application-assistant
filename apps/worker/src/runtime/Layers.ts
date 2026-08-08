@@ -10,6 +10,7 @@ import type { Corpus } from "../services/Corpus.ts";
 import type { Database } from "../services/Database.ts";
 import type { Drafting } from "../services/Drafting.ts";
 import type { Entitlements } from "../services/Entitlements.ts";
+import type { Hydration } from "../services/Hydration.ts";
 import type { Ingestion } from "../services/Ingestion.ts";
 import type { Judgements } from "../services/Judgements.ts";
 import type { Policy } from "../services/Policy.ts";
@@ -28,8 +29,9 @@ import { layer as corpusLayer } from "../corpus/index.ts";
 import { layer as applicationsLayer } from "../applications/index.ts";
 import { layer as catalogLayer } from "../catalog/index.ts";
 import { layer as draftingLayer } from "../drafting/index.ts";
+import { layer as hydrationLayer } from "../hydration/index.ts";
 import { layer as ingestionLayer } from "../ingestion/index.ts";
-import { layer as sourceLeaseLayer } from "../ingestion/SourceLeaseObject.ts";
+import { hydrationLeaseLayer, layer as sourceLeaseLayer } from "../ingestion/SourceLeaseObject.ts";
 import { layer as idsLayer } from "./Ids.ts";
 import type { Env } from "./Env.ts";
 
@@ -72,6 +74,7 @@ export type Services =
   | Drafting
   | Applications
   | Entitlements
+  | Hydration
   | Policy
   | SavedJobs
   | SourceCatalog
@@ -94,6 +97,13 @@ export type Services =
  * `Ingestion`"). NAV is registered here, not inside `acquisition/index.ts`,
  * because only this file has `env` — and therefore `env.NAV_API_TOKEN` and
  * `env.SOURCE_LEASE` — in scope.
+ *
+ * `Hydration` is composed the same way, alongside `Ingestion` rather than
+ * after it: both need `Acquisition` and `Corpus`, neither needs the other,
+ * so they are independent branches over the same `withApplications` context
+ * rather than one layered on top of the second. `HydrationLease` reuses
+ * `env.SOURCE_LEASE` — the same binding `SourceLease` is wired to — see
+ * `ingestion/SourceLeaseObject.ts`'s `hydrationLeaseLayer`.
  */
 export const services = (env: Env): Layer.Layer<Services> => {
   // `idsLayer` needs nothing (see `runtime/Ids.ts`), so it joins the merge
@@ -120,6 +130,10 @@ export const services = (env: Env): Layer.Layer<Services> => {
     Layer.provide(acquisition),
     Layer.provide(sourceLeaseLayer(env.SOURCE_LEASE)),
   );
+  const hydration = hydrationLayer.pipe(
+    Layer.provide(acquisition),
+    Layer.provide(hydrationLeaseLayer(env.SOURCE_LEASE)),
+  );
 
-  return Layer.provideMerge(ingestion, withApplications);
+  return Layer.provideMerge(Layer.mergeAll(ingestion, hydration), withApplications);
 };

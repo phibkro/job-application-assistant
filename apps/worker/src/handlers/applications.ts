@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import { isHydrated } from "@job-index/domain/Job";
 import type {
   DraftMissing,
   EntitlementRequired,
@@ -7,7 +8,7 @@ import type {
   ProfileIncomplete,
 } from "@job-index/domain/Failure";
 import { api, CurrentPrincipal, ForbiddenByPlatform, NotFound, UpgradeRequired } from "../Api.ts";
-import { Corpus } from "../services/Corpus.ts";
+import { Hydration } from "../services/Hydration.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
@@ -23,18 +24,25 @@ export const layer = HttpApiBuilder.group(api, "applications", (handlers) =>
   handlers
     .handle("save", ({ payload }) =>
       Effect.gen(function* () {
-        const corpus = yield* Corpus;
+        const hydration = yield* Hydration;
         const savedJobs = yield* SavedJobs;
         const principal = yield* CurrentPrincipal;
         const jobId = decodeCanonicalJobId(payload.jobId);
-        const job = yield* corpus.get(jobId);
-        if (job === undefined) {
+        // `save` is the one hard precondition for hydration: `SavedJobs.save`
+        // takes a snapshot (`Job.snapshotOf`) that composes `description`
+        // into every future draft, so it must never run against a job this
+        // could not hydrate. `isHydrated` is what makes that a compile-time
+        // fact rather than a runtime check — `savedJobs.save` below only
+        // type-checks inside this branch. A job that does not exist, or one
+        // that turned out closed before hydration could complete, both fail
+        // the same way: `NotFound` is the only error `save` declares (see
+        // `Api.ts`), so "could not hydrate" and "never existed" are
+        // deliberately indistinguishable on the wire, the same way
+        // `SavedJobs.resolve` already treats "someone else's" as absent.
+        const job = yield* hydration.hydrate(jobId);
+        if (job === undefined || !isHydrated(job)) {
           return yield* Effect.fail(new NotFound({ message: `no job with id ${payload.jobId}` }));
         }
-        // `save` takes the whole job, not just its id: this is the one
-        // moment the advert gets snapshotted (`SavedJobs`'s docstring), and
-        // the job is already in hand from the existence check above — no
-        // second corpus read is needed to take the copy.
         const savedJobId = yield* savedJobs.save(principal.profileId, job, payload.note ?? "");
         return { savedJobId };
       }),

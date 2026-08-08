@@ -9,15 +9,15 @@ import {
 } from "@job-index/domain/Failure";
 import type { Credential } from "@job-index/domain/Access";
 import { snapshotOf } from "@job-index/domain/Job";
-import type { CanonicalJob, JobSnapshot } from "@job-index/domain/Job";
+import type { HydratedCanonicalJob, JobSnapshot } from "@job-index/domain/Job";
 import type { Profile } from "@job-index/domain/Profile";
 import type { CanonicalJobId, PrincipalId, ProfileId, Sequence } from "@job-index/domain/Ids";
 import { Accounts, Profiles } from "../services/Accounts.ts";
-import { Corpus } from "../services/Corpus.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
 import { ApplicationMissing } from "@job-index/domain/Failure";
 import { Applications } from "../services/Applications.ts";
+import { Hydration } from "../services/Hydration.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
 import { buildHandler } from "./testSupport.ts";
 
@@ -39,18 +39,18 @@ const authedAs = (profile: ProfileId) => {
   });
 };
 
-const job: CanonicalJob = {
+const job: HydratedCanonicalJob = {
   id: "cj_1" as CanonicalJobId,
   title: "Baker",
   employerName: "Bakery AS",
   location: "Oslo",
-  description: "",
   applicationUrl: "https://example.com/1",
   publishedAt: "2026-01-01T00:00:00Z",
   status: { _tag: "Active" },
   sequence: 1 as Sequence,
   changedAt: "2026-01-01T00:00:00Z",
   sources: [],
+  hydration: { _tag: "Hydrated", description: "" },
 };
 
 const jobSnapshot: JobSnapshot = snapshotOf(job);
@@ -66,20 +66,23 @@ const blankProfile: Profile = {
 };
 
 describe("applications.save", () => {
-  it("404s (NotFound) when the job doesn't exist in the corpus", async () => {
+  it("404s (NotFound) when Hydration.hydrate finds no such job", async () => {
     const { handler } = buildHandler({
       accounts: authedAs(alice),
-      corpus: Layer.succeed(Corpus, {
-        observe: () => Effect.die("unused"),
-        get: () => Effect.succeed(undefined),
-        changedSince: () => Effect.die("unused"),
-        search: () => Effect.die("unused"),
-        fresh: () => Effect.die("unused"),
-        markOffered: () => Effect.die("unused"),
-        closeAbsent: () => Effect.die("unused"),
-      }),
+      hydration: Layer.succeed(Hydration, { hydrate: () => Effect.succeed(undefined) }),
     });
     const res = await handler(post("/api/v1/me/saved", { jobId: "missing" }));
+    expect(await res.json()).toMatchObject({ _tag: "NotFound" });
+  });
+
+  it("404s (NotFound) when hydration never completed — falsifier 6, fail loud rather than snapshot a blank description", async () => {
+    const { handler } = buildHandler({
+      accounts: authedAs(alice),
+      hydration: Layer.succeed(Hydration, {
+        hydrate: () => Effect.succeed({ ...job, hydration: { _tag: "Unhydrated" } }),
+      }),
+    });
+    const res = await handler(post("/api/v1/me/saved", { jobId: "cj_1" }));
     expect(await res.json()).toMatchObject({ _tag: "NotFound" });
   });
 
@@ -87,15 +90,7 @@ describe("applications.save", () => {
     let seen: unknown;
     const { handler } = buildHandler({
       accounts: authedAs(alice),
-      corpus: Layer.succeed(Corpus, {
-        observe: () => Effect.die("unused"),
-        get: () => Effect.succeed(job),
-        changedSince: () => Effect.die("unused"),
-        search: () => Effect.die("unused"),
-        fresh: () => Effect.die("unused"),
-        markOffered: () => Effect.die("unused"),
-        closeAbsent: () => Effect.die("unused"),
-      }),
+      hydration: Layer.succeed(Hydration, { hydrate: () => Effect.succeed(job) }),
       savedJobs: Layer.succeed(SavedJobs, {
         save: (profile, savedJob, note) => {
           // `save` now takes the whole job, not just its id — captures the

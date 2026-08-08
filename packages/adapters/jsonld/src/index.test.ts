@@ -66,4 +66,26 @@ describe("page", () => {
 
     expect(exit._tag).toBe("Failure");
   });
+
+  it("every listing this adapter produces is already hydrated — no cheaper summary tier underneath it", async () => {
+    const page = await Effect.runPromise(
+      Effect.provide(
+        SourceAdapter.use((adapter) => adapter.page(PLATFORM, PAGE_URL)),
+        layerOf(clientOf(() => new Response(html, { status: 200 }))),
+      ),
+    );
+    expect(page.listings[0]?.hydrated).toBe(true);
+  });
+});
+
+describe("hydrate", () => {
+  it("fails rather than inventing content — this adapter caches nothing between page() calls to re-extract from", async () => {
+    const exit = await Effect.runPromiseExit(
+      Effect.provide(
+        SourceAdapter.use((adapter) => adapter.hydrate(PLATFORM, "job-100")),
+        layerOf(clientOf(() => new Response(html, { status: 200 }))),
+      ),
+    );
+    expect(exit._tag).toBe("Failure");
+  });
 });

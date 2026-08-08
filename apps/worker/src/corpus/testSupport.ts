@@ -9,6 +9,7 @@ import {
   INSERT_CANONICAL_JOB,
   INSERT_FRESHNESS,
   INSERT_OCCURRENCE,
+  SELECT_ACTIVE_OCCURRENCE_BY_CANONICAL_JOB,
   SELECT_CANONICAL_JOB_BY_ID,
   SELECT_CANONICAL_JOBS_CHANGED_SINCE,
   SELECT_FRESH_CANONICAL_JOBS,
@@ -109,6 +110,12 @@ export const makeTestDatabase = (): DatabaseShape => {
           return Array.from(occurrences.values()).filter(
             (row) => row.sourceId === bindings[0] && row.active === 1,
           ) as unknown as ReadonlyArray<A>;
+        }
+        case SELECT_ACTIVE_OCCURRENCE_BY_CANONICAL_JOB: {
+          const matches = Array.from(occurrences.values())
+            .filter((row) => row.canonicalJobId === bindings[0] && row.active === 1)
+            .toSorted((a, b) => a.firstSeenAt.localeCompare(b.firstSeenAt));
+          return (matches.length === 0 ? [] : [matches[0]]) as unknown as ReadonlyArray<A>;
         }
         case COUNT_ACTIVE_OCCURRENCES: {
           const activeCount = Array.from(occurrences.values()).filter(

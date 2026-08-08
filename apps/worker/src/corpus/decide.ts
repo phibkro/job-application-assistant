@@ -1,4 +1,10 @@
-import type { CanonicalJob, NormalizedListing, ObservationOutcome } from "@job-index/domain/Job";
+import type {
+  CanonicalJob,
+  CanonicalJobHydration,
+  NormalizedListing,
+  ObservationOutcome,
+  RawListing,
+} from "@job-index/domain/Job";
 import type { SourceId, Sequence } from "@job-index/domain/Ids";
 import type { OccurrenceRecord } from "./rows.ts";
 
@@ -46,6 +52,7 @@ const occurrenceRecordFor = (
   id: listing.occurrenceId,
   canonicalJobId: listing.canonicalJobId,
   sourceId: listing.listing.sourceId,
+  platformId: listing.listing.platformId,
   externalId: listing.listing.externalId,
   contentFingerprint: listing.contentFingerprint,
   // Every call to `observe` is a positive sighting, so an occurrence seen
@@ -55,6 +62,25 @@ const occurrenceRecordFor = (
   firstSeenAt: existingOccurrence?.firstSeenAt ?? now,
   lastSeenAt: now,
 });
+
+/**
+ * The hydration a canonical row should carry after folding in one
+ * observation.
+ *
+ * `raw.hydrated` is the only thing that can ever *add* real detail —
+ * summary-only re-observations (every NAV page, forever) must never
+ * overwrite a previously hydrated description with a placeholder, so the
+ * existing state wins whenever this observation is not itself hydrated. A
+ * fresh vacancy with no `existing` yet starts `Unhydrated` unless this very
+ * observation already carries detail (a scripted adapter's one-shot scrape).
+ */
+const hydrationFor = (
+  raw: RawListing,
+  existing: CanonicalJobHydration | undefined,
+): CanonicalJobHydration =>
+  raw.hydrated
+    ? { _tag: "Hydrated", description: raw.description, deadline: raw.deadline }
+    : (existing ?? { _tag: "Unhydrated" });
 
 export const decideObservation = (
   listing: NormalizedListing,
@@ -74,14 +100,13 @@ export const decideObservation = (
       title: raw.title,
       employerName: raw.employerName,
       location: raw.location,
-      description: raw.description,
       applicationUrl: raw.applicationUrl,
       publishedAt: raw.publishedAt,
-      deadline: raw.deadline,
       status: { _tag: "Active" },
       sequence: nextSequence as Sequence,
       changedAt: now,
       sources: [raw.sourceId],
+      hydration: hydrationFor(raw, undefined),
     };
     return {
       outcome: { _tag: "CreatedCanonical", id: canonical.id },
@@ -109,14 +134,13 @@ export const decideObservation = (
       title: raw.title,
       employerName: raw.employerName,
       location: raw.location,
-      description: raw.description,
       applicationUrl: raw.applicationUrl,
       publishedAt: raw.publishedAt,
-      deadline: raw.deadline,
       status: { _tag: "Active" },
       sequence: nextSequence as Sequence,
       changedAt: now,
       sources,
+      hydration: hydrationFor(raw, existingCanonical.hydration),
     };
     return {
       outcome: { _tag: "ReopenedCanonical", id: canonical.id },
@@ -153,12 +177,11 @@ export const decideObservation = (
       title: raw.title,
       employerName: raw.employerName,
       location: raw.location,
-      description: raw.description,
       applicationUrl: raw.applicationUrl,
       publishedAt: raw.publishedAt,
-      deadline: raw.deadline,
       sequence: nextSequence as Sequence,
       changedAt: now,
+      hydration: hydrationFor(raw, existingCanonical.hydration),
     };
     return {
       outcome: { _tag: "UpdatedCanonical", id: canonical.id },

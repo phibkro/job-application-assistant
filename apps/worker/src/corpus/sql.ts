@@ -90,6 +90,21 @@ export const SELECT_ACTIVE_OCCURRENCES_BY_SOURCE = selectFrom(
 export const DEACTIVATE_OCCURRENCE = `UPDATE occurrences SET active = 0 WHERE id = ?`;
 
 /**
+ * Which occurrence `Hydration.hydrate` should fetch detail through, for a
+ * canonical job that has more than one active source.
+ *
+ * `firstSeenAt ASC` picks the source that told us about this vacancy first
+ * — an arbitrary but *stable* tiebreak (the same occurrence every time, so a
+ * retried hydration always targets the same adapter rather than a different
+ * one each attempt) rather than one this slot invents fresh per query.
+ */
+export const SELECT_ACTIVE_OCCURRENCE_BY_CANONICAL_JOB = selectFrom(
+  "occurrences",
+  OCCURRENCE_FIELDS,
+  "WHERE canonicalJobId = ? AND active = 1 ORDER BY firstSeenAt ASC LIMIT 1",
+);
+
+/**
  * Whether any source still advertises this vacancy. A canonical job closes
  * only when the count reaches zero: one platform dropping an advert that
  * another still carries is not a closure.

@@ -20,11 +20,12 @@ import { layer as savedJobsLayer } from "./savedJobsService.ts";
  * `saved_jobs` would be one too many.
  *
  * Still required from outside: `Database`, `Profiles`, `Drafting` — every
- * one of them a different slot's own layer. `Corpus` is no longer among
- * them: both `prepare` and `draft` (see `handlers/applications.ts`) now work
- * from a `SavedJob`'s own frozen `jobSnapshot` rather than reading the
- * corpus a second time; only the `save` handler still needs `Corpus`
- * directly, to confirm the vacancy exists before bookmarking it.
+ * one of them a different slot's own layer. `Corpus` is not among them:
+ * `prepare` and `draft` (see `handlers/applications.ts`) work from a
+ * `SavedJob`'s own frozen `jobSnapshot` rather than reading the corpus a
+ * second time, and `save` now goes through `Hydration` (which composes
+ * `Corpus` itself) rather than reading `Corpus` directly, so it can ensure
+ * the vacancy is hydrated before bookmarking it.
  */
 export const layer = applicationsLayer.pipe(
   Layer.provideMerge(Layer.mergeAll(entitlementsLayer, policyLayer, savedJobsLayer)),

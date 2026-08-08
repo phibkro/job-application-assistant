@@ -3,7 +3,7 @@ import type { AcquisitionTier } from "@job-index/domain/Source";
 import type { PlatformId } from "@job-index/domain/Ids";
 import { AdapterUnavailable } from "@job-index/domain/Failure";
 import type { DecodeFailed, SourceUnavailable } from "@job-index/domain/Failure";
-import type { AcquiredPage, SourceAdapter } from "./SourceAdapter.ts";
+import type { AcquiredPage, HydrateOutcome, SourceAdapter } from "./SourceAdapter.ts";
 
 /**
  * One adapter, registered against the tier it reads.
@@ -47,6 +47,23 @@ export const resolve = (
       if (registration.tier !== tier) continue;
       if (yield* registration.adapter.supports(platform)) {
         return yield* registration.adapter.page(platform, cursor);
+      }
+    }
+    return yield* Effect.fail(new AdapterUnavailable({ platform, tier }));
+  });
+
+/** `resolve`'s counterpart for a targeted detail fetch — same dispatch, same "no match is a first-class outcome" contract. */
+export const resolveHydrate = (
+  registrations: ReadonlyArray<Registration>,
+  tier: AcquisitionTier["_tag"],
+  platform: PlatformId,
+  externalId: string,
+): Effect.Effect<HydrateOutcome, AdapterUnavailable | DecodeFailed | SourceUnavailable> =>
+  Effect.gen(function* () {
+    for (const registration of registrations) {
+      if (registration.tier !== tier) continue;
+      if (yield* registration.adapter.supports(platform)) {
+        return yield* registration.adapter.hydrate(platform, externalId);
       }
     }
     return yield* Effect.fail(new AdapterUnavailable({ platform, tier }));

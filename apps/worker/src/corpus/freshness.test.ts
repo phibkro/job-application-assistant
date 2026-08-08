@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
 import type { CanonicalJob, RawListing } from "@job-index/domain/Job";
-import type { CanonicalJobId, ProfileId, Sequence, SourceId } from "@job-index/domain/Ids";
+import type {
+  CanonicalJobId,
+  PlatformId,
+  ProfileId,
+  Sequence,
+  SourceId,
+} from "@job-index/domain/Ids";
 import { normalize } from "./identity.ts";
 import { makeObserve } from "./observe.ts";
 import { makeFresh, makeMarkOffered } from "./freshness.ts";
@@ -12,6 +18,7 @@ import { makeTestDatabase } from "./testSupport.ts";
 const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: "nav" as SourceId,
   sourceName: "NAV",
+  platformId: "arbeidsplassen-nav" as PlatformId,
   externalId: "1",
   title: "Baker",
   employerName: "Bakery AS",
@@ -19,6 +26,7 @@ const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   description: "Bakes bread.",
   applicationUrl: "https://example.com/job/1",
   publishedAt: "2026-01-01T00:00:00Z",
+  hydrated: true,
   ...overrides,
 });
 
@@ -97,13 +105,13 @@ describe("fresh / markOffered", () => {
       title: "Seasonal Picker",
       employerName: "Orchard AS",
       location: "Hardanger",
-      description: "Picks apples.",
       applicationUrl: "https://example.com/job/closed",
       publishedAt: "2026-01-01T00:00:00Z",
       status: { _tag: "Closed", closedAt: "2026-01-05T00:00:00Z" },
       sequence: 1 as Sequence,
       changedAt: "2026-01-05T00:00:00Z",
       sources: ["nav" as SourceId],
+      hydration: { _tag: "Hydrated", description: "Picks apples." },
     };
     await Effect.runPromise(
       database.run(

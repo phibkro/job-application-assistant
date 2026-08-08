@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import * as Effect from "effect/Effect";
-import type { SourceId } from "../../../domain/src/Ids.ts";
+import type { PlatformId, SourceId } from "../../../domain/src/Ids.ts";
 import {
   hasJobPostingType,
   identifierFromValue,
@@ -13,6 +13,7 @@ import {
 const context: JobPostingContext = {
   sourceId: "career-site" as SourceId,
   sourceName: "Career Site",
+  platformId: "career-site" as PlatformId,
   pageUrl: "https://careers.example/openings/backend-engineer",
 };
 
@@ -95,6 +96,10 @@ describe("toRawListing", () => {
     expect(listing.location).toBe("Oslo, NO");
     expect(listing.deadline).toBe("2026-09-01");
     expect(listing.applicationUrl).toBe("https://careers.example/openings/backend-engineer");
+    // A JSON-LD scrape is a one-shot read of the whole advert — there is no
+    // cheaper summary tier underneath it, so it is hydrated at observe time.
+    expect(listing.hydrated).toBe(true);
+    expect(listing.platformId).toBe(context.platformId);
   });
 
   it("refuses a posting with neither title nor name", async () => {

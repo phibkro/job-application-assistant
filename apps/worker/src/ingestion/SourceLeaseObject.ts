@@ -1,7 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import type { PlatformId } from "@job-index/domain/Ids";
+import type { CanonicalJobId, PlatformId } from "@job-index/domain/Ids";
+import { HydrationLease } from "../services/HydrationLease.ts";
 import { SourceLease } from "../services/SourceLease.ts";
 import type { LeaseOutcome } from "../services/SourceLease.ts";
 
@@ -126,4 +127,24 @@ export const layer = (namespace: SourceLeaseNamespace): Layer.Layer<SourceLease>
         Effect.asVoid,
         Effect.orDie,
       ),
+  });
+
+/**
+ * `HydrationLease`, wired to the SAME namespace binding `layer` above uses
+ * for `SourceLease` — see `HydrationLease`'s own doc comment for why this is
+ * the chosen mechanism (and what was rejected instead). The `hydrate:`
+ * prefix is what keeps a canonical job id and a platform id from ever
+ * naming the same Durable Object instance; nothing else about this object
+ * needs to know which keyspace a given lock came from.
+ */
+export const hydrationLeaseLayer = (namespace: SourceLeaseNamespace): Layer.Layer<HydrationLease> =>
+  Layer.succeed(HydrationLease, {
+    acquire: (job: CanonicalJobId, owner, recoverAfterMs) =>
+      Effect.tryPromise(() =>
+        namespace.get(namespace.idFromName(`hydrate:${job}`)).acquire(owner, recoverAfterMs),
+      ).pipe(Effect.orDie),
+    release: (job: CanonicalJobId, owner) =>
+      Effect.tryPromise(() =>
+        namespace.get(namespace.idFromName(`hydrate:${job}`)).release(owner),
+      ).pipe(Effect.asVoid, Effect.orDie),
   });

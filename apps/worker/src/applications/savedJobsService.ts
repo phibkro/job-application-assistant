@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { SavedJob } from "@job-index/domain/Applications";
 import { snapshotOf } from "@job-index/domain/Job";
-import type { CanonicalJob } from "@job-index/domain/Job";
+import type { HydratedCanonicalJob } from "@job-index/domain/Job";
 import type { ProfileId, SavedJobId } from "@job-index/domain/Ids";
 import { Database } from "../services/Database.ts";
 import { Ids } from "../services/Ids.ts";
@@ -31,7 +31,11 @@ export const layer = Layer.effect(
     const withDatabase = <A>(effect: Effect.Effect<A, never, Database>): Effect.Effect<A> =>
       Effect.provideService(effect, Database, database);
 
-    const save = (profile: ProfileId, job: CanonicalJob, note: string): Effect.Effect<SavedJobId> =>
+    const save = (
+      profile: ProfileId,
+      job: HydratedCanonicalJob,
+      note: string,
+    ): Effect.Effect<SavedJobId> =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;
         const id = (yield* ids.next) as SavedJobId;

@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { RawListing } from "../../../domain/src/Job.ts";
 import { DecodeFailed } from "../../../domain/src/Failure.ts";
-import type { SourceId } from "../../../domain/src/Ids.ts";
+import type { PlatformId, SourceId } from "../../../domain/src/Ids.ts";
 import { findLdJsonBlocks } from "./ScriptBlocks.ts";
 import { hasJobPostingType, isRecord, JobPosting, toRawListing } from "./JobPosting.ts";
 
@@ -51,7 +51,12 @@ const jobPostingNodes = (html: string): ReadonlyArray<unknown> =>
  */
 export const extractJobPostings = (
   html: string,
-  context: { readonly sourceId: SourceId; readonly sourceName: string; readonly pageUrl: string },
+  context: {
+    readonly sourceId: SourceId;
+    readonly sourceName: string;
+    readonly platformId: PlatformId;
+    readonly pageUrl: string;
+  },
 ): Effect.Effect<ReadonlyArray<RawListing>, DecodeFailed> =>
   Effect.gen(function* () {
     const nodes = jobPostingNodes(html);

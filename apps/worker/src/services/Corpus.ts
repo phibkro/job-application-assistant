@@ -2,11 +2,24 @@ import type * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
 import type {
   CanonicalJob,
+  DetailFields,
   JobStatus,
   NormalizedListing,
   ObservationOutcome,
 } from "@job-index/domain/Job";
-import type { CanonicalJobId, ProfileId, Sequence, SourceId } from "@job-index/domain/Ids";
+import type {
+  CanonicalJobId,
+  PlatformId,
+  ProfileId,
+  Sequence,
+  SourceId,
+} from "@job-index/domain/Ids";
+
+/** What `Hydration` needs to route a detail fetch back to the adapter that produced this vacancy. */
+export interface HydrationTarget {
+  readonly platformId: PlatformId;
+  readonly externalId: string;
+}
 
 /**
  * `listJobs`'s filter: `term` against title/employer, `location` against
@@ -78,5 +91,40 @@ export class Corpus extends Context.Service<
       source: SourceId,
       seenExternalIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<ObservationOutcome>>;
+
+    /**
+     * One active occurrence to hydrate this canonical job through, or
+     * `undefined` if none is active (every source dropped it, but the
+     * closure sweep has not yet run — nothing left to fetch from). Owned by
+     * `Corpus`, not `Hydration`, because occurrence SQL already lives here
+     * (`Database`'s own contract: "the only module that knows SQL" is
+     * satisfied by keeping it in the one slot, not spreading it to a second
+     * one that also wants it).
+     */
+    readonly occurrenceFor: (id: CanonicalJobId) => Effect.Effect<HydrationTarget | undefined>;
+
+    /**
+     * Writes a completed detail fetch onto the canonical row, idempotently:
+     * the same `detail` in always produces the same row out, so a retry
+     * after a crash between write and lease-release is harmless rather than
+     * something a caller must guard against. A no-op (returns the row
+     * unchanged) if the row is missing or already `Hydrated` — hydration
+     * only ever moves forward.
+     */
+    readonly hydrateDetail: (
+      id: CanonicalJobId,
+      detail: DetailFields,
+    ) => Effect.Effect<CanonicalJob | undefined>;
+
+    /**
+     * Closes a vacancy discovered gone *during* hydration — the advert
+     * closed in the window between the feed page being written and the
+     * detail fetch reaching it (falsifier 7). Distinct from `closeAbsent`:
+     * that sweep closes what an ingestion run finished enumerating and did
+     * not see again; this closes a single vacancy a hydration attempt
+     * learned is gone, with no re-enumeration involved. A no-op if the row
+     * is missing or already `Closed`.
+     */
+    readonly closeEarly: (id: CanonicalJobId) => Effect.Effect<CanonicalJob | undefined>;
   }
 >()("@job-index/Corpus") {}

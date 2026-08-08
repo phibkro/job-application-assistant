@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import type { RawListing } from "@job-index/domain/Job";
-import type { SourceId } from "@job-index/domain/Ids";
+import type { PlatformId, SourceId } from "@job-index/domain/Ids";
 import { canonicalizeUrl, deriveCanonicalKey, normalize } from "./identity.ts";
 
 /** A `RawListing` field arbitrary that avoids the empty string, so title/employer/location dedup keys stay meaningfully distinguishable. */
@@ -10,6 +10,9 @@ const nonEmptyText = fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s.
 const rawListingArb: fc.Arbitrary<RawListing> = fc.record({
   sourceId: fc.constantFrom("nav", "webcruiter", "finn").map((s) => s as SourceId),
   sourceName: nonEmptyText,
+  platformId: fc
+    .constantFrom("arbeidsplassen-nav", "webcruiter", "finn")
+    .map((s) => s as PlatformId),
   externalId: nonEmptyText,
   title: nonEmptyText,
   employerName: nonEmptyText,
@@ -18,6 +21,7 @@ const rawListingArb: fc.Arbitrary<RawListing> = fc.record({
   applicationUrl: fc.webUrl(),
   publishedAt: fc.constant("2026-01-01T00:00:00Z"),
   deadline: fc.option(fc.string(), { nil: undefined }),
+  hydrated: fc.boolean(),
 });
 
 const TRACKING_PARAMS = [

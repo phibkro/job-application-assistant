@@ -3,6 +3,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import type { AcquisitionTier } from "@job-index/domain/Source";
 import { api, NotFound } from "../Api.ts";
 import { Corpus, type JobFilter } from "../services/Corpus.ts";
+import { Hydration } from "../services/Hydration.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
 import {
   decodeCanonicalJobId,
@@ -35,10 +36,18 @@ export const layer = HttpApiBuilder.group(api, "corpus", (handlers) =>
         return { data, meta: { limit, nextCursor: nextCursorOf(data, limit) } };
       }),
     )
+    // Opening a vacancy is the "someone hovered, or clicked" moment the
+    // design spec's user journey describes: `hydrate` fetches its detail if
+    // nothing has yet, and is a no-op (a plain `Corpus.get`, in effect) for
+    // one that already has it. A failed fetch is not surfaced as a wire
+    // error — `getJob` still returns whatever the corpus has, unhydrated —
+    // because "opening" must stay resilient to one flaky detail fetch; see
+    // `Hydration`'s own doc comment for why `save` (the loud-failure path,
+    // falsifier 6) is different.
     .handle("getJob", ({ params }) =>
       Effect.gen(function* () {
-        const corpus = yield* Corpus;
-        const job = yield* corpus.get(decodeCanonicalJobId(params.id));
+        const hydration = yield* Hydration;
+        const job = yield* hydration.hydrate(decodeCanonicalJobId(params.id));
         if (job === undefined) {
           return yield* Effect.fail(new NotFound({ message: `no job with id ${params.id}` }));
         }

@@ -13,6 +13,7 @@ import { Accounts, Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
 import { Applications } from "../services/Applications.ts";
+import { Hydration } from "../services/Hydration.ts";
 import { Judgements } from "../services/Judgements.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
@@ -39,6 +40,13 @@ const defaultCorpus = Layer.succeed(Corpus, {
   fresh: unstubbed("Corpus", "fresh"),
   markOffered: unstubbed("Corpus", "markOffered"),
   closeAbsent: unstubbed("Corpus", "closeAbsent"),
+  occurrenceFor: unstubbed("Corpus", "occurrenceFor"),
+  hydrateDetail: unstubbed("Corpus", "hydrateDetail"),
+  closeEarly: unstubbed("Corpus", "closeEarly"),
+});
+
+const defaultHydration = Layer.succeed(Hydration, {
+  hydrate: unstubbed("Hydration", "hydrate"),
 });
 
 const defaultAccounts = Layer.succeed(Accounts, {
@@ -93,6 +101,7 @@ export interface Fakes {
   readonly drafting?: Layer.Layer<Drafting>;
   readonly applications?: Layer.Layer<Applications>;
   readonly entitlements?: Layer.Layer<Entitlements>;
+  readonly hydration?: Layer.Layer<Hydration>;
   readonly savedJobs?: Layer.Layer<SavedJobs>;
   readonly judgements?: Layer.Layer<Judgements>;
   readonly sourceCatalog?: Layer.Layer<SourceCatalog>;
@@ -117,6 +126,7 @@ export const buildHandler = (fakes: Fakes = {}) => {
     Layer.provide(fakes.drafting ?? defaultDrafting),
     Layer.provide(fakes.applications ?? defaultApplications),
     Layer.provide(fakes.entitlements ?? defaultEntitlements),
+    Layer.provide(fakes.hydration ?? defaultHydration),
     Layer.provide(fakes.savedJobs ?? defaultSavedJobs),
     Layer.provide(fakes.judgements ?? defaultJudgements),
     Layer.provide(fakes.sourceCatalog ?? defaultSourceCatalog),

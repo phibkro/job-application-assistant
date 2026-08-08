@@ -1,7 +1,8 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import type { PlatformId } from "@job-index/domain/Ids";
 import { AdapterUnavailable } from "@job-index/domain/Failure";
-import { resolve } from "@job-index/adapters/Registry";
+import { resolve, resolveHydrate } from "@job-index/adapters/Registry";
 import type { Registration } from "@job-index/adapters/Registry";
 import { Acquisition } from "../services/Acquisition.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
@@ -30,16 +31,27 @@ export const layer = (
     Acquisition,
     Effect.gen(function* () {
       const catalog = yield* SourceCatalog;
+      const tierFor = (platform: PlatformId) =>
+        Effect.map(catalog.list(), (entries) => {
+          const entry = entries.find((candidate) => candidate.id === platform);
+          return entry?.tier._tag ?? "Unknown";
+        });
       return Acquisition.of({
         page: (platform, cursor) =>
           Effect.gen(function* () {
-            const entries = yield* catalog.list();
-            const entry = entries.find((candidate) => candidate.id === platform);
-            const tier = entry?.tier._tag ?? "Unknown";
+            const tier = yield* tierFor(platform);
             if (tier === "Unknown") {
               return yield* Effect.fail(new AdapterUnavailable({ platform, tier }));
             }
             return yield* resolve(registrations, tier, platform, cursor);
+          }),
+        hydrate: (platform, externalId) =>
+          Effect.gen(function* () {
+            const tier = yield* tierFor(platform);
+            if (tier === "Unknown") {
+              return yield* Effect.fail(new AdapterUnavailable({ platform, tier }));
+            }
+            return yield* resolveHydrate(registrations, tier, platform, externalId);
           }),
       });
     }),

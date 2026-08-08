@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import type { SourceId } from "@job-index/domain/Ids";
+import type { PlatformId, SourceId } from "@job-index/domain/Ids";
 import type { RawListing } from "@job-index/domain/Job";
 import { makeFakeD1 } from "../db/FakeD1.ts";
 import { normalize } from "../corpus/index.ts";
@@ -47,6 +47,7 @@ const withEnv = <A>(effect: Effect.Effect<A, never, Corpus | Profiles>): Promise
 const raw: RawListing = {
   sourceId: "nav" as SourceId,
   sourceName: "NAV",
+  platformId: "arbeidsplassen-nav" as PlatformId,
   externalId: "1",
   title: "Baker",
   employerName: "Bakery AS",
@@ -54,6 +55,7 @@ const raw: RawListing = {
   description: "Bakes bread.",
   applicationUrl: "https://example.com/job/1",
   publishedAt: "2026-01-01T00:00:00Z",
+  hydrated: true,
 };
 
 describe("the service graph, over a D1 binding", () => {

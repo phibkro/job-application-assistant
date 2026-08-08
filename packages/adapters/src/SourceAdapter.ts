@@ -1,6 +1,6 @@
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
-import type { RawListing } from "@job-index/domain/Job";
+import type { DetailFields, RawListing } from "@job-index/domain/Job";
 import type { PlatformId } from "@job-index/domain/Ids";
 import type { DecodeFailed, SourceUnavailable } from "@job-index/domain/Failure";
 
@@ -30,6 +30,20 @@ export interface AcquiredPage {
 }
 
 /**
+ * What one targeted detail fetch found.
+ *
+ * `ClosedSince` is not a failure: NAV answering "this advert is gone" for an
+ * entry its own feed still called active a moment ago is the lifecycle
+ * working, exactly as `nav/decode.ts`'s `isClosedSince` already documents
+ * for the page-time case. `Hydration` (the worker service that calls this)
+ * closes the vacancy rather than writing an empty `Hydrated` value — see
+ * `design-specs/deferred-hydration.md`'s falsifier 7.
+ */
+export type HydrateOutcome =
+  | { readonly _tag: "Hydrated"; readonly detail: DetailFields }
+  | { readonly _tag: "ClosedSince" };
+
+/**
  * A single acquisition mechanism. Registered per tier; never chosen by itself.
  *
  * Kept separate from `Acquisition` (`apps/worker/src/services/Acquisition.ts`)
@@ -50,5 +64,20 @@ export class SourceAdapter extends Context.Service<
       platform: PlatformId,
       cursor: string,
     ) => Effect.Effect<AcquiredPage, DecodeFailed | SourceUnavailable>;
+    /**
+     * One vacancy's detail, fetched on demand rather than as part of a page
+     * — see `design-specs/deferred-hydration.md`. An adapter whose `page`
+     * already returns everything a detail fetch could (JSON-LD: one scrape
+     * per vacancy, no cheaper summary tier underneath it) implements this
+     * defensively rather than as a genuine no-op: it has nothing cached to
+     * hand back for an arbitrary `externalId`, and in practice a vacancy
+     * that adapter produced is never `Unhydrated` in the first place (its
+     * `RawListing.hydrated` is always `true`), so this path is not expected
+     * to be reached. See that adapter's own `hydrate` for the reasoning.
+     */
+    readonly hydrate: (
+      platform: PlatformId,
+      externalId: string,
+    ) => Effect.Effect<HydrateOutcome, DecodeFailed | SourceUnavailable>;
   }
 >()("@job-index/SourceAdapter") {}

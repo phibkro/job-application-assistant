@@ -2,6 +2,7 @@ import { AsyncData } from "foldkit";
 import type { HtmlBuilder, Html } from "foldkit/html";
 import type { CanonicalJob } from "@job-index/domain/Job";
 import {
+  BrowseJobHovered,
   BrowseLocationChanged,
   BrowseNextPageRequested,
   BrowseSearchSubmitted,
@@ -29,7 +30,12 @@ const statusLabel = (job: CanonicalJob): string =>
 const jobListItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
   h.keyed("li")(
     job.id,
-    [h.Class("flex items-center justify-between gap-4 py-3")],
+    [
+      h.Class("flex items-center justify-between gap-4 py-3"),
+      // The cheapest intent signal: a hover asks the worker to hydrate this
+      // vacancy before anyone clicks. See `Message.ts`'s `BrowseJobHovered`.
+      h.OnMouseEnter(BrowseJobHovered({ jobId: job.id })),
+    ],
     [
       h.div(
         [h.Class("min-w-0")],

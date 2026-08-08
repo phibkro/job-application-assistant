@@ -30,6 +30,11 @@ const catalogOf = (entries: ReadonlyArray<CatalogEntry>) =>
 const feedAdapter: SourceAdapter["Service"] = {
   supports: (platform) => Effect.succeed(platform === "arbeidsplassen-nav"),
   page: () => Effect.succeed({ listings: [], cursor: "next", more: false, via: "feed" as const }),
+  hydrate: () =>
+    Effect.succeed({
+      _tag: "Hydrated" as const,
+      detail: { description: "Full advert.", applicationUrl: "https://example.com/apply" },
+    }),
 };
 
 describe("Acquisition Live layer", () => {
@@ -46,6 +51,24 @@ describe("Acquisition Live layer", () => {
     );
 
     expect(page.cursor).toBe("next");
+  });
+
+  it("hydrate resolves the tier from the catalogue exactly like page does", async () => {
+    const registrations: ReadonlyArray<Registration> = [{ tier: "Feed", adapter: feedAdapter }];
+
+    const outcome = await Effect.runPromise(
+      Effect.provide(
+        Acquisition.use((acquisition) =>
+          acquisition.hydrate("arbeidsplassen-nav" as PlatformId, "ext-1"),
+        ),
+        Layer.provideMerge(layer(registrations), catalogOf([entry()])),
+      ),
+    );
+
+    expect(outcome).toEqual({
+      _tag: "Hydrated",
+      detail: { description: "Full advert.", applicationUrl: "https://example.com/apply" },
+    });
   });
 
   it("fails with AdapterUnavailable for a platform the catalogue has no entry for", async () => {

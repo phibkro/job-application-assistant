@@ -1,22 +1,16 @@
 import * as Effect from "effect/Effect";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
-import type { PlatformId } from "../../../domain/src/Ids.ts";
 import { SourceUnavailable } from "../../../domain/src/Failure.ts";
-import type { AcquiredPage, SourceAdapter } from "../../src/SourceAdapter.ts";
+import type { AcquiredPage, HydrateOutcome, SourceAdapter } from "../../src/SourceAdapter.ts";
 import {
   decodeDetail,
   decodeFeedPage,
   isClosedSince,
+  NAV_PLATFORM_ID,
   NAV_SOURCE_ID,
   summaryListing,
 } from "./decode.ts";
-
-// The catalogue seed (migrations/0007_source_catalog_seed.sql) names this
-// platform `arbeidsplassen-nav` — distinct from the `nav` RawListing.sourceId
-// the Rust implementation already committed to, per `Ids.ts`'s note that
-// `PlatformId` and `SourceId` are different identifiers.
-const NAV_PLATFORM_ID = "arbeidsplassen-nav" as PlatformId;
 
 const NAV_BASE_URL = "https://pam-stilling-feed.nav.no";
 
@@ -79,18 +73,22 @@ const fetchJson = (
  * might guess at is accepted and silently ignored. Sent only on a fresh
  * sweep; once the cursor names a page, the cursor is the position.
  */
+/** NAV's own detail endpoint for one feed entry, by the same uuid the feed itself calls `externalId`. */
+const detailUrl = (externalId: string): string => resolveUrl(`/api/v1/feedentry/${externalId}`);
+
 export const make = (
   client: HttpClient.HttpClient,
   token: string | undefined,
   since?: Date,
 ): SourceAdapter["Service"] => ({
   supports: (platform) => Effect.succeed(platform === NAV_PLATFORM_ID),
-  // Fetches one feed page and, for every active entry, its detail — the
-  // feed alone carries no real description or application URL. A detail
-  // that fails to decode fails the whole page rather than silently
-  // substituting the feed summary: that silent substitution is the exact
-  // defect `DecodeFailed`'s doc comment describes, and the reason it now
-  // fails loudly instead.
+  // One request: the feed page itself. Every active entry becomes a summary
+  // listing built entirely from feed data — no per-entry detail fetch. That
+  // used to happen here and is why one page cost 883 requests against
+  // Cloudflare's 50-per-invocation limit; see
+  // `design-specs/deferred-hydration.md`. The description/deadline/better
+  // applicationUrl a detail fetch would add now arrive on demand, through
+  // `hydrate` below, only for a vacancy someone actually opens.
   page: (_platform, cursor) =>
     Effect.gen(function* () {
       // A cursor naming a page is a position already reached; only the feed
@@ -104,23 +102,7 @@ export const make = (
       );
       const page = yield* decodeFeedPage(feedJson);
       const activeItems = page.items.filter((item) => item.active);
-
-      const decoded = yield* Effect.forEach(activeItems, (item) =>
-        item.detailUrl === undefined
-          ? summaryListing(item)
-          : Effect.flatMap(fetchJson(client, resolveUrl(item.detailUrl), token), (detailJson) =>
-              // Closed between the feed page being written and this sweep
-              // reaching it: NAV answers with a status and no content. Not a
-              // listing any more, and not a decode failure either — the
-              // sweep's own absence detection closes what it stops seeing.
-              isClosedSince(detailJson)
-                ? Effect.succeed(undefined)
-                : decodeDetail(detailJson, item),
-            ),
-      );
-      // Entries that closed since the page was written drop out here rather
-      // than being reported as listings nobody can apply to.
-      const listings = decoded.filter((listing) => listing !== undefined);
+      const listings = yield* Effect.forEach(activeItems, summaryListing);
 
       return {
         listings,
@@ -128,5 +110,27 @@ export const make = (
         more: page.nextUrl !== undefined,
         via: "feed",
       } satisfies AcquiredPage;
+    }),
+  // The targeted counterpart to the eager fetch `page` no longer performs:
+  // one request, for one vacancy someone actually opened. `isClosedSince`
+  // is the same lifecycle check `page`'s old eager path used to make inline
+  // — an advert that closed between the feed page being written and this
+  // fetch reaching it is not a decode failure, it is `ClosedSince`, and the
+  // caller (`Hydration`) closes the vacancy rather than hydrating it empty.
+  hydrate: (_platform, externalId) =>
+    Effect.gen(function* () {
+      const detailJson = yield* fetchJson(client, detailUrl(externalId), token);
+      if (isClosedSince(detailJson)) {
+        return { _tag: "ClosedSince" } satisfies HydrateOutcome;
+      }
+      const listing = yield* decodeDetail(detailJson);
+      return {
+        _tag: "Hydrated",
+        detail: {
+          description: listing.description,
+          applicationUrl: listing.applicationUrl,
+          deadline: listing.deadline,
+        },
+      } satisfies HydrateOutcome;
     }),
 });

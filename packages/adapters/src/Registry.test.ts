@@ -6,7 +6,7 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import type { PlatformId } from "@job-index/domain/Ids";
 import { make as makeNavAdapter } from "@job-index/adapters/nav";
 import type { SourceAdapter } from "./SourceAdapter.ts";
-import { resolve } from "./Registry.ts";
+import { resolve, resolveHydrate } from "./Registry.ts";
 import type { Registration } from "./Registry.ts";
 
 const NAV_PLATFORM_ID = "arbeidsplassen-nav" as PlatformId;
@@ -53,6 +53,25 @@ describe("resolve", () => {
     expect(page.listings).toHaveLength(1);
   });
 
+  it("dispatches hydrate to the same registration page uses", async () => {
+    const navAdapter = makeNavAdapter(
+      clientOf((url) => {
+        if (url.endsWith("/api/v1/feedentry/active-vacancy-1")) {
+          return new Response(JSON.stringify(fixture("detail-active.json")), { status: 200 });
+        }
+        throw new Error(`unexpected request in test: ${url}`);
+      }),
+      undefined,
+    );
+    const registrations: ReadonlyArray<Registration> = [{ tier: "Feed", adapter: navAdapter }];
+
+    const outcome = await Effect.runPromise(
+      resolveHydrate(registrations, "Feed", NAV_PLATFORM_ID, "active-vacancy-1"),
+    );
+
+    expect(outcome._tag).toBe("Hydrated");
+  });
+
   it("fails with AdapterUnavailable when no registration matches the tier", async () => {
     const registrations: ReadonlyArray<Registration> = [{ tier: "Feed", adapter: inertNavAdapter }];
 
@@ -76,6 +95,7 @@ describe("resolve", () => {
       supports: () => Effect.succeed(true),
       page: () =>
         Effect.succeed({ listings: [], cursor: "done", more: false, via: "feed" as const }),
+      hydrate: () => Effect.die("unused"),
     };
     const registrations: ReadonlyArray<Registration> = [
       { tier: "Feed", adapter: inertNavAdapter },

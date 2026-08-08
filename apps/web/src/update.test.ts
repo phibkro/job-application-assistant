@@ -45,13 +45,13 @@ const job = S.decodeUnknownSync(CanonicalJob)({
   title: "Software Engineer",
   employerName: "Acme",
   location: "Oslo",
-  description: "Build things.",
   applicationUrl: "https://example.com/jobs/1",
   publishedAt: "2026-01-01T00:00:00Z",
   status: { _tag: "Active" as const },
   sequence: 1,
   changedAt: "2026-01-01T00:00:00Z",
   sources: [],
+  hydration: { _tag: "Hydrated" as const, description: "Build things." },
 });
 
 const page = { data: [job], meta: { limit: 20, nextCursor: null as string | null } };

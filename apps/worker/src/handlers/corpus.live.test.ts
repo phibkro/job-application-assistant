@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type { RawListing } from "@job-index/domain/Job";
-import type { SourceId } from "@job-index/domain/Ids";
+import type { PlatformId, SourceId } from "@job-index/domain/Ids";
 import { layer as databaseLayer } from "../db/Live.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { layer as corpusPersistenceLayer, normalize } from "../corpus/index.ts";
@@ -27,6 +27,7 @@ type CorpusShape = Effect.Success<typeof Corpus>;
 const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: "nav" as SourceId,
   sourceName: "NAV",
+  platformId: "arbeidsplassen-nav" as PlatformId,
   externalId: "1",
   title: "Baker",
   employerName: "Bakery AS",
@@ -34,6 +35,7 @@ const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   description: "Bakes bread.",
   applicationUrl: "https://example.com/job/1",
   publishedAt: "2026-01-01T00:00:00Z",
+  hydrated: true,
   ...overrides,
 });
 

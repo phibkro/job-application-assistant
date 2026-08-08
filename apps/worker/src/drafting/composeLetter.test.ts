@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
-import type { CanonicalJob } from "@job-index/domain/Job";
+import type { JobSnapshot } from "@job-index/domain/Job";
 import type { Experience, Profile } from "@job-index/domain/Profile";
 import { composeLetter } from "./composeLetter.ts";
 import { testJob, testProfile } from "./fixtures.ts";
@@ -140,7 +140,7 @@ describe("composeLetter", () => {
 
     fc.assert(
       fc.property(arbScenario, ({ profile, job }) => {
-        const fullJob = testJob(job as Partial<CanonicalJob>);
+        const fullJob = testJob(job as Partial<JobSnapshot>);
         const letter = composeLetter(profile as Profile, fullJob);
         const advert =
           `${fullJob.title} ${fullJob.description} ${fullJob.employerName}`.toLowerCase();

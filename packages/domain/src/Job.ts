@@ -1,11 +1,23 @@
 import * as Schema from "effect/Schema";
 import * as Model from "effect/unstable/schema/Model";
-import { CanonicalJobId, OccurrenceId, Sequence, SourceId } from "./Ids.ts";
+import { CanonicalJobId, OccurrenceId, PlatformId, Sequence, SourceId } from "./Ids.ts";
 
 /** A vacancy as a source published it, before identity is derived. */
 export const RawListing = Schema.Struct({
   sourceId: SourceId,
   sourceName: Schema.String,
+  /**
+   * Which acquisition mechanism produced this sighting — distinct from
+   * `sourceId` for the same reason `identity.ts` already documents (NAV's
+   * feed calls itself `"nav"` while the catalogue calls it
+   * `"arbeidsplassen-nav"`). Recorded per observation, not looked up later,
+   * because there is no reliable `sourceId -> platform` table to look it up
+   * *in* — the adapter that produced this listing already knows which
+   * platform it read, so it is the one place this fact is cheap to carry.
+   * `hydrate` needs it to route a targeted detail fetch back to the same
+   * adapter that produced the summary.
+   */
+  platformId: PlatformId,
   externalId: Schema.String,
   title: Schema.String,
   employerName: Schema.String,
@@ -18,6 +30,15 @@ export const RawListing = Schema.Struct({
    * Free text must not become a date, so it becomes nothing.
    */
   deadline: Schema.optional(Schema.String),
+  /**
+   * Whether `description`/`deadline` are genuine detail content or a
+   * feed-only placeholder. A feed adapter (NAV) sets this `false` on every
+   * page it reads: the whole point of deferred hydration is that a page
+   * fetch never carries real detail. A scripted adapter that scrapes a full
+   * page per vacancy (JSON-LD) sets it `true`, because there is no cheaper
+   * "summary" tier to defer to — see `Job.ts`'s `CanonicalJobHydration`.
+   */
+  hydrated: Schema.Boolean,
 });
 export type RawListing = typeof RawListing.Type;
 
@@ -26,6 +47,47 @@ export const JobStatus = Schema.Union([
   Schema.TaggedStruct("Closed", { closedAt: Schema.String }),
 ]);
 export type JobStatus = typeof JobStatus.Type;
+
+/**
+ * Whether a detail fetch has ever completed for this vacancy.
+ *
+ * A tagged union rather than an optional `description` on `CanonicalJob`
+ * itself: "we have not fetched this yet" and "this advert genuinely has no
+ * description" are different facts, and only one of them is worth retrying.
+ * Collapsing them into an empty string would make the retry decision a
+ * guess; a caller that needs `description`/`deadline` must first prove it
+ * has a `Hydrated` value, which is what makes composing against a blank
+ * advert (see `snapshotOf` below) a type error rather than a bug some review
+ * has to catch.
+ */
+export const CanonicalJobHydration = Schema.Union([
+  Schema.TaggedStruct("Unhydrated", {}),
+  Schema.TaggedStruct("Hydrated", {
+    description: Schema.String,
+    deadline: Schema.optional(Schema.String),
+  }),
+]);
+export type CanonicalJobHydration = typeof CanonicalJobHydration.Type;
+
+/**
+ * The fields only a detail fetch supplies, and nothing else: not `title`,
+ * `employerName`, or `location`, because identity is derived from those (see
+ * `corpus/identity.ts`'s `deriveCanonicalKey`) and a detail fetch must never
+ * be able to retroactively move a vacancy's identity. `applicationUrl` is
+ * included even though a summary already carries one, because a detail
+ * fetch commonly resolves a *better* one (the employer's own application
+ * link, rather than NAV's public advert page) — see
+ * `design-specs/deferred-hydration.md`'s field table.
+ *
+ * Shared between `@job-index/adapters` (what `SourceAdapter.hydrate`
+ * returns) and the worker's `Corpus`/`Hydration` (what gets written back),
+ * so the two sides of that seam cannot drift on what "detail" means.
+ */
+export interface DetailFields {
+  readonly description: string;
+  readonly applicationUrl: string;
+  readonly deadline?: string;
+}
 
 /**
  * A raw listing with identity derived.
@@ -45,22 +107,38 @@ export const NormalizedListing = Schema.Struct({
 });
 export type NormalizedListing = typeof NormalizedListing.Type;
 
-/** One vacancy, however many sources advertised it. */
+/**
+ * One vacancy, however many sources advertised it.
+ *
+ * `applicationUrl` stays required: NAV's public advert URL is derivable from
+ * the entry's own id, so even a job nobody has opened yet carries a real
+ * link a person can follow with no detail fetch — see
+ * `design-specs/deferred-hydration.md`. `description`/`deadline` are the two
+ * fields only a detail fetch supplies, so they live behind `hydration`
+ * rather than beside it.
+ */
 export const CanonicalJob = Schema.Struct({
   id: CanonicalJobId,
   title: Schema.String,
   employerName: Schema.String,
   location: Schema.String,
-  description: Schema.String,
   applicationUrl: Schema.String,
   publishedAt: Schema.String,
-  deadline: Schema.optional(Schema.String),
   status: JobStatus,
   sequence: Sequence,
   changedAt: Schema.String,
   sources: Schema.Array(SourceId),
+  hydration: CanonicalJobHydration,
 });
 export type CanonicalJob = typeof CanonicalJob.Type;
+
+/** `CanonicalJob` narrowed to the branch that actually carries `description`/`deadline`. */
+export type HydratedCanonicalJob = CanonicalJob & {
+  readonly hydration: Extract<CanonicalJobHydration, { readonly _tag: "Hydrated" }>;
+};
+
+export const isHydrated = (job: CanonicalJob): job is HydratedCanonicalJob =>
+  job.hydration._tag === "Hydrated";
 
 /**
  * The vacancy as it stood at the moment a person saved or applied to it —
@@ -107,15 +185,26 @@ export const JobSnapshot = Schema.Struct({
 });
 export type JobSnapshot = typeof JobSnapshot.Type;
 
-/** The frozen slice of a `CanonicalJob` a save or an application takes at the moment it acts. */
-export const snapshotOf = (job: CanonicalJob): JobSnapshot => ({
+/**
+ * The frozen slice of a `CanonicalJob` a save or an application takes at the
+ * moment it acts.
+ *
+ * Takes a `HydratedCanonicalJob`, not a plain `CanonicalJob`: a snapshot
+ * exists so drafting can compose against `description` later with no second
+ * corpus read, so a snapshot of an unhydrated vacancy — a description this
+ * function does not have — is not a value this signature can produce. The
+ * caller (`SavedJobs.save`) is the one place that must first prove the job
+ * it holds is hydrated; see `design-specs/deferred-hydration.md`'s falsifier
+ * 6 ("fails loudly ... rather than composing against an empty description").
+ */
+export const snapshotOf = (job: HydratedCanonicalJob): JobSnapshot => ({
   title: job.title,
   employerName: job.employerName,
   location: job.location,
-  description: job.description,
+  description: job.hydration.description,
   applicationUrl: job.applicationUrl,
   publishedAt: job.publishedAt,
-  deadline: job.deadline,
+  deadline: job.hydration.deadline,
 });
 
 /**
@@ -148,10 +237,21 @@ export class CanonicalJobRecord extends Model.Class<CanonicalJobRecord>("Canonic
   title: Schema.String,
   employerName: Schema.String,
   location: Schema.String,
+  /**
+   * A plain `TEXT NOT NULL` column even for an unhydrated row: it holds `""`
+   * rather than SQL `NULL`, so the storage row needs no nullability change
+   * of its own. `hydrationTag` is the single source of truth for whether
+   * this value means anything; `rows.ts` is the one place that reads it and
+   * decides. Reading `description` here without checking `hydrationTag`
+   * first is the mistake this column's own shape cannot prevent — see
+   * `CanonicalJob`'s `hydration` field for where that check is structural.
+   */
   description: Schema.String,
   applicationUrl: Schema.String,
   publishedAt: Schema.String,
   deadline: Model.FieldOption(Schema.String),
+  /** Flattened from `CanonicalJobHydration`'s tag, the same reason `statusTag` is flattened below. */
+  hydrationTag: Schema.Literals(["Unhydrated", "Hydrated"]),
   statusTag: Schema.Literals(["Active", "Closed"]),
   statusClosedAt: Model.FieldOption(Schema.String),
   /**
@@ -188,6 +288,8 @@ export class OccurrenceRecord extends Model.Class<OccurrenceRecord>("OccurrenceR
   id: OccurrenceId,
   canonicalJobId: CanonicalJobId,
   sourceId: SourceId,
+  /** Which adapter can re-fetch this occurrence's detail — see `RawListing.platformId`. */
+  platformId: PlatformId,
   externalId: Schema.String,
   contentFingerprint: Schema.String,
   /**
