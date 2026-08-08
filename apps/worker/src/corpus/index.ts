@@ -6,6 +6,7 @@ import { makeChangedSince, makeGet } from "./queries.ts";
 import { makeObserve } from "./observe.ts";
 import { makeCloseAbsent } from "./close.ts";
 import { makeFresh, makeMarkOffered } from "./freshness.ts";
+import { makeCloseEarly, makeHydrateDetail, makeOccurrenceFor } from "./hydrate.ts";
 import { layer as judgementsLayer } from "./judgements.ts";
 import { makeSearch } from "./search.ts";
 
@@ -36,6 +37,9 @@ const corpusLayer = Layer.effect(
       fresh: makeFresh(database),
       markOffered: makeMarkOffered(database),
       closeAbsent: makeCloseAbsent(database),
+      occurrenceFor: makeOccurrenceFor(database),
+      hydrateDetail: makeHydrateDetail(database),
+      closeEarly: makeCloseEarly(database),
     });
   }),
 );

@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { RawListing } from "../../../domain/src/Job.ts";
-import type { SourceId } from "../../../domain/src/Ids.ts";
+import type { PlatformId, SourceId } from "../../../domain/src/Ids.ts";
 import { DecodeFailed } from "../../../domain/src/Failure.ts";
 import {
   firstPresent,
@@ -24,6 +24,15 @@ import * as NavSchema from "./schema.ts";
  */
 export const NAV_SOURCE_ID = "nav" as SourceId;
 const NAV_SOURCE_NAME = "Arbeidsplassen (NAV)";
+
+/**
+ * The catalogue seed's id for this platform (migrations/0007_source_catalog_seed.sql)
+ * — distinct from `NAV_SOURCE_ID` per this module's own note above. Declared
+ * here, not in `index.ts`, so `summaryListing`/`decodeDetail` can stamp
+ * `RawListing.platformId` without a caller having to pass in the one value
+ * this whole adapter ever produces.
+ */
+export const NAV_PLATFORM_ID = "arbeidsplassen-nav" as PlatformId;
 
 const navPostingUrl = (uuid: string): string =>
   `https://arbeidsplassen.nav.no/stillinger/stilling/${uuid}`;
@@ -124,6 +133,7 @@ export const summaryListing = (item: FeedItem): Effect.Effect<RawListing, Decode
   return Effect.succeed({
     sourceId: NAV_SOURCE_ID,
     sourceName: NAV_SOURCE_NAME,
+    platformId: NAV_PLATFORM_ID,
     externalId: item.externalId,
     title,
     employerName: item.employerName ?? UNKNOWN_EMPLOYER,
@@ -132,6 +142,10 @@ export const summaryListing = (item: FeedItem): Effect.Effect<RawListing, Decode
     applicationUrl: navPostingUrl(item.externalId),
     publishedAt: modifiedAt,
     deadline: undefined,
+    // A feed page never carries a detail fetch's content — that is the
+    // entire point of deferred hydration — so every summary listing is
+    // unhydrated by construction, not by a caller remembering to say so.
+    hydrated: false,
   });
 };
 
@@ -237,6 +251,7 @@ export const decodeDetail = (
       return Effect.succeed<RawListing>({
         sourceId: NAV_SOURCE_ID,
         sourceName: NAV_SOURCE_NAME,
+        platformId: NAV_PLATFORM_ID,
         externalId: detail.uuid,
         title,
         employerName,
@@ -245,6 +260,10 @@ export const decodeDetail = (
         applicationUrl,
         publishedAt,
         deadline,
+        // A detail payload is exactly the content a detail fetch exists to
+        // supply, whether this call came from a (now-unused) eager page
+        // fetch or from `hydrate` — see `index.ts`.
+        hydrated: true,
       });
     }),
   );

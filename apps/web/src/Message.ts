@@ -53,10 +53,21 @@ export const BrowseSearchSubmitted = m("BrowseSearchSubmitted");
 export const BrowseNextPageRequested = m("BrowseNextPageRequested");
 export const BrowseJobsSucceeded = m("BrowseJobsSucceeded", { page: JobPage });
 export const BrowseJobsFailed = m("BrowseJobsFailed", { problem: Problem });
+/**
+ * The cheapest intent signal a browse list can offer (see
+ * `design-specs/deferred-hydration.md`'s "What is not here yet" — hover is
+ * the one this build commits to). Fires `PrefetchJob`, whose result never
+ * reaches the Model (see `PrefetchSettled`): the point is asking the worker
+ * to hydrate the vacancy server-side before a click, not caching anything
+ * here — `JobDetail`'s own route always re-fetches on open regardless.
+ */
+export const BrowseJobHovered = m("BrowseJobHovered", { jobId: S.String });
 
 // Job detail
 export const JobFetchSucceeded = m("JobFetchSucceeded", { job: CanonicalJob });
 export const JobFetchFailed = m("JobFetchFailed", { problem: Problem });
+/** `PrefetchJob`'s sole completion Message, win or lose — see `BrowseJobHovered`. */
+export const PrefetchSettled = m("PrefetchSettled");
 
 // Feed
 export const FeedRequested = m("FeedRequested");
@@ -134,8 +145,10 @@ export const Message = S.Union([
   BrowseNextPageRequested,
   BrowseJobsSucceeded,
   BrowseJobsFailed,
+  BrowseJobHovered,
   JobFetchSucceeded,
   JobFetchFailed,
+  PrefetchSettled,
   FeedRequested,
   FeedSucceeded,
   FeedFailed,

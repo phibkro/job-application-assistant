@@ -88,6 +88,9 @@ describe("the Authenticated middleware", () => {
         fresh: () => Effect.succeed([]),
         markOffered: () => Effect.die("unused"),
         closeAbsent: () => Effect.die("unused"),
+        occurrenceFor: () => Effect.die("unused"),
+        hydrateDetail: () => Effect.die("unused"),
+        closeEarly: () => Effect.die("unused"),
       }),
     });
     const res = await handler(

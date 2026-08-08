@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { CanonicalJob, NormalizedListing, RawListing } from "@job-index/domain/Job";
-import type { CanonicalJobId, SourceId } from "@job-index/domain/Ids";
+import type { CanonicalJobId, PlatformId, SourceId } from "@job-index/domain/Ids";
 import { normalize } from "./identity.ts";
 import { decideObservation, type ObservationState } from "./decide.ts";
 import type { OccurrenceRecord } from "./rows.ts";
 
+/**
+ * `hydrated: true` by default: most of this file's cases are about identity
+ * and merge mechanics unrelated to deferred hydration, and defaulting to
+ * "already hydrated" (as if a detail fetch already ran) is what keeps every
+ * pre-existing `description` assertion meaningful without threading
+ * hydration state through every case. The hydration-specific cases below
+ * override it explicitly.
+ */
 const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: "nav" as SourceId,
   sourceName: "NAV",
+  platformId: "arbeidsplassen-nav" as PlatformId,
   externalId: "1",
   title: "Baker",
   employerName: "Bakery AS",
@@ -15,8 +24,13 @@ const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   description: "Bakes bread.",
   applicationUrl: "https://example.com/job/1",
   publishedAt: "2026-01-01T00:00:00Z",
+  hydrated: true,
   ...overrides,
 });
+
+/** `CanonicalJob.hydration`'s `description`, or `undefined` if unhydrated — a test-only convenience, not a domain-level shortcut. */
+const descriptionOf = (job: CanonicalJob): string | undefined =>
+  job.hydration._tag === "Hydrated" ? job.hydration.description : undefined;
 
 const emptyState = (nextSequence = 1): ObservationState => ({
   existingCanonical: undefined,
@@ -66,7 +80,7 @@ describe("decideObservation", () => {
     };
     const decision = decideObservation(revised, state);
     expect(decision.outcome).toEqual({ _tag: "UpdatedCanonical", id: listing.canonicalJobId });
-    expect(decision.canonical.description).toBe("Bakes bread and pastries.");
+    expect(descriptionOf(decision.canonical)).toBe("Bakes bread and pastries.");
     expect(decision.canonical.sequence).toBe(8);
     expect(decision.writeOccurrence).toBe("update");
   });
@@ -128,18 +142,19 @@ describe("decideObservation", () => {
       title: "Baker",
       employerName: "Bakery AS",
       location: "Oslo",
-      description: "Bakes bread.",
       applicationUrl: "https://example.com/job/1",
       publishedAt: "2026-01-01T00:00:00Z",
       status: { _tag: "Closed", closedAt: "2026-01-05T00:00:00Z" },
       sequence: 4 as CanonicalJob["sequence"],
       changedAt: "2026-01-05T00:00:00Z",
       sources: ["nav" as SourceId],
+      hydration: { _tag: "Hydrated", description: "Bakes bread." },
     };
     const existingOccurrence: OccurrenceRecord = {
       id: listing.occurrenceId,
       canonicalJobId: listing.canonicalJobId,
       sourceId: "nav" as SourceId,
+      platformId: "arbeidsplassen-nav" as PlatformId,
       externalId: "1",
       contentFingerprint: listing.contentFingerprint,
       active: false,
@@ -227,5 +242,100 @@ describe("decideObservation", () => {
     expect(store.size).toBe(2); // 3 ads, 2 canonical jobs
     expect(occurrences.size).toBe(3); // both source occurrences retained
     expect(store.get(adA.canonicalJobId)?.sources).toEqual(["nav", "webcruiter"]);
+  });
+
+  /**
+   * The property deferred hydration rests on: NAV's feed sweeps a still-open
+   * vacancy every ~15 minutes forever, always with `hydrated: false`. If a
+   * feed-only re-observation ever overwrote a previously hydrated
+   * description, everything `Hydration.hydrate` wrote would be erased by the
+   * very next sweep — see `hydrationFor`'s doc comment in `decide.ts`.
+   */
+  describe("hydration state across re-observation", () => {
+    it("a feed-only observation of a brand-new vacancy starts Unhydrated", () => {
+      const listing = normalize(raw({ hydrated: false }));
+      const decision = decideObservation(listing, emptyState());
+      expect(decision.canonical.hydration).toEqual({ _tag: "Unhydrated" });
+    });
+
+    it("a scripted adapter's one-shot scrape (hydrated: true) starts Hydrated", () => {
+      const listing = normalize(raw({ hydrated: true, description: "Full advert text." }));
+      const decision = decideObservation(listing, emptyState());
+      expect(decision.canonical.hydration).toEqual({
+        _tag: "Hydrated",
+        description: "Full advert text.",
+        deadline: undefined,
+      });
+    });
+
+    it("a feed-only re-observation with changed content does not downgrade an already-hydrated job", () => {
+      const listing = normalize(raw({ hydrated: false }));
+      const created = decideObservation(listing, emptyState());
+      const hydratedCanonical: CanonicalJob = {
+        ...created.canonical,
+        hydration: { _tag: "Hydrated", description: "Fetched via Hydration.hydrate." },
+      };
+
+      // The feed moved the employer name — a genuine content change — but
+      // this observation is still feed-only (`hydrated: false`).
+      const revised = normalize(raw({ hydrated: false, employerName: "Bakery Norge AS" }));
+      const state: ObservationState = {
+        existingCanonical: hydratedCanonical,
+        existingOccurrence: created.occurrence,
+        nextSequence: 9,
+        now: "2026-01-07T00:00:00Z",
+      };
+
+      const decision = decideObservation(revised, state);
+      expect(decision.outcome).toEqual({ _tag: "UpdatedCanonical", id: listing.canonicalJobId });
+      expect(decision.canonical.employerName).toBe("Bakery Norge AS");
+      // The description a real detail fetch supplied survives the sweep —
+      // not silently replaced by the feed's own placeholder text.
+      expect(decision.canonical.hydration).toEqual({
+        _tag: "Hydrated",
+        description: "Fetched via Hydration.hydrate.",
+      });
+    });
+
+    it("a source reopening an already-hydrated, since-closed vacancy keeps its hydration through the reopen", () => {
+      const listing = normalize(raw({ hydrated: false }));
+      const closedButHydrated: CanonicalJob = {
+        id: listing.canonicalJobId,
+        title: "Baker",
+        employerName: "Bakery AS",
+        location: "Oslo",
+        applicationUrl: "https://example.com/job/1",
+        publishedAt: "2026-01-01T00:00:00Z",
+        status: { _tag: "Closed", closedAt: "2026-01-05T00:00:00Z" },
+        sequence: 4 as CanonicalJob["sequence"],
+        changedAt: "2026-01-05T00:00:00Z",
+        sources: ["nav" as SourceId],
+        hydration: { _tag: "Hydrated", description: "Fetched before it closed." },
+      };
+      const existingOccurrence: OccurrenceRecord = {
+        id: listing.occurrenceId,
+        canonicalJobId: listing.canonicalJobId,
+        sourceId: "nav" as SourceId,
+        platformId: "arbeidsplassen-nav" as PlatformId,
+        externalId: "1",
+        contentFingerprint: listing.contentFingerprint,
+        active: false,
+        firstSeenAt: "2026-01-01T00:00:00Z",
+        lastSeenAt: "2026-01-05T00:00:00Z",
+      };
+      const state: ObservationState = {
+        existingCanonical: closedButHydrated,
+        existingOccurrence,
+        nextSequence: 5,
+        now: "2026-01-06T00:00:00Z",
+      };
+
+      const decision = decideObservation(listing, state);
+      expect(decision.outcome).toEqual({ _tag: "ReopenedCanonical", id: listing.canonicalJobId });
+      expect(decision.canonical.hydration).toEqual({
+        _tag: "Hydrated",
+        description: "Fetched before it closed.",
+      });
+    });
   });
 });

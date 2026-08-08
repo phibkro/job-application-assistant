@@ -92,6 +92,28 @@ export const FetchJob = Command.define("FetchJob", {
     ),
 });
 
+/**
+ * The hover-to-prefetch call: the same `getJob` endpoint `FetchJob` uses,
+ * fired early so the worker hydrates the vacancy before a click, and
+ * discarded either way — `PrefetchSettled` carries nothing back, on purpose
+ * (see `Message.ts`'s `BrowseJobHovered`). A failure here (the source is
+ * down, the id is stale) is not this person's problem: `JobDetail`'s own
+ * route re-fetches on open regardless and shows its own error if that one
+ * fails.
+ */
+export const PrefetchJob = Command.define("PrefetchJob", {
+  args: { jobId: S.String },
+  messages: [Msg.PrefetchSettled],
+  execute: ({ jobId }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        yield* client.corpus.getJob({ params: { id: jobId } });
+        return Msg.PrefetchSettled();
+      }).pipe(Effect.catch(() => Effect.succeed(Msg.PrefetchSettled()))),
+    ),
+});
+
 export const FetchFeed = Command.define("FetchFeed", {
   messages: [Msg.FeedSucceeded, Msg.FeedFailed],
   execute: withHttp(

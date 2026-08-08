@@ -17,8 +17,12 @@ import type {
  * `design-specs/source-plugin-surface.md`. Re-exported so worker code that
  * only needs `Acquisition` has one import to reach both.
  */
-export { SourceAdapter, type AcquiredPage } from "@job-index/adapters/SourceAdapter";
-import type { AcquiredPage } from "@job-index/adapters/SourceAdapter";
+export {
+  SourceAdapter,
+  type AcquiredPage,
+  type HydrateOutcome,
+} from "@job-index/adapters/SourceAdapter";
+import type { AcquiredPage, HydrateOutcome } from "@job-index/adapters/SourceAdapter";
 
 /**
  * Reading listings from a platform, whatever it takes to read them.
@@ -45,6 +49,19 @@ export class Acquisition extends Context.Service<
       cursor: string,
     ) => Effect.Effect<
       AcquiredPage,
+      | AdapterUnavailable
+      | DecodeFailed
+      | RateLimited
+      | RendererUnavailable
+      | SourceUnavailable
+      | Unauthorized
+    >;
+    /** One vacancy's detail — the counterpart `Hydration` calls instead of a whole page. */
+    readonly hydrate: (
+      platform: PlatformId,
+      externalId: string,
+    ) => Effect.Effect<
+      HydrateOutcome,
       | AdapterUnavailable
       | DecodeFailed
       | RateLimited

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
-import type { RawListing } from "@job-index/domain/Job";
-import type { SourceId } from "@job-index/domain/Ids";
+import type { CanonicalJob, RawListing } from "@job-index/domain/Job";
+import type { PlatformId, SourceId } from "@job-index/domain/Ids";
 import { normalize } from "./identity.ts";
 import { makeObserve } from "./observe.ts";
 import { makeGet } from "./queries.ts";
@@ -10,6 +10,7 @@ import { makeTestDatabase } from "./testSupport.ts";
 const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: "nav" as SourceId,
   sourceName: "NAV",
+  platformId: "arbeidsplassen-nav" as PlatformId,
   externalId: "1",
   title: "Baker",
   employerName: "Bakery AS",
@@ -17,8 +18,13 @@ const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   description: "Bakes bread.",
   applicationUrl: "https://example.com/job/1",
   publishedAt: "2026-01-01T00:00:00Z",
+  hydrated: true,
   ...overrides,
 });
+
+/** `CanonicalJob.hydration`'s `description`, or `undefined` if unhydrated — test-only convenience. */
+const descriptionOf = (job: CanonicalJob | undefined): string | undefined =>
+  job !== undefined && job.hydration._tag === "Hydrated" ? job.hydration.description : undefined;
 
 describe("observe (against a real, if fake, Database)", () => {
   it("creates a canonical job on first sighting, and get() finds it", async () => {
@@ -58,7 +64,7 @@ describe("observe (against a real, if fake, Database)", () => {
     expect(outcome).toEqual({ _tag: "UpdatedCanonical", id: listing.canonicalJobId });
 
     const job = await Effect.runPromise(get(listing.canonicalJobId));
-    expect(job?.description).toBe("Bakes bread and croissants.");
+    expect(descriptionOf(job)).toBe("Bakes bread and croissants.");
   });
 
   /**

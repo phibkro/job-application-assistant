@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
-import type { SourceId } from "../../../domain/src/Ids.ts";
+import type { PlatformId, SourceId } from "../../../domain/src/Ids.ts";
 import { extractJobPostings } from "./Extract.ts";
 
 const context = {
   sourceId: "career-site" as SourceId,
   sourceName: "Career Site",
+  platformId: "career-site" as PlatformId,
   pageUrl: "https://careers.example/openings/backend-engineer",
 };
 

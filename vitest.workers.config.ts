@@ -77,6 +77,7 @@ export default defineConfig({
       "apps/worker/src/ingestion/SourceLeaseObject.test.ts",
       "apps/worker/src/corpus/live.test.ts",
       "apps/worker/src/handlers/corpus.live.test.ts",
+      "apps/worker/src/hydration/live.test.ts",
     ],
     setupFiles: ["./apps/worker/src/testSupport/workersSetup.ts"],
     coverage: {
@@ -106,7 +107,9 @@ export default defineConfig({
         "apps/worker/src/ingestion/SourceLeaseObject.ts",
         "apps/worker/src/ingestion/index.ts",
         "apps/worker/src/corpus/index.ts",
+        "apps/worker/src/corpus/hydrate.ts",
         "apps/worker/src/handlers/corpus.ts",
+        "apps/worker/src/hydration/index.ts",
       ],
       // `branches` is lower than `vitest.config.ts`'s 70: this project's
       // live tests deliberately exercise one path each (e.g.

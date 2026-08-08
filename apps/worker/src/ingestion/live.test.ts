@@ -65,6 +65,10 @@ const fakeAcquisition = (script: PageScript): Acquisition["Service"] => ({
       via: "feed",
     } satisfies AcquiredPage);
   },
+  // This file is `Ingestion.collect`'s own proof; nothing here ever opens a
+  // vacancy, so `hydrate` is never reached — see `hydration/live.test.ts`
+  // for the seam that exercises it.
+  hydrate: () => Effect.die("ingestion live test: hydrate is not exercised here"),
 });
 
 /**
@@ -121,6 +125,7 @@ const fakeCatalog = (startCursor: string): SourceCatalog["Service"] => ({
 const listing = (externalId: string, overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: SOURCE,
   sourceName: "Test Source",
+  platformId: PLATFORM,
   externalId,
   title: `Job ${externalId}`,
   employerName: "Employer AS",
@@ -128,6 +133,7 @@ const listing = (externalId: string, overrides: Partial<RawListing> = {}): RawLi
   description: "A job.",
   applicationUrl: `https://example.com/job/${externalId}`,
   publishedAt: "2026-01-01T00:00:00Z",
+  hydrated: false,
   ...overrides,
 });
 
@@ -330,6 +336,7 @@ describe("Ingestion.collect on a real D1 binding", () => {
               via: "feed",
             } satisfies AcquiredPage;
           }),
+        hydrate: () => Effect.die("ingestion live test: hydrate is not exercised here"),
       };
 
       const deps = Layer.mergeAll(

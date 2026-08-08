@@ -13,6 +13,34 @@ import { button, card, pageClass, renderProblem } from "./Shared.ts";
 const statusLabel = (job: CanonicalJob): string =>
   job.status._tag === "Active" ? "Active" : `Closed ${job.status.closedAt}`;
 
+/**
+ * The description slot, for a job that may not have one yet.
+ *
+ * Deliberately not a blank space and not the word "Loading…" either: an
+ * unhydrated vacancy is not still loading in the ordinary sense (the page
+ * finished; there is just no detail on file yet), and the design spec is
+ * explicit that this must not "look like an advert with no description".
+ * `getJob` already tried to hydrate it once by the time this renders (see
+ * `handlers/corpus.ts`), so if it's still unhydrated here the fetch itself
+ * came back empty — the original listing link below is the honest fallback,
+ * not a description this page does not have.
+ */
+const descriptionBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
+  job.hydration._tag === "Hydrated"
+    ? h.p([h.Class("mt-4 whitespace-pre-wrap text-sm text-gray-700")], [job.hydration.description])
+    : h.div(
+        [h.Class("mt-4 rounded-md border border-dashed border-gray-300 bg-gray-50 p-4")],
+        [
+          h.p(
+            [h.Class("text-sm text-gray-600")],
+            [
+              "The full description isn't available from this source right now. ",
+              "The original listing (below) has it.",
+            ],
+          ),
+        ],
+      );
+
 const jobBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
   card(
     [
@@ -21,10 +49,10 @@ const jobBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
         [h.Class("mt-1 text-sm text-gray-500")],
         [`${job.employerName} — ${job.location} — ${statusLabel(job)}`],
       ),
-      job.deadline === undefined
-        ? h.empty
-        : h.p([h.Class("mt-1 text-sm text-gray-500")], [`Deadline: ${job.deadline}`]),
-      h.p([h.Class("mt-4 whitespace-pre-wrap text-sm text-gray-700")], [job.description]),
+      job.hydration._tag === "Hydrated" && job.hydration.deadline !== undefined
+        ? h.p([h.Class("mt-1 text-sm text-gray-500")], [`Deadline: ${job.hydration.deadline}`])
+        : h.empty,
+      descriptionBody(job, h),
       h.a(
         [
           h.Href(job.applicationUrl),

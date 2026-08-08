@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import type { RawListing } from "../../../domain/src/Job.ts";
-import type { SourceId } from "../../../domain/src/Ids.ts";
+import type { PlatformId, SourceId } from "../../../domain/src/Ids.ts";
 import { DecodeFailed } from "../../../domain/src/Failure.ts";
 import {
   firstPresent,
@@ -103,6 +103,7 @@ export const identifierFromValue = (value: unknown): string | undefined => {
 export interface JobPostingContext {
   readonly sourceId: SourceId;
   readonly sourceName: string;
+  readonly platformId: PlatformId;
   /** The absolute URL of the page the node was extracted from. */
   readonly pageUrl: string;
 }
@@ -147,6 +148,7 @@ export const toRawListing = (
   return Effect.succeed({
     sourceId: context.sourceId,
     sourceName: context.sourceName,
+    platformId: context.platformId,
     externalId,
     title,
     employerName,
@@ -155,6 +157,11 @@ export const toRawListing = (
     applicationUrl,
     publishedAt,
     deadline,
+    // A JSON-LD `JobPosting` is extracted whole, from the same page a
+    // "summary" scan would have read — there is no cheaper tier underneath
+    // it, so every listing this adapter produces is hydrated at observe
+    // time. See `index.ts`'s `hydrate`.
+    hydrated: true,
   });
 };
 

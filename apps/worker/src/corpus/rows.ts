@@ -3,7 +3,13 @@ import type {
   OccurrenceRecord as OccurrenceModel,
 } from "@job-index/domain/Job";
 import type { CanonicalJob } from "@job-index/domain/Job";
-import type { CanonicalJobId, OccurrenceId, SourceId, Sequence } from "@job-index/domain/Ids";
+import type {
+  CanonicalJobId,
+  OccurrenceId,
+  PlatformId,
+  SourceId,
+  Sequence,
+} from "@job-index/domain/Ids";
 import { normalizeText } from "./identity.ts";
 import { CANONICAL_JOB_FIELDS, OCCURRENCE_FIELDS } from "./sql.ts";
 
@@ -31,10 +37,8 @@ export const canonicalJobFromRow = (row: CanonicalJobRow): CanonicalJob => ({
   title: row.title,
   employerName: row.employerName,
   location: row.location,
-  description: row.description,
   applicationUrl: row.applicationUrl,
   publishedAt: row.publishedAt,
-  deadline: row.deadline ?? undefined,
   status:
     row.statusTag === "Closed"
       ? { _tag: "Closed", closedAt: row.statusClosedAt ?? "" }
@@ -42,6 +46,14 @@ export const canonicalJobFromRow = (row: CanonicalJobRow): CanonicalJob => ({
   sequence: row.sequence as Sequence,
   changedAt: row.changedAt,
   sources: JSON.parse(row.sources) as ReadonlyArray<SourceId>,
+  // `description`/`deadline` are read only behind the `hydrationTag` gate:
+  // an `Unhydrated` row's `description` column is `""` by convention (see
+  // `CanonicalJobRecord`'s own doc comment), never surfaced as if it meant
+  // something.
+  hydration:
+    row.hydrationTag === "Hydrated"
+      ? { _tag: "Hydrated", description: row.description, deadline: row.deadline ?? undefined }
+      : { _tag: "Unhydrated" },
 });
 
 export const rowFromCanonicalJob = (job: CanonicalJob, canonicalKey: string): CanonicalJobRow => ({
@@ -50,10 +62,11 @@ export const rowFromCanonicalJob = (job: CanonicalJob, canonicalKey: string): Ca
   title: job.title,
   employerName: job.employerName,
   location: job.location,
-  description: job.description,
+  description: job.hydration._tag === "Hydrated" ? job.hydration.description : "",
   applicationUrl: job.applicationUrl,
   publishedAt: job.publishedAt,
-  deadline: job.deadline ?? null,
+  deadline: job.hydration._tag === "Hydrated" ? (job.hydration.deadline ?? null) : null,
+  hydrationTag: job.hydration._tag,
   statusTag: job.status._tag,
   statusClosedAt: job.status._tag === "Closed" ? job.status.closedAt : null,
   sequence: job.sequence,
@@ -69,6 +82,7 @@ export interface OccurrenceRecord {
   readonly id: OccurrenceId;
   readonly canonicalJobId: CanonicalJobId;
   readonly sourceId: SourceId;
+  readonly platformId: PlatformId;
   readonly externalId: string;
   readonly contentFingerprint: string;
   /** Whether the source still advertises it; see `OccurrenceModel.active`. */
@@ -81,6 +95,7 @@ export const occurrenceFromRow = (row: OccurrenceRow): OccurrenceRecord => ({
   id: row.id as OccurrenceId,
   canonicalJobId: row.canonicalJobId as CanonicalJobId,
   sourceId: row.sourceId as SourceId,
+  platformId: row.platformId as PlatformId,
   externalId: row.externalId,
   contentFingerprint: row.contentFingerprint,
   active: row.active === 1,
@@ -92,6 +107,7 @@ export const rowFromOccurrence = (record: OccurrenceRecord): OccurrenceRow => ({
   id: record.id,
   canonicalJobId: record.canonicalJobId,
   sourceId: record.sourceId,
+  platformId: record.platformId,
   externalId: record.externalId,
   contentFingerprint: record.contentFingerprint,
   active: record.active ? 1 : 0,

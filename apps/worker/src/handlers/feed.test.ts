@@ -29,13 +29,13 @@ describe("feed (authenticated)", () => {
       title: "Baker",
       employerName: "Bakery AS",
       location: "Oslo",
-      description: "",
       applicationUrl: "https://example.com/1",
       publishedAt: "2026-01-01T00:00:00Z",
       status: { _tag: "Active" },
       sequence: 5 as Sequence,
       changedAt: "2026-01-01T00:00:00Z",
       sources: [],
+      hydration: { _tag: "Unhydrated" },
     };
     let seenProfile: unknown;
     const { handler } = buildHandler({
@@ -51,6 +51,9 @@ describe("feed (authenticated)", () => {
         },
         markOffered: () => Effect.die("unused"),
         closeAbsent: () => Effect.die("unused"),
+        occurrenceFor: () => Effect.die("unused"),
+        hydrateDetail: () => Effect.die("unused"),
+        closeEarly: () => Effect.die("unused"),
       }),
     });
     const res = await handler(

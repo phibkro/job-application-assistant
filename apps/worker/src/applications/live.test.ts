@@ -8,7 +8,7 @@ import { DeliveryPlatform } from "@job-index/domain/Delivery";
 import { Subscription } from "@job-index/domain/Subscription";
 import { PlatformPolicyRecord, SavedJob } from "@job-index/domain/Applications";
 import type { PolicyTag } from "@job-index/domain/Applications";
-import { snapshotOf } from "@job-index/domain/Job";
+import { isHydrated, snapshotOf } from "@job-index/domain/Job";
 import type { RawListing } from "@job-index/domain/Job";
 import type {
   CanonicalJobId,
@@ -102,6 +102,7 @@ const runExit = <A, E>(effect: Effect.Effect<A, E, Requirements>): Promise<Exit.
 const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   sourceId: "nav" as SourceId,
   sourceName: "NAV",
+  platformId: "arbeidsplassen-nav" as PlatformId,
   externalId: "1",
   title: "Baker",
   employerName: "Bakery AS",
@@ -109,6 +110,12 @@ const raw = (overrides: Partial<RawListing> = {}): RawListing => ({
   description: "Bakes bread.",
   applicationUrl: "https://jobs.webcruiter.no/vacancy/1",
   publishedAt: "2026-01-01T00:00:00Z",
+  // This slot's own tests are about `Applications`/`Policy`/snapshot
+  // behaviour, not about deferred hydration — seeding a job as already
+  // hydrated (as if its detail fetch already ran) is what lets `save`,
+  // `snapshotOf`, and every assertion on `description` below stay about
+  // what they were written to test.
+  hydrated: true,
   ...overrides,
 });
 
@@ -123,6 +130,7 @@ const seedSavedJob = (profile: ProfileId, listingOverrides: Partial<RawListing> 
     yield* corpus.observe(listing);
     const job = yield* corpus.get(listing.canonicalJobId);
     if (job === undefined) return yield* Effect.die("seedSavedJob: observe did not persist");
+    if (!isHydrated(job)) return yield* Effect.die("seedSavedJob: job did not come out hydrated");
     const now = yield* DateTime.now;
     const savedJobId = crypto.randomUUID() as SavedJobId;
     yield* SavedJobs.insert(
@@ -430,6 +438,7 @@ describe("Applications against a real SQLite engine", () => {
         yield* corpus.observe(normalize(raw({ description: "Bakes bread the traditional way." })));
         const job = yield* corpus.get(normalize(raw()).canonicalJobId);
         if (job === undefined) return yield* Effect.die("seed failed");
+        if (!isHydrated(job)) return yield* Effect.die("seed did not come out hydrated");
         const savedJobId = yield* savedJobs.save(PROFILE, job, "");
 
         // Same title/employer/location — same `canonicalJobId` — but a
@@ -444,7 +453,11 @@ describe("Applications against a real SQLite engine", () => {
       }),
     );
     expect(result.beforeEdit?.description).toBe("Bakes bread the traditional way.");
-    expect(result.afterEdit?.description).toBe("Now runs an industrial oven around the clock.");
+    expect(
+      result.afterEdit !== undefined && isHydrated(result.afterEdit)
+        ? result.afterEdit.hydration.description
+        : undefined,
+    ).toBe("Now runs an industrial oven around the clock.");
   });
 
   it("prepare inherits the saved job's frozen snapshot rather than reading the corpus again — an edit after saving does not change what gets applied to", async () => {
@@ -459,6 +472,7 @@ describe("Applications against a real SQLite engine", () => {
         yield* corpus.observe(normalize(raw({ description: "Bakes bread the traditional way." })));
         const job = yield* corpus.get(normalize(raw()).canonicalJobId);
         if (job === undefined) return yield* Effect.die("seed failed");
+        if (!isHydrated(job)) return yield* Effect.die("seed did not come out hydrated");
         const savedJobId = yield* savedJobs.save(PROFILE, job, "");
 
         // The corpus edits the same vacancy before the person ever applies.

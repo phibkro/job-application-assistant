@@ -56,17 +56,22 @@ describe("supports", () => {
 });
 
 describe("page", () => {
-  it("fetches the feed, decodes the active entry's detail, and skips the inactive one", async () => {
+  /**
+   * Falsifier 1 of `design-specs/deferred-hydration.md`: ingesting one feed
+   * page makes exactly one HTTP request, asserted by counting requests
+   * through this fake `HttpClient` — not by reading the code. This is the
+   * whole reason the slot exists: the previous shape fetched detail for
+   * every active entry too (883 requests for one real page), which is more
+   * than Cloudflare allows per invocation on the free plan.
+   */
+  it("fetches the feed page and nothing else — one request per page, however many active entries it lists", async () => {
     let calls = 0;
     const client = clientOf((url) => {
       calls += 1;
       if (url.endsWith("/api/v1/feed?last=true")) {
         return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
       }
-      if (url.endsWith("/api/v1/feedentry/active-vacancy-1")) {
-        return new Response(JSON.stringify(fixture("detail-active.json")), { status: 200 });
-      }
-      throw new Error(`unexpected request in test: ${url}`);
+      throw new Error(`unexpected request in test: ${url} (page() must not fetch detail)`);
     });
 
     const page = await Effect.runPromise(
@@ -82,19 +87,17 @@ describe("page", () => {
     expect(page.listings).toHaveLength(1);
     expect(page.listings[0]?.externalId).toBe("active-vacancy-1");
     expect(page.listings[0]?.employerName).toBe("Example Technology AS");
-    // Only the active entry's detail is fetched — the inactive one costs
-    // nothing extra.
-    expect(calls).toBe(2);
+    // Built entirely from feed data — description is the placeholder, not a
+    // detail fetch's content, and the listing says so.
+    expect(page.listings[0]?.hydrated).toBe(false);
+    expect(calls).toBe(1);
   });
 
-  it("presents the bearer token on every request — the gap a live run once caught (a 401, not a reduced-access response)", async () => {
+  it("presents the bearer token on the feed request — the gap a live run once caught (a 401, not a reduced-access response)", async () => {
     const seenAuth: Array<string | null> = [];
     const client = clientOf((url, headers) => {
       seenAuth.push(headers.get("authorization"));
-      if (url.endsWith("/api/v1/feed?last=true")) {
-        return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
-      }
-      return new Response(JSON.stringify(fixture("detail-active.json")), { status: 200 });
+      return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
     });
 
     await Effect.runPromise(
@@ -104,7 +107,7 @@ describe("page", () => {
       ),
     );
 
-    expect(seenAuth).toEqual(["Bearer secret-token", "Bearer secret-token"]);
+    expect(seenAuth).toEqual(["Bearer secret-token"]);
   });
 
   it("surfaces a non-2xx feed response as SourceUnavailable rather than throwing", async () => {
@@ -122,14 +125,9 @@ describe("page", () => {
 
   it("tells a fresh sweep where to start, and does not re-tell a resumed one", async () => {
     const seen: Array<string | null> = [];
-    const respond = (url: string, headers: Headers): Response => {
+    const respond = (_url: string, headers: Headers): Response => {
       seen.push(headers.get("if-modified-since"));
-      return new Response(
-        JSON.stringify(
-          url.includes("/feed/") ? fixture("detail-active.json") : fixture("feed-page.json"),
-        ),
-        { status: 200 },
-      );
+      return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
     };
     const since = new Date("2025-08-08T00:00:00.000Z");
     const adapter = make(clientOf(respond), "token", since);
@@ -149,39 +147,127 @@ describe("page", () => {
     expect(seen[0]).toBeNull();
   });
 
-  it("skips an advert that closed between the feed page and this sweep, rather than failing the page", async () => {
-    // What NAV actually returns for an entry the feed still lists as active
-    // but which has since closed: a status and nothing else. Every one of
-    // twenty-five sampled from a year-old page looked like this, and treating
-    // it as corruption stopped ingestion at page zero.
-    const client = clientOf((url) =>
-      url.includes("/feedentry/") || url.includes("/feed/")
-        ? new Response(
-            JSON.stringify({
-              uuid: "gone",
-              sistEndret: "2026-08-06T07:20:51+02:00",
-              status: "INACTIVE",
-            }),
-          )
-        : new Response(JSON.stringify(fixture("feed-page.json"))),
-    );
-
-    const page = await Effect.runPromise(
-      make(client, "token").page(NAV_PLATFORM_ID, "https://pam-stilling-feed.nav.no/api/v1/feed"),
-    );
-    expect(page.listings).toEqual([]);
-  });
-
-  it("still fails loudly when content is missing from something calling itself active", async () => {
-    const client = clientOf((url) =>
-      url.includes("/feedentry/") || url.includes("/feed/")
-        ? new Response(JSON.stringify({ uuid: "broken", status: "ACTIVE" }))
-        : new Response(JSON.stringify(fixture("feed-page.json"))),
+  it("still fails loudly when a feed entry has no usable title", async () => {
+    const client = clientOf(
+      () =>
+        new Response(
+          JSON.stringify({
+            feed_url: "/api/v1/feed/page-1",
+            items: [
+              {
+                id: "e1",
+                url: "/api/v1/feedentry/broken",
+                title: "",
+                content_text: "",
+                date_modified: "2026-08-05T08:00:00Z",
+                _feed_entry: { uuid: "broken", status: "ACTIVE", title: "", sistEndret: "" },
+              },
+            ],
+          }),
+        ),
     );
 
     const exit = await Effect.runPromiseExit(
       make(client, "token").page(NAV_PLATFORM_ID, "https://pam-stilling-feed.nav.no/api/v1/feed"),
     );
     expect(JSON.stringify(exit)).toContain("DecodeFailed");
+  });
+});
+
+describe("hydrate", () => {
+  it("fetches one vacancy's detail and returns only the fields a page could not", async () => {
+    let calls = 0;
+    const client = clientOf((url) => {
+      calls += 1;
+      expect(url.endsWith("/api/v1/feedentry/active-vacancy-1")).toBe(true);
+      return new Response(JSON.stringify(fixture("detail-active.json")), { status: 200 });
+    });
+
+    const outcome = await Effect.runPromise(
+      Effect.provide(
+        SourceAdapter.use((adapter) => adapter.hydrate(NAV_PLATFORM_ID, "active-vacancy-1")),
+        layerOf(client, "secret-token"),
+      ),
+    );
+
+    expect(calls).toBe(1);
+    expect(outcome).toEqual({
+      _tag: "Hydrated",
+      detail: {
+        description: "Help customers use technical products.",
+        applicationUrl: "https://careers.example/jobs/100?utm_source=nav",
+        deadline: "2026-08-25",
+      },
+    });
+  });
+
+  it("presents the bearer token on the detail request", async () => {
+    const seenAuth: Array<string | null> = [];
+    const client = clientOf((_url, headers) => {
+      seenAuth.push(headers.get("authorization"));
+      return new Response(JSON.stringify(fixture("detail-active.json")), { status: 200 });
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        SourceAdapter.use((adapter) => adapter.hydrate(NAV_PLATFORM_ID, "active-vacancy-1")),
+        layerOf(client, "secret-token"),
+      ),
+    );
+
+    expect(seenAuth).toEqual(["Bearer secret-token"]);
+  });
+
+  /**
+   * The lifecycle case falsifier 7 names: an advert the feed still called
+   * active a moment ago has since closed. NAV answers with a status and no
+   * content — not a decode failure, and not a listing to hydrate empty.
+   */
+  it("reports ClosedSince rather than DecodeFailed when the advert closed since the feed page was written", async () => {
+    const client = clientOf(
+      () =>
+        new Response(
+          JSON.stringify({
+            uuid: "gone",
+            sistEndret: "2026-08-06T07:20:51+02:00",
+            status: "INACTIVE",
+          }),
+        ),
+    );
+
+    const outcome = await Effect.runPromise(
+      Effect.provide(
+        SourceAdapter.use((adapter) => adapter.hydrate(NAV_PLATFORM_ID, "gone")),
+        layerOf(client, "token"),
+      ),
+    );
+
+    expect(outcome).toEqual({ _tag: "ClosedSince" });
+  });
+
+  it("still fails loudly when content is missing from something calling itself active", async () => {
+    const client = clientOf(
+      () => new Response(JSON.stringify({ uuid: "broken", status: "ACTIVE" })),
+    );
+
+    const exit = await Effect.runPromiseExit(
+      Effect.provide(
+        SourceAdapter.use((adapter) => adapter.hydrate(NAV_PLATFORM_ID, "broken")),
+        layerOf(client, "token"),
+      ),
+    );
+    expect(exit._tag).toBe("Failure");
+  });
+
+  it("surfaces a non-2xx detail response as SourceUnavailable rather than throwing", async () => {
+    const client = clientOf(() => new Response("nope", { status: 503 }));
+
+    const exit = await Effect.runPromiseExit(
+      Effect.provide(
+        SourceAdapter.use((adapter) => adapter.hydrate(NAV_PLATFORM_ID, "active-vacancy-1")),
+        layerOf(client, undefined),
+      ),
+    );
+    expect(exit._tag).toBe("Failure");
   });
 });

@@ -79,6 +79,7 @@ const columnTypes: Record<string, string> = {
   providerRef: "TEXT NOT NULL DEFAULT ''",
   tokenHash: "TEXT NOT NULL",
   apiKeyHash: "TEXT NOT NULL",
+  hydrationTag: "TEXT NOT NULL DEFAULT 'Unhydrated' CHECK (hydrationTag IN ('Unhydrated', 'Hydrated'))",
   statusTag: "TEXT NOT NULL CHECK (statusTag IN ('Active', 'Closed'))",
   savedJobId: "TEXT NOT NULL",
   note: "TEXT NOT NULL DEFAULT ''",

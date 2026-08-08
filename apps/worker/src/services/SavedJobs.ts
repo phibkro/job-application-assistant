@@ -1,6 +1,6 @@
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
-import type { CanonicalJob, JobSnapshot } from "@job-index/domain/Job";
+import type { HydratedCanonicalJob, JobSnapshot } from "@job-index/domain/Job";
 import type { SavedJob } from "@job-index/domain/Applications";
 import type { ProfileId, SavedJobId } from "@job-index/domain/Ids";
 
@@ -17,11 +17,15 @@ import type { ProfileId, SavedJobId } from "@job-index/domain/Ids";
  * whoever saved it, and an id that resolves for anyone is an access-control
  * hole disguised as a lookup.
  *
- * `save` takes the whole `CanonicalJob`, not just its id: the operator's
- * decision that an advert is snapshotted, not referenced, means the moment of
- * saving is the one place `Job.snapshotOf` can be called — the caller (the
- * `save` handler) already holds the job it just fetched from `Corpus` to
- * confirm it exists, so no second corpus read is needed here to take the copy.
+ * `save` takes the whole job, not just its id: the operator's decision that
+ * an advert is snapshotted, not referenced, means the moment of saving is
+ * the one place `Job.snapshotOf` can be called — the caller (the `save`
+ * handler) already holds the job it just hydrated, so no second corpus read
+ * is needed here to take the copy. It takes a `HydratedCanonicalJob`
+ * specifically, not a plain `CanonicalJob`: `snapshotOf` requires one (see
+ * its own doc comment), so a caller that has not first proven the job it
+ * holds is hydrated cannot call `save` at all — a compile error, not a
+ * blank `description` some review has to catch.
  * `resolve` answers with that frozen `JobSnapshot`, not a live `CanonicalJobId`
  * lookup: what a saved job "points at" is now the vacancy as it stood when it
  * was saved, which is also what makes it survive the corpus row being edited
@@ -32,7 +36,7 @@ export class SavedJobs extends Context.Service<
   {
     readonly save: (
       profile: ProfileId,
-      job: CanonicalJob,
+      job: HydratedCanonicalJob,
       note: string,
     ) => Effect.Effect<SavedJobId>;
     /** The vacancy this saved job points at, as it stood when it was saved — or `undefined` if it is not this profile's. */

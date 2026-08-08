@@ -32,10 +32,26 @@ export const make = (client: HttpClient.HttpClient): SourceAdapter["Service"] =>
       const listings = yield* extractJobPostings(html, {
         sourceId: platform as unknown as SourceId,
         sourceName: platform,
+        platformId: platform,
         pageUrl: cursor,
       });
       return { listings, cursor, more: false, via: "scripted" } satisfies AcquiredPage;
     }),
+  // Every listing this adapter produces is already `hydrated: true` (see
+  // `JobPosting.ts`'s `toRawListing`) — a whole `JobPosting` node is scraped
+  // per vacancy, with no cheaper summary tier underneath it, so
+  // `Hydration.hydrate` never reaches an `Unhydrated` job this adapter
+  // created and this path is not expected to run. Implemented as a genuine
+  // failure rather than a no-op returning invented content, because this
+  // adapter caches nothing between `page` calls: there is no HTML left to
+  // re-extract `externalId` from once `page` has returned, only a fresh
+  // fetch of some URL this call was never given.
+  hydrate: (platform, externalId) =>
+    Effect.fail(
+      new SourceUnavailable({
+        source: `${platform}:${externalId}`,
+      }),
+    ),
 });
 
 const fetchText = (
