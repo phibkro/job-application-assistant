@@ -18,7 +18,15 @@ esac
 config="infra/alchemy.run.ts"
 state_dir=".deploy"
 log_dir=".artifacts/deploy/${environment}"
-database_name="${JOB_INDEX_D1_NAME:-job-index-${environment}-db}"
+database_name=""
+database_id=""
+database_config=""
+cleanup_database_config() {
+  if [ -n "${database_config}" ]; then
+    rm -f -- "${database_config}"
+  fi
+}
+trap cleanup_database_config EXIT
 mkdir -p "${state_dir}" "${log_dir}"
 
 dev_vars_file="${JOB_INDEX_DEV_VARS_FILE:-.dev.vars}"
@@ -153,7 +161,7 @@ PYOUT
 }
 
 apply_database() {
-  local database_id database_name database_config
+  database_config=""
   database_id="$(read_stack_output databaseId)"
   database_name="$(read_stack_output database)"
   if [ -z "${database_id}" ] || [ -z "${database_name}" ]; then
@@ -165,7 +173,7 @@ apply_database() {
   # Address the exact resource Alchemy returned instead of rediscovering it by
   # name; this also prevents a similarly named legacy database from matching.
   database_config="$(mktemp)"
-  trap 'rm -f "${database_config}"' EXIT
+  # The process-level cleanup trap removes this file if any Wrangler step fails.
   cat >"${database_config}" <<JSON
 {
   "name": "job-index-database-apply",
@@ -184,12 +192,12 @@ JSON
   # database it leaves earlier tables in place; Wrangler then applies only the
   # ordered migrations whose target shape the snapshot could not mark current.
   echo "Applying the generated schema, ordered migrations, and researched catalogue to ${database_name}..."
-  CI=1 wrangler d1 execute DB --remote --config "${database_config}" --file db/schema.sql --yes >/dev/null
+  CI=1 wrangler d1 execute "${database_name}" --remote --config "${database_config}" --file db/schema.sql --yes >/dev/null
   ./scripts/migrate-d1.sh remote "${database_name}" "${database_id}"
-  CI=1 wrangler d1 execute DB --remote --config "${database_config}" --file db/catalog-seed.sql --yes >/dev/null
+  CI=1 wrangler d1 execute "${database_name}" --remote --config "${database_config}" --file db/catalog-seed.sql --yes >/dev/null
 
-  rm -f "${database_config}"
-  trap - EXIT
+  cleanup_database_config
+  database_config=""
 }
 
 # Production publishes without cron triggers, upgrades the database, and only

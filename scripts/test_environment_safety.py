@@ -80,10 +80,13 @@ deploy = (ROOT / "scripts/deploy.sh").read_text()
 # trying to rediscover the new database by name.
 assert '"database_id": "${database_id}"' in deploy
 assert '--config "${database_config}"' in deploy
+assert 'wrangler d1 execute "${database_name}" --remote --config' in deploy
 assert './scripts/migrate-d1.sh remote "${database_name}" "${database_id}"' in deploy
+assert "local database_id" not in deploy
 
 migrate_d1 = (ROOT / "scripts/migrate-d1.sh").read_text()
 assert 'database_id="${3:-}"' in migrate_d1
+assert 'wrangler d1 migrations apply "$database_name"' in migrate_d1
 assert 'environment="${1:-staging}"' in deploy
 assert "Production requires a NAV-issued private consumer token" in deploy
 assert "Production requires ADMIN_SYNC_TOKEN" in deploy

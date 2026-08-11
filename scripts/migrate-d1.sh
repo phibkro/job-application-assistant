@@ -45,7 +45,7 @@ case "$mode" in
   ]
 }
 JSON
-    CI=1 wrangler d1 migrations apply DB --remote --config "$config"
+    CI=1 wrangler d1 migrations apply "$database_name" --remote --config "$config"
     ;;
   *)
     echo "Usage: scripts/migrate-d1.sh local DB_NAME [WRANGLER_CONFIG]" >&2
