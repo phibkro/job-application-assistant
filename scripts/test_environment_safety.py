@@ -97,6 +97,7 @@ assert "JOB_INDEX_DEV_VARS_FILE" in deploy
 assert "bootstrap-publish" in deploy
 # The two-phase production publication: schedules off, then on.
 assert "deploy_stack 0" in deploy
+assert '"${deployment_url}" "${environment}"' in deploy
 assert "deploy_stack 1" in deploy
 assert "JOB_INDEX_ACTIVATE_SCHEDULES" in deploy
 production_phase = deploy.rsplit('if [ "${environment}" = "production" ]; then', 1)[
@@ -114,6 +115,9 @@ assert "/api/health" in deploy
 # the cutover (see apps/worker/src/index.ts); the Rust-only demo/NAV-status
 # checks it used to run went with the crate that served them.
 production_smoke = (ROOT / "scripts/smoke-production.sh").read_text()
+assert 'EXPECTED_ENVIRONMENT="${2:-production}"' in production_smoke
+assert 'health["environment"] == expected_environment' in production_smoke
+assert 'about["environment"] == expected_environment' in production_smoke
 assert "/api/health" in production_smoke
 assert "/api/about" in production_smoke
 assert 'about["license"] == "proprietary"' in production_smoke

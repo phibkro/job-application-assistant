@@ -244,7 +244,7 @@ done
 # longer exist. The current smoke is deliberately non-destructive: it proves
 # health, service identity, and a public corpus read. It is deployment evidence
 # for those paths only, not full production qualification.
-SMOKE_OUTPUT_DIR="${log_dir}/smoke" ./scripts/smoke-production.sh "${deployment_url}"
+SMOKE_OUTPUT_DIR="${log_dir}/smoke" ./scripts/smoke-production.sh "${deployment_url}" "${environment}"
 
 python3 - "${environment}" "${deployment_url}" "${config}" "${database_name}" "${database_id}" "${nav_auth_mode}" "${source_code_url}" > "${state_dir}/${environment}.json" <<'PY'
 import hashlib
