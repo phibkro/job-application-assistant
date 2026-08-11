@@ -38,6 +38,7 @@ describe("scheduledIngestion", () => {
     const nav = entry("arbeidsplassen-nav", "Feed");
     const collected: Array<PlatformId> = [];
     let requestedTier: AcquisitionTier | undefined;
+    let requestedMaxPages: number | undefined;
 
     const layer = Layer.mergeAll(
       Layer.succeed(
@@ -52,9 +53,10 @@ describe("scheduledIngestion", () => {
       Layer.succeed(
         Ingestion,
         Ingestion.of({
-          collect: (platform) =>
+          collect: (platform, budget) =>
             Effect.sync(() => {
               collected.push(platform);
+              requestedMaxPages = budget.maxPages;
               return report;
             }),
         }),
@@ -65,5 +67,6 @@ describe("scheduledIngestion", () => {
 
     expect(requestedTier).toEqual({ _tag: "Feed" });
     expect(collected).toEqual([nav.id]);
+    expect(requestedMaxPages).toBe(1);
   });
 });
