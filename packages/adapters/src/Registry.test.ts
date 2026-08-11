@@ -33,7 +33,7 @@ describe("resolve", () => {
   it("dispatches to the reference NAV adapter for its registered tier and platform", async () => {
     const navAdapter = makeNavAdapter(
       clientOf((url) => {
-        if (url.endsWith("/api/v1/feed?last=true&pageSize=100")) {
+        if (url.endsWith("/api/v1/feed?last=true&pageSize=10")) {
           return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
         }
         if (url.endsWith("/api/v1/feedentry/active-vacancy-1")) {

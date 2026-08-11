@@ -65,7 +65,7 @@ describe("page", () => {
     let calls = 0;
     const client = clientOf((url) => {
       calls += 1;
-      if (url.endsWith("/api/v1/feed?last=true&pageSize=100")) {
+      if (url.endsWith("/api/v1/feed?last=true&pageSize=10")) {
         return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
       }
       throw new Error(`unexpected request in test: ${url} (page() must not fetch detail)`);
@@ -193,8 +193,8 @@ describe("page", () => {
     await Effect.runPromise(Effect.exit(adapter.page(NAV_PLATFORM_ID, "/api/v1/feed/abc-123")));
     expect(seen[0]).toBeNull();
     expect(seenUrls).toEqual([
-      "https://pam-stilling-feed.nav.no/api/v1/feed?pageSize=100",
-      "https://pam-stilling-feed.nav.no/api/v1/feed/abc-123?pageSize=100",
+      "https://pam-stilling-feed.nav.no/api/v1/feed?pageSize=10",
+      "https://pam-stilling-feed.nav.no/api/v1/feed/abc-123?pageSize=10",
     ]);
   });
 
