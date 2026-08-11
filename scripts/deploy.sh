@@ -153,6 +153,7 @@ PYOUT
 }
 
 apply_database() {
+  local database_id database_name database_config
   database_id="$(read_stack_output databaseId)"
   database_name="$(read_stack_output database)"
   if [ -z "${database_id}" ] || [ -z "${database_name}" ]; then
@@ -160,13 +161,35 @@ apply_database() {
     exit 1
   fi
 
+  # A newly created D1 can take time to appear in Wrangler's account listing.
+  # Address the exact resource Alchemy returned instead of rediscovering it by
+  # name; this also prevents a similarly named legacy database from matching.
+  database_config="$(mktemp)"
+  trap 'rm -f "${database_config}"' EXIT
+  cat >"${database_config}" <<JSON
+{
+  "name": "job-index-database-apply",
+  "compatibility_date": "2026-05-25",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "${database_name}",
+      "database_id": "${database_id}"
+    }
+  ]
+}
+JSON
+
   # The snapshot creates new databases at the current shape. On an existing
   # database it leaves earlier tables in place; Wrangler then applies only the
   # ordered migrations whose target shape the snapshot could not mark current.
   echo "Applying the generated schema, ordered migrations, and researched catalogue to ${database_name}..."
-  wrangler d1 execute "${database_name}" --remote --file db/schema.sql --yes >/dev/null
-  ./scripts/migrate-d1.sh remote "${database_name}"
-  wrangler d1 execute "${database_name}" --remote --file db/catalog-seed.sql --yes >/dev/null
+  CI=1 wrangler d1 execute DB --remote --config "${database_config}" --file db/schema.sql --yes >/dev/null
+  ./scripts/migrate-d1.sh remote "${database_name}" "${database_id}"
+  CI=1 wrangler d1 execute DB --remote --config "${database_config}" --file db/catalog-seed.sql --yes >/dev/null
+
+  rm -f "${database_config}"
+  trap - EXIT
 }
 
 # Production publishes without cron triggers, upgrades the database, and only

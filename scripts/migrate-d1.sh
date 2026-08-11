@@ -20,10 +20,13 @@ case "$mode" in
     CI=1 wrangler d1 migrations apply "$database_name" --local --config "$config" "${persist_args[@]}"
     ;;
   remote)
-    database_id="$(wrangler d1 list --json | jq -r --arg name "$database_name" '.[] | select(.name == $name) | .uuid')"
-    if [ -z "$database_id" ] || [ "$database_id" = "null" ]; then
-      echo "Could not resolve D1 database id for ${database_name}." >&2
-      exit 1
+    database_id="${3:-}"
+    if [ -z "$database_id" ]; then
+      database_id="$(wrangler d1 list --json | jq -r --arg name "$database_name" '.[] | select(.name == $name) | .uuid')"
+      if [ -z "$database_id" ] || [ "$database_id" = "null" ]; then
+        echo "Could not resolve D1 database id for ${database_name}." >&2
+        exit 1
+      fi
     fi
 
     config="$(mktemp)"
@@ -42,11 +45,11 @@ case "$mode" in
   ]
 }
 JSON
-    CI=1 wrangler d1 migrations apply "$database_name" --remote --config "$config"
+    CI=1 wrangler d1 migrations apply DB --remote --config "$config"
     ;;
   *)
     echo "Usage: scripts/migrate-d1.sh local DB_NAME [WRANGLER_CONFIG]" >&2
-    echo "       scripts/migrate-d1.sh remote DB_NAME" >&2
+    echo "       scripts/migrate-d1.sh remote DB_NAME [DATABASE_ID]" >&2
     exit 2
     ;;
 esac

@@ -69,11 +69,21 @@ for script in ("scripts/deploy.sh", "scripts/deploy-preview.sh"):
     assert "migrate-d1.sh" in text, f"{script} must apply ordered D1 migrations"
     assert "db/catalog-seed.sql" in text, f"{script} must seed the researched catalogue"
 
+
 justfile = (ROOT / "justfile").read_text()
 for recipe in ["deploy-staging:", "deploy-production:", "admin-key:"]:
     assert recipe in justfile, recipe
 
 deploy = (ROOT / "scripts/deploy.sh").read_text()
+# Remote D1 creation is eventually consistent in the account listing. Schema
+# application must use Alchemy's exact database id rather than immediately
+# trying to rediscover the new database by name.
+assert '"database_id": "${database_id}"' in deploy
+assert '--config "${database_config}"' in deploy
+assert './scripts/migrate-d1.sh remote "${database_name}" "${database_id}"' in deploy
+
+migrate_d1 = (ROOT / "scripts/migrate-d1.sh").read_text()
+assert 'database_id="${3:-}"' in migrate_d1
 assert 'environment="${1:-staging}"' in deploy
 assert "Production requires a NAV-issued private consumer token" in deploy
 assert "Production requires ADMIN_SYNC_TOKEN" in deploy
