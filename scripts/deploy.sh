@@ -169,6 +169,18 @@ if [ ! -d infra/node_modules ]; then
   run_logged infra-install bash -c "cd infra && bun install"
 fi
 
+# Alchemy deploys pre-built artifacts. Build them here, after verification and
+# immediately before publication, so a deploy cannot reuse files left by an
+# earlier preview or checkout.
+echo "Building deployment artifacts..."
+run_logged web-build bash -c "cd apps/web && bun run build"
+mkdir -p .preview
+run_logged worker-build bun build apps/worker/src/index.ts \
+  --outfile=.preview/worker.js \
+  --target=browser --format=esm \
+  --conditions=workerd --conditions=worker \
+  --external "cloudflare:*"
+
 read_stack_output() {
   python3 - "$1" <<'PYOUT'
 import json

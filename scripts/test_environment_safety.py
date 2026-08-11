@@ -98,6 +98,9 @@ assert "Production requires ADMIN_SYNC_TOKEN" in deploy
 assert "smoke-production.sh" in deploy
 assert "JOB_INDEX_DEV_VARS_FILE" in deploy
 assert "bootstrap-publish" in deploy
+assert "run_logged web-build" in deploy
+assert "run_logged worker-build bun build apps/worker/src/index.ts" in deploy
+assert deploy.index("run_logged worker-build") < deploy.index("deploy_stack 0")
 # The two-phase production publication: schedules off, then on.
 assert "deploy_stack 0" in deploy
 assert '"${deployment_url}" "${environment}"' in deploy
