@@ -76,8 +76,9 @@ const MAIL_VERIFIED_DESTINATION = "philib.krogh@gmail.com";
 
 /**
  * Production is published in two phases so a cron-enabled version can never
- * run before its credentials exist: the first deploy omits triggers and the
- * second activates them. scripts/deploy.sh sets this on the second pass only.
+ * run before its credentials exist. Staging deploys with schedules off, but
+ * an operator can activate the same trigger temporarily to qualify ingestion
+ * against the staged Worker and D1.
  */
 const ACTIVATE_SCHEDULES = process.env.JOB_INDEX_ACTIVATE_SCHEDULES === "1";
 
@@ -141,14 +142,16 @@ const environmentVars = {
 /**
  * The Worker currently implements one scheduled job: NAV ingestion.
  *
- * Only production runs it after the credential-first publication phase.
- * Staging must not race the production connector for the same NAV cursor.
+ * Production activates it in the credential-first deployment's second phase.
+ * Staging accepts the same explicit activation flag for bounded qualification;
+ * the normal staging deployment always supplies `0`.
  * Add another trigger only when the scheduled handler dispatches a distinct,
  * implemented workload for it.
  */
 const INGESTION_CRON = "0,15,30,45 * * * *";
+const SCHEDULES_ALLOWED = PRODUCTION || STAGE === "staging";
 
-const CRONS = PRODUCTION && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];
+const CRONS = SCHEDULES_ALLOWED && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];
 
 export default Alchemy.Stack(
   "JobIndex",

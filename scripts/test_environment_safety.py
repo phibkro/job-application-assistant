@@ -33,12 +33,15 @@ assert '"NAV_API_TOKEN"' in infra
 for obsolete in ("ALLOW_NAV_SYNC_WITHOUT_TOKEN", "NAV_USE_PUBLIC_TOKEN"):
     assert obsolete not in infra, obsolete
 
-# Triggers activate only on the second phase of a production deploy, so
-# scheduled ingestion cannot run before its credentials exist.
-production_cron_guard = (
-    "const CRONS = PRODUCTION && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];"
+# Triggers activate only through an explicit flag. The production deploy sets
+# it only after credentials and schema exist; staging sets it only for a
+# bounded qualification run.
+schedule_activation_guard = (
+    'const SCHEDULES_ALLOWED = PRODUCTION || STAGE === "staging";',
+    "const CRONS = SCHEDULES_ALLOWED && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];",
 )
-assert production_cron_guard in infra
+for line in schedule_activation_guard:
+    assert line in infra
 assert 'process.env.JOB_INDEX_ACTIVATE_SCHEDULES === "1"' in infra
 assert 'const INGESTION_CRON = "0,15,30,45 * * * *";' in infra
 for inactive_cron in (

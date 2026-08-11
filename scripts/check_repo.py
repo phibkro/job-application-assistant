@@ -361,11 +361,14 @@ if production_config.is_file():
     if '"NAV_API_TOKEN"' not in infra_text:
         errors.append("runtime private NAV token binding is missing")
     ingestion_cron = 'const INGESTION_CRON = "0,15,30,45 * * * *";'
-    production_cron_guard = (
-        "const CRONS = PRODUCTION && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];"
+    schedule_activation_guard = (
+        'const SCHEDULES_ALLOWED = PRODUCTION || STAGE === "staging";',
+        "const CRONS = SCHEDULES_ALLOWED && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];",
     )
-    if ingestion_cron not in infra_text or production_cron_guard not in infra_text:
-        errors.append("production must phase-gate the bounded ingestion trigger")
+    if ingestion_cron not in infra_text or any(
+        line not in infra_text for line in schedule_activation_guard
+    ):
+        errors.append("production and staging must explicitly gate the bounded ingestion trigger")
     inactive_crons = (
         '"2,7,12,17,22,27,32,37,42,47,52,57 * * * *"',
         '"4,9,14,19,24,29,34,39,44,49,54,59 * * * *"',
