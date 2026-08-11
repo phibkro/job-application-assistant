@@ -29,7 +29,7 @@ case "$mode" in
       fi
     fi
 
-    config="$(mktemp)"
+    config="$(mktemp --suffix=.jsonc)"
     trap 'rm -f "$config"' EXIT
     cat >"$config" <<JSON
 {

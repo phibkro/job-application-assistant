@@ -172,7 +172,7 @@ apply_database() {
   # A newly created D1 can take time to appear in Wrangler's account listing.
   # Address the exact resource Alchemy returned instead of rediscovering it by
   # name; this also prevents a similarly named legacy database from matching.
-  database_config="$(mktemp)"
+  database_config="$(mktemp --suffix=.jsonc)"
   # The process-level cleanup trap removes this file if any Wrangler step fails.
   cat >"${database_config}" <<JSON
 {
