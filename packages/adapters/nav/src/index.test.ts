@@ -55,18 +55,17 @@ describe("supports", () => {
 
 describe("page", () => {
   /**
-   * Falsifier 1 of `design-specs/deferred-hydration.md`: ingesting one feed
-   * page makes exactly one HTTP request, asserted by counting requests
-   * through this fake `HttpClient` — not by reading the code. This is the
-   * whole reason the slot exists: the previous shape fetched detail for
-   * every active entry too (883 requests for one real page), which is more
-   * than Cloudflare allows per invocation on the free plan.
+   * Ingesting one bounded feed page makes exactly one HTTP request, asserted
+   * by counting requests through this fake `HttpClient` — not by reading the
+   * code. The page-size assertion protects progress: NAV's 1,000-entry
+   * default cannot finish before the collection duration expires, while a
+   * completed page gives the next run a durable cursor.
    */
-  it("fetches the feed page and nothing else — one request per page, however many active entries it lists", async () => {
+  it("requests one checkpointable feed page and nothing else", async () => {
     let calls = 0;
     const client = clientOf((url) => {
       calls += 1;
-      if (url.endsWith("/api/v1/feed?last=true")) {
+      if (url.endsWith("/api/v1/feed?last=true&pageSize=100")) {
         return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
       }
       throw new Error(`unexpected request in test: ${url} (page() must not fetch detail)`);
@@ -176,7 +175,9 @@ describe("page", () => {
 
   it("tells a fresh sweep where to start, and does not re-tell a resumed one", async () => {
     const seen: Array<string | null> = [];
-    const respond = (_url: string, headers: Headers): Response => {
+    const seenUrls: Array<string> = [];
+    const respond = (url: string, headers: Headers): Response => {
+      seenUrls.push(url);
       seen.push(headers.get("if-modified-since"));
       return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
     };
@@ -191,6 +192,10 @@ describe("page", () => {
     seen.length = 0;
     await Effect.runPromise(Effect.exit(adapter.page(NAV_PLATFORM_ID, "/api/v1/feed/abc-123")));
     expect(seen[0]).toBeNull();
+    expect(seenUrls).toEqual([
+      "https://pam-stilling-feed.nav.no/api/v1/feed?pageSize=100",
+      "https://pam-stilling-feed.nav.no/api/v1/feed/abc-123?pageSize=100",
+    ]);
   });
 
   it("still fails loudly when a feed entry has no usable title", async () => {

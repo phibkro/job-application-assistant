@@ -24,6 +24,7 @@ export {
 export type { NavCredential } from "./credential.ts";
 
 const NAV_BASE_URL = "https://pam-stilling-feed.nav.no";
+const FEED_PAGE_SIZE = 100;
 
 const resolveUrl = (path: string): string =>
   path.startsWith("http://") || path.startsWith("https://")
@@ -84,13 +85,14 @@ const fetchJson = (
  * public endpoint. Production wiring hands in the one concrete `HttpClient`
  * and shared credential; tests hand in fakes that touch no network.
  *
- * `since` is what makes this feed usable at all. NAV publishes an append-only
- * history from June 2023, and a sweep that starts at its head walks years of
- * expired adverts before reaching anything live — thirty pages a run, nothing
- * collected. Their documentation gives the entry point: `If-Modified-Since`,
- * a header rather than a query parameter, which is why every parameter one
- * might guess at is accepted and silently ignored. Sent only on a fresh
- * sweep; once the cursor names a page, the cursor is the position.
+ * `since` makes a fresh sweep start at the retention boundary rather than
+ * walking NAV's append-only history from June 2023. `pageSize` is the other
+ * operational bound: NAV defaults to 1,000 entries, which cannot be folded
+ * into D1 before one scheduled run's duration budget expires. One hundred
+ * entries leaves enough time to finish and checkpoint a page; every request
+ * sets it because NAV's `next_url` does not carry the requested size forward.
+ * `If-Modified-Since` is sent only on a fresh sweep; once the cursor names a
+ * page, the cursor is the position.
  */
 /** NAV's own detail endpoint for one feed entry, by the same uuid the feed itself calls `externalId`. */
 const detailUrl = (externalId: string): string => resolveUrl(`/api/v1/feedentry/${externalId}`);
@@ -113,10 +115,12 @@ export const make = (
       // A cursor naming a page is a position already reached; only the feed
       // root is a fresh start that needs telling where to begin.
       const fresh = !cursor.includes("/feed/");
+      const feedUrl = new URL(resolveUrl(cursor));
+      feedUrl.searchParams.set("pageSize", String(FEED_PAGE_SIZE));
       const feedJson = yield* fetchJson(
         client,
         credential,
-        resolveUrl(cursor),
+        feedUrl.toString(),
         fresh ? since : undefined,
       );
       const page = yield* decodeFeedPage(feedJson);
