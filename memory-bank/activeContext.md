@@ -15,6 +15,7 @@ The approved product direction is the Job Application Assistant mission and MVP 
 - `../effect` is the official local Effect source and idiom guide. The project is pinned to `effect@4.0.0-beta.104`; the current checkout reports beta.107, so exact API compatibility must be checked against the pinned dependency before adopting an idiom.
 - `db/schema.sql` and `db/catalog-seed.sql` are generated snapshots. `scripts/ts/schema.ts` and `scripts/ts/catalog.ts` provide emit/check commands, and `bun run check` includes both checks.
 - `infra/alchemy.run.ts` declares the TypeScript Worker for every Alchemy stage. This is current source configuration, not evidence that a staging or production deployment is current.
+- Staging and production preserve the legacy `Db` resource but bind the TypeScript Worker to a distinct `TypeScriptDb` (`job-index-<stage>-typescript-db`), as WS-0012 requires. This prevents Alchemy state recovery from adopting the incompatible Rust D1 by name.
 - Only NAV is registered in the TypeScript acquisition layer. `apps/worker/src/ingestion/scheduled.ts` selects Feed catalog entries; `scheduled.test.ts` guards that target boundary.
 - Production configuration declares one credential-gated ingestion trigger, restrictive demo/NAV settings, and private NAV/admin credentials. Production qualification evidence is still incomplete.
 - NAV credentials resolve per request: staging can use the cached public token, while production requires a private NAV secret. A 401 invalidates and refreshes only the token used by that request.

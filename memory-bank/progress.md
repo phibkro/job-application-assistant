@@ -14,6 +14,7 @@
 - Runtime NAV credentials: the adapter shares a cached public token or uses the private secret, invalidates only a failing token on 401, and retries once.
 - Saved application workspace: durable snapshots, owner-scoped custom labels, presets, compare-and-swap lifecycle events, current/prior attempts, note-preserving event updates, session-epoch isolation for late owner-scoped responses, and the `/saved` interface.
 - Ordered D1 migration support: generated snapshots mark current shapes, existing databases apply `migrations/*.sql`, and the runner records only successful migrations.
+- TypeScript D1 isolation: staging/production retain the legacy database resource unbound and use a separately identified `TypeScriptDb`, preventing the RFC 0015 cutover from adopting the Rust schema.
 - Local full-stack Saved evidence: save → draft → assisted preparation → approval → label assignment/filter → explicit submission confirmation → Applied preset → history.
 
 ## Known gaps and evidence status

@@ -66,8 +66,13 @@ This order prevents scheduled ingestion from using the previous table shape.
 
 ## Database upgrades
 
-The generated schema creates a new database at the current shape.
-`d1_migrations` records ordered upgrades for an existing database.
+Each TypeScript stage uses `job-index-<stage>-typescript-db`. The legacy
+`job-index-<stage>-db` remains declared but is not bound to the replacement
+Worker, so Alchemy preserves it without attempting an incompatible schema
+upgrade.
+
+The generated schema creates the TypeScript database at the current shape.
+`d1_migrations` records ordered upgrades between later TypeScript snapshots.
 
 Do not apply migration SQL manually. Use the deployment command or
 `scripts/migrate-d1.sh`. The migration runner records a migration only after

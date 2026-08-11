@@ -154,19 +154,25 @@ export default Alchemy.Stack(
   "JobIndex",
   { providers: Cloudflare.providers(), state: State.localState() },
   Effect.gen(function* () {
-    // The system of record. Alchemy provisions the D1 resource, but it does
-    // not mutate application tables. The deploy script first applies the
-    // generated snapshot, then the ordered TypeScript-era migrations. For
-    // production it does that between the no-cron and cron-enabled publishes,
-    // so scheduled ingestion never reaches an earlier table shape.
-    //
-    // No `migrationsDir` here: Alchemy creates the resource before the deploy
-    // script can establish the generated baseline. Running an incremental
-    // ALTER migration during resource provisioning would therefore fail on a
-    // new database. `scripts/migrate-d1.sh` runs migrations after the snapshot
-    // and uses Wrangler's migration ledger to preserve existing deployments.
-    const database = yield* Cloudflare.D1Database("Db", {
+    // RFC 0015 starts the TypeScript service on a new database; the Rust
+    // staging/production schema is intentionally not back-filled. Keep the
+    // legacy `Db` resource declared so Alchemy preserves it, but never bind it
+    // to the replacement Worker.
+    yield* Cloudflare.D1Database("Db", {
       name: `job-index-${STAGE}-db`,
+      primaryLocationHint: "weur",
+    });
+
+    // The TypeScript system of record has a distinct logical and physical
+    // identity, so a state rebuild cannot adopt the legacy database by name.
+    // Alchemy provisions only the resource. The deploy script applies the
+    // generated snapshot and then any later TypeScript-era migrations before
+    // production schedules are enabled.
+    //
+    // No `migrationsDir` here: an incremental ALTER migration would run during
+    // resource provisioning, before a new database has its generated baseline.
+    const database = yield* Cloudflare.D1Database("TypeScriptDb", {
+      name: `job-index-${STAGE}-typescript-db`,
       // Norwegian vacancies read from Norway.
       primaryLocationHint: "weur",
     });

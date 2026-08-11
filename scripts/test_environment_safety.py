@@ -18,6 +18,13 @@ assert "triggers" not in preview_config
 
 infra = (ROOT / "infra/alchemy.run.ts").read_text()
 
+# RFC 0015 starts the TypeScript service on a new database. Keep the legacy
+# `Db` resource declared so Alchemy cannot delete it, and bind the Worker to a
+# separately identified resource whose physical name cannot adopt the Rust D1.
+assert 'Cloudflare.D1Database("Db"' in infra
+assert 'Cloudflare.D1Database("TypeScriptDb"' in infra
+assert "job-index-${STAGE}-typescript-db" in infra
+
 # Production must not expose the demo mutations or stale public-token
 # fallback bindings. Private mode remains available through the explicit
 # NAV_API_TOKEN secret.
