@@ -10,8 +10,8 @@
 - Generated source-catalog seed (`db/catalog-seed.sql`) checked by `bun run catalog:check`, from `scripts/ts/catalog.ts` and the researched platform index/observations.
 - Local preview (`just preview`) serving the TypeScript stack with a seeded local D1.
 - The approved Job Application Assistant mission and MVP boundary are recorded canonically in [`docs/internal/product/vision.md`](../docs/internal/product/vision.md); context docs link there instead of copying the full decision.
-- Scheduled ingestion target stabilization: `apps/worker/src/ingestion/scheduled.ts` selects the Feed tier implemented by this deployment, production declares only its ingestion cron, and `scheduled.test.ts` guards the target boundary.
-- Runtime NAV credentials: the adapter shares a cached public token or uses the private secret, invalidates only a failing token on 401, and retries once.
+- Scheduled ingestion targets only the Feed tier. NAV requests 10-entry pages, and each scheduled invocation attempts one checkpointable page.
+- Runtime NAV credentials use a cached public token or a private secret. A 401 refreshes only the failed token.
 - Saved application workspace: durable snapshots, owner-scoped custom labels, presets, compare-and-swap lifecycle events, current/prior attempts, note-preserving event updates, session-epoch isolation for late owner-scoped responses, and the `/saved` interface.
 - Ordered D1 migration support: generated snapshots mark current shapes, existing databases apply `migrations/*.sql`, and the runner records only successful migrations.
 - TypeScript D1 isolation: staging/production retain the legacy database resource unbound and use a separately identified `TypeScriptDb`, preventing the RFC 0015 cutover from adopting the Rust schema.
@@ -22,18 +22,19 @@
 These gaps are current boundaries or evidence limits, not claims that source code is absent where it is implemented:
 
 - **Administrative surface.** API-key principal administration (quotas, revocation, audit log), owned saved-search webhook subscriptions/delivery, and corpus maintenance (audit/dry-run reconcile/purge) are not implemented in the TypeScript service. `ADMIN_SYNC_TOKEN` is still required by production deploy gates and infrastructure secret bindings, but no TypeScript route currently checks it.
+- **Scheduled ingestion.** Staging authenticated with NAV and wrote more than 300 corpus rows. Runs then ended in a D1 `Effect.tryPromise` operation after approximately 175 seconds. No successful run checkpoint or report exists. Staging schedules are disabled.
 - **Production qualification.** No current TypeScript evidence proves realistic-corpus query-plan capacity, a clean restore drill, or the black-box staging smoke path. Production qualification remains open.
-- **Staging evidence.** Existing staging evidence is stale; the current `infra/alchemy.run.ts` declaration (TypeScript Worker for every Alchemy stage) must not be mistaken for a current deployed revision.
+- **Staging evidence.** Revision `c14a829` passed the full deployment gate and HTTP smoke. This evidence does not qualify scheduled ingestion or production.
 - **OpenAPI contract.** `openapi/job-index-v1.json` is not a current generated artifact; nothing currently generates a replacement from `apps/worker/src/Api.ts`.
 
 ## Current stabilization focus
 
-Prove NAV credential resolution and scheduled ingestion on a deployed revision.
-Local source, unit, D1, and browser evidence is current. Remote staging and
-production qualification evidence is not current.
+Find the D1 operation that blocks scheduled NAV folding. Then prove that one
+deployed run checkpoints its cursor and writes its run report. Remote staging
+HTTP evidence is current. Production qualification remains open.
 
 ## Next work
 
-- Exercise scheduled NAV ingestion on a deployed revision, refresh staging evidence, and complete TypeScript production qualification.
+- Correct the scheduled D1 fold, refresh staging ingestion evidence, and complete TypeScript production qualification.
 - Decide separately whether to port administrative capabilities and generate a replacement OpenAPI contract.
 - After MVP stabilization, evaluate future candidates from the [product vision](../docs/internal/product/vision.md): ATS-friendly document assistance and bounded Cloudflare Agents SDK/browser/computer-control support. These are not committed architecture, and submission still requires explicit human approval.
