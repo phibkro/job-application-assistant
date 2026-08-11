@@ -30,6 +30,7 @@ trap cleanup_database_config EXIT
 mkdir -p "${state_dir}" "${log_dir}"
 
 dev_vars_file="${JOB_INDEX_DEV_VARS_FILE:-.dev.vars}"
+nav_validation_url="${NAV_KEY_VALIDATION_URL:-https://pam-stilling-feed.nav.no/api/v1/feed?last=true}"
 
 read_dev_var() {
   local key="$1"
@@ -99,6 +100,33 @@ PYTOKEN
   # that is not published. If SOURCE_CODE_URL is still set it is passed through
   # untouched — some deployments may want to link an internal repository — but
   # nothing requires it.
+fi
+
+# A token can be revoked before its JWT expiry (NAV invalidates earlier tokens
+# when a consumer receives a replacement). Validate the credential at deploy
+# time so staging cannot record private mode, and production cannot enable its
+# trigger, with a token the feed already rejects.
+if [ -n "${private_nav_token}" ]; then
+  if ! nav_status="$(
+    curl \
+      --silent \
+      --show-error \
+      --location \
+      --output /dev/null \
+      --write-out '%{http_code}' \
+      --header 'Accept: application/json' \
+      --header "Authorization: Bearer ${private_nav_token}" \
+      "${nav_validation_url}"
+  )"; then
+    nav_status="network-error"
+  fi
+  case "${nav_status}" in
+    200|304) ;;
+    *)
+      echo "NAV rejected the configured private token during feed validation (HTTP ${nav_status})." >&2
+      exit 1
+      ;;
+  esac
 fi
 
 # A browser login is opened only when no API token or OAuth session exists.

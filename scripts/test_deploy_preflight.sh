@@ -18,6 +18,14 @@ exit 99
 WRANGLER
 chmod +x "${tmp}/bin/wrangler"
 
+cat > "${tmp}/bin/curl" <<'CURL'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "${CURL_CALL_LOG:?}"
+printf '%s' "${CURL_STATUS:-200}"
+CURL
+chmod +x "${tmp}/bin/curl"
+
 make_jwt() {
   python3 - <<'PYJWT'
 import base64
@@ -42,6 +50,7 @@ assert_preflight_failure() {
       HOME="${tmp}" \
       PATH="${tmp}/bin:${PATH}" \
       WRANGLER_CALL_LOG="${tmp}/wrangler-calls" \
+      CURL_CALL_LOG="${tmp}/curl-calls" \
       JOB_INDEX_DEV_VARS_FILE="${tmp}/missing.dev.vars" \
       "$@" \
       "${bash_bin}" "${root}/scripts/deploy.sh" production 2>&1
@@ -80,6 +89,10 @@ assert_preflight_failure \
 assert_preflight_failure \
   "Production ADMIN_SYNC_TOKEN must contain at least 32 characters." \
   env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=too-short
+
+assert_preflight_failure \
+  "NAV rejected the configured private token during feed validation (HTTP 401)." \
+  env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef CURL_STATUS=401
 
 # The source-URL preflight assertions are gone with the AGPL obligation that
 # required them. The credential gates above stay: those protect production,
