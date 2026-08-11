@@ -53,6 +53,15 @@ export const layerSqlite = (location: string = ":memory:"): Layer.Layer<Database
         db.query(sql).run(...bind(bindings));
       });
 
+    const runAffected = (sql: string, bindings: ReadonlyArray<unknown>): Effect.Effect<number> =>
+      Effect.sync(() => {
+        const result = db.query(sql).run(...bind(bindings));
+        if (typeof result === "object" && result !== null && "changes" in result) {
+          const changes = result.changes;
+          return typeof changes === "number" ? changes : 0;
+        }
+        return 0;
+      });
     // All-or-nothing over the given list. Every write runs between BEGIN and
     // COMMIT; anything SQLite rejects rolls the whole list back before the
     // defect propagates, so a partial batch is not a state a caller can see.
@@ -72,5 +81,5 @@ export const layerSqlite = (location: string = ":memory:"): Layer.Layer<Database
             }
           });
 
-    return Database.of({ query, run, atomic });
+    return Database.of({ query, run, runAffected, atomic });
   });

@@ -48,6 +48,8 @@ export type SavedJobId = typeof SavedJobId.Type;
 
 export const ApplicationId = Schema.String.pipe(Schema.brand("ApplicationId"));
 export type ApplicationId = typeof ApplicationId.Type;
+export const CustomLabelId = Schema.String.pipe(Schema.brand("CustomLabelId"));
+export type CustomLabelId = typeof CustomLabelId.Type;
 
 export const SavedSearchId = Schema.String.pipe(Schema.brand("SavedSearchId"));
 export type SavedSearchId = typeof SavedSearchId.Type;

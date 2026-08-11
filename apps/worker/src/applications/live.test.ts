@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { DeliveryPlatform } from "@job-index/domain/Delivery";
 import { Subscription } from "@job-index/domain/Subscription";
-import { PlatformPolicyRecord, SavedJob } from "@job-index/domain/Applications";
+import { ApplicationRecord, PlatformPolicyRecord, SavedJob } from "@job-index/domain/Applications";
 import type { PolicyTag } from "@job-index/domain/Applications";
 import { isHydrated, snapshotOf } from "@job-index/domain/Job";
 import type { RawListing } from "@job-index/domain/Job";
@@ -141,6 +141,7 @@ const seedSavedJob = (profile: ProfileId, listingOverrides: Partial<RawListing> 
         jobSnapshot: snapshotOf(job),
         note: "",
         createdAt: now,
+        updatedAt: now,
       }),
     );
     return { savedJobId, canonicalJobId: listing.canonicalJobId as CanonicalJobId };
@@ -489,5 +490,153 @@ describe("Applications against a real SQLite engine", () => {
     );
     // Not the edited advert the corpus now holds — the one the person saved.
     expect(snapshotDescription).toBe("Bakes bread the traditional way.");
+  });
+
+  it("accepts valid lifecycle events and rejects invalid or stale attempts", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        yield* seedDeliveryPlatform("webcruiter.no");
+        yield* seedPolicy("Allowed");
+        yield* seedSubscription({ _tag: "Premium", until: "2099-01-01" });
+        const { savedJobId } = yield* seedSavedJob(PROFILE);
+        const applications = yield* Applications;
+        const prepared = yield* applications.prepare(PROFILE, savedJobId, "assisted");
+        const db = yield* Database;
+        const initial = yield* db.query<{ status: string; updatedAt: string }>(
+          "SELECT status, updatedAt FROM applications WHERE id = ?",
+          [prepared.application],
+        );
+        const expectedUpdatedAt = initial[0]?.updatedAt;
+        if (expectedUpdatedAt === undefined)
+          return yield* Effect.die("missing prepared application");
+
+        const invalid = yield* Effect.exit(
+          applications.recordEvent(
+            PROFILE,
+            prepared.application,
+            "record-interview",
+            "",
+            expectedUpdatedAt,
+          ),
+        );
+        const afterInvalid = yield* db.query<{ status: string; updatedAt: string }>(
+          "SELECT status, updatedAt FROM applications WHERE id = ?",
+          [prepared.application],
+        );
+        const submitted = yield* applications.recordEvent(
+          PROFILE,
+          prepared.application,
+          "confirm-submission",
+          "Confirmed externally.",
+          expectedUpdatedAt,
+        );
+        const interviewed = yield* applications.recordEvent(
+          PROFILE,
+          prepared.application,
+          "record-interview",
+          undefined,
+          submitted.updatedAt,
+        );
+        const afterInterview = yield* db.query<{ notes: string; status: string }>(
+          "SELECT notes, status FROM applications WHERE id = ?",
+          [prepared.application],
+        );
+        const stale = yield* Effect.exit(
+          applications.recordEvent(
+            PROFILE,
+            prepared.application,
+            "record-interview",
+            "",
+            expectedUpdatedAt,
+          ),
+        );
+        const afterStale = yield* db.query<{ status: string; updatedAt: string }>(
+          "SELECT status, updatedAt FROM applications WHERE id = ?",
+          [prepared.application],
+        );
+        return { invalid, afterInvalid, submitted, interviewed, afterInterview, stale, afterStale };
+      }),
+    );
+    expect(result.invalid._tag).toBe("Failure");
+    if (result.invalid._tag === "Failure") {
+      expect(String(result.invalid.cause)).toContain("InvalidApplicationTransition");
+    }
+    expect(result.afterInvalid[0]?.status).toBe("ready");
+    expect(result.submitted.status).toBe("submitted");
+    expect(result.interviewed.status).toBe("interview");
+    expect(result.afterInterview).toEqual([
+      { notes: "Confirmed externally.", status: "interview" },
+    ]);
+    expect(result.stale._tag).toBe("Failure");
+    if (result.stale._tag === "Failure") {
+      expect(String(result.stale.cause)).toContain("StaleApplicationUpdate");
+    }
+    expect(result.afterStale[0]?.status).toBe("interview");
+    expect(result.afterStale[0]?.updatedAt).not.toBe(result.afterInvalid[0]?.updatedAt);
+  });
+
+  it("applies an application update only once for one owner and expected version", async () => {
+    const counts = await run(
+      Effect.gen(function* () {
+        yield* seedDeliveryPlatform("webcruiter.no");
+        yield* seedPolicy("Allowed");
+        yield* seedSubscription({ _tag: "Premium", until: "2099-01-01" });
+        const { savedJobId } = yield* seedSavedJob(PROFILE);
+        const applications = yield* Applications;
+        const prepared = yield* applications.prepare(PROFILE, savedJobId, "assisted");
+        const existing = yield* ApplicationRecords.findByIdForProfile(
+          prepared.application,
+          PROFILE,
+        );
+        if (existing === undefined) return yield* Effect.die("missing prepared application");
+        const expectedUpdatedAt = DateTime.formatIso(existing.updatedAt);
+        const first = new ApplicationRecord({
+          ...existing,
+          status: "submitted",
+          updatedAt: DateTime.addDuration(existing.updatedAt, 1),
+        });
+        const second = new ApplicationRecord({
+          ...first,
+          status: "interview",
+          updatedAt: DateTime.addDuration(first.updatedAt, 1),
+        });
+        const firstCount = yield* ApplicationRecords.updateIfUnchanged(first, expectedUpdatedAt);
+        const secondCount = yield* ApplicationRecords.updateIfUnchanged(second, expectedUpdatedAt);
+        const stored = yield* ApplicationRecords.findByIdForProfile(prepared.application, PROFILE);
+        return { firstCount, secondCount, stored };
+      }),
+    );
+    expect(counts.firstCount).toBe(1);
+    expect(counts.secondCount).toBe(0);
+    expect(counts.stored?.status).toBe("submitted");
+  });
+  it("returns newest-first saved application history with exactly one current attempt", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        yield* seedDeliveryPlatform("webcruiter.no");
+        yield* seedPolicy("Allowed");
+        yield* seedSubscription({ _tag: "Premium", until: "2099-01-01" });
+        const { savedJobId } = yield* seedSavedJob(PROFILE);
+        const applications = yield* Applications;
+        const first = yield* applications.prepare(PROFILE, savedJobId, "assisted");
+        const second = yield* applications.prepare(PROFILE, savedJobId, "assisted");
+        const history = yield* applications.historyForSaved(PROFILE, savedJobId);
+        const foreign = yield* Effect.exit(
+          applications.historyForSaved("other-profile" as ProfileId, savedJobId),
+        );
+        return { first, second, history, foreign };
+      }),
+    );
+
+    expect(result.history.map((entry) => entry.applicationId)).toEqual([
+      result.second.application,
+      result.first.application,
+    ]);
+    expect(result.history.map((entry) => entry.isCurrent)).toEqual([true, false]);
+    expect(result.history.every((entry) => entry.notes === "")).toBe(true);
+    expect(result.foreign._tag).toBe("Failure");
+    if (result.foreign._tag === "Failure") {
+      expect(String(result.foreign.cause)).toContain("SavedJobMissing");
+    }
   });
 });

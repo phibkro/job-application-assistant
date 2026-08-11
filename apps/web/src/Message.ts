@@ -4,6 +4,7 @@ import { m } from "foldkit/message";
 import { CanonicalJob } from "@job-index/domain/Job";
 import { JobPage, Problem } from "./Model.ts";
 import * as ProfileMessage from "./profile/Message.ts";
+import * as SavedMessage from "./saved/Message.ts";
 import { Route } from "./Route.ts";
 
 /**
@@ -29,21 +30,18 @@ export const UrlRequested = m("UrlRequested", { request: Navigation.UrlRequest }
 export const UrlChanged = m("UrlChanged", { route: Route });
 /** The sole completion Message for `PushUrl`/`LoadUrl`: both leave the
  *  visible change already applied (the browser's own history/location APIs
- *  did it synchronously), so, like `StorageSynced`, there is nothing left
- *  for `update` to do with the result. */
+ *  did it synchronously), so there is nothing left for `update` to do. */
 export const UrlPushed = m("UrlPushed");
 
 // Session
 export const SessionTokenInputChanged = m("SessionTokenInputChanged", { value: S.String });
 export const SessionTokenSubmitted = m("SessionTokenSubmitted");
 export const SessionCleared = m("SessionCleared");
-/** The sole completion Message for `PersistSessionToken` and
- *  `ClearSessionToken`: both write to `sessionStorage`, a Command effect
- *  that must still resolve to some Message, but neither has anything left
- *  to tell the Model — `SessionTokenSubmitted` / `SessionCleared` already
- *  applied the visible change before the Command ran. `update` treats this
- *  as a no-op. */
-export const StorageSynced = m("StorageSynced");
+/** Completion for `PersistSessionToken` and `ClearSessionToken`. The epoch
+ *  identifies the session transition that scheduled the storage write, so a
+ *  late completion from an earlier owner cannot start the current owner's
+ *  Saved load. */
+export const StorageSynced = m("StorageSynced", { sessionEpoch: S.Number });
 
 // Browse
 export const BrowseTermChanged = m("BrowseTermChanged", { value: S.String });
@@ -88,7 +86,14 @@ export const FeedDismissFailed = m("FeedDismissFailed", { jobId: S.String, probl
 // Profile — the entire cluster (was 18 tags: field edits, experience-entry
 // edits, and the fetch/save request lifecycle) lives behind the profile
 // Submodel now (see `profile/`). The root only forwards to it.
-export const GotProfileMessage = m("GotProfileMessage", { message: ProfileMessage.Message });
+export const GotProfileMessage = m("GotProfileMessage", {
+  sessionEpoch: S.Number,
+  message: ProfileMessage.Message,
+});
+export const GotSavedMessage = m("GotSavedMessage", {
+  sessionEpoch: S.Number,
+  message: SavedMessage.Message,
+});
 
 // Apply loop
 export const SaveJobClicked = m("SaveJobClicked", { jobId: S.String });
@@ -160,6 +165,7 @@ export const Message = S.Union([
   FeedDismissSucceeded,
   FeedDismissFailed,
   GotProfileMessage,
+  GotSavedMessage,
   SaveJobClicked,
   SaveJobSucceeded,
   SaveJobFailed,

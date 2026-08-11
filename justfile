@@ -8,9 +8,6 @@ help:
 setup:
   ./scripts/dispatch.sh _setup
 
-# Refresh the rotating NAV public token used by local Wrangler.
-nav-token:
-  ./scripts/dispatch.sh _nav-token
 
 # Configure a NAV-issued private consumer bearer token locally.
 nav-key:
@@ -42,18 +39,18 @@ soak base_url duration="300" interval="30":
 preview:
   ./scripts/dispatch.sh _preview
 
-# Deploy the TypeScript service to its own Cloudflare stage (not a cutover).
+# Deploy the TypeScript service to an independent Cloudflare preview stage.
 deploy-preview:
   ./scripts/dispatch.sh _deploy-preview
 
-# Deploy the disposable staging environment and run destructive smoke tests.
+# Deploy staging after verification and run a non-destructive HTTP smoke.
 deploy:
   ./scripts/dispatch.sh _deploy-staging
 
 deploy-staging:
   ./scripts/dispatch.sh _deploy-staging
 
-# Deploy production. Requires private NAV/admin secrets and SOURCE_CODE_URL.
+# Deploy production. Requires private NAV and administrative secrets.
 deploy-production:
   ./scripts/dispatch.sh _deploy-production
 
@@ -64,16 +61,13 @@ clean:
 _setup:
   ./scripts/setup.sh
 
-_nav-token:
-  JOB_INDEX_SKIP_NAV_TOKEN_SETUP=1 ./scripts/setup.sh
-  ./scripts/refresh-nav-token.sh --force-public
 
 _nav-key:
-  JOB_INDEX_SKIP_NAV_TOKEN_SETUP=1 ./scripts/setup.sh
+  ./scripts/setup.sh
   ./scripts/configure-nav-key.sh
 
 _nav-key-cloudflare:
-  JOB_INDEX_SKIP_NAV_TOKEN_SETUP=1 ./scripts/setup.sh
+  ./scripts/setup.sh
   ./scripts/configure-nav-key.sh --cloudflare
 
 _admin-key:

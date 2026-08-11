@@ -7,7 +7,10 @@ import type {
   ApplicationMissing,
   DraftMissing,
   EntitlementRequired,
+  InvalidApplicationTransition,
   PolicyProhibited,
+  SavedJobMissing,
+  StaleApplicationUpdate,
 } from "@job-index/domain/Failure";
 
 /**
@@ -38,24 +41,35 @@ export type ApplicationStatus =
   | "offer"
   | "withdrawn";
 
-/**
- * The human step in an automated run, and what it does to the application.
- *
- * Two vocabularies meet here: a person approves, reworks, or declines; the
- * application moves through a lifecycle. Nothing stated how they line up, so
- * the handler was making the call — which put a product rule in the layer
- * whose job is decoding strings.
- *
- * Approving is what submission means, so it submits. Declining ends this
- * application rather than pausing it, so it withdraws — a person who changes
- * their mind saves the job again. Rework returns it to `ready`, the state a
- * freshly prepared application is already in, because "draft it again" is the
- * same work as drafting it the first time.
- */
+export type ApplicationEventName =
+  | "confirm-submission"
+  | "record-interview"
+  | "record-offer"
+  | "record-rejection"
+  | "withdraw";
+export interface ApplicationEventResult {
+  readonly applicationId: ApplicationId;
+  readonly status: ApplicationStatus;
+  readonly updatedAt: string;
+}
+
+export interface SavedApplicationHistoryEntry {
+  readonly applicationId: ApplicationId;
+  readonly status: ApplicationStatus;
+  readonly method: Method;
+  readonly applicationUrl: string;
+  readonly notes: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly isCurrent: boolean;
+}
+
+/** Compatibility decisions for the original preparation endpoint. */
 export type Decision = "approve" | "rework" | "decline";
 
+/** Approval reviews the prepared package; only confirmation submits it. */
 export const statusForDecision = (decision: Decision): ApplicationStatus =>
-  decision === "approve" ? "submitted" : decision === "decline" ? "withdrawn" : "ready";
+  decision === "decline" ? "withdrawn" : "ready";
 
 export class Applications extends Context.Service<
   Applications,
@@ -73,12 +87,28 @@ export class Applications extends Context.Service<
      * not exist answered 200, and the person who mistyped an id was told their
      * decision had been recorded.
      */
+    readonly recordEvent: (
+      user: UserId,
+      application: ApplicationId,
+      event: ApplicationEventName,
+      notes: string | undefined,
+      expectedUpdatedAt: string,
+    ) => Effect.Effect<
+      ApplicationEventResult,
+      ApplicationMissing | InvalidApplicationTransition | StaleApplicationUpdate
+    >;
     readonly setStatus: (
       user: UserId,
       application: ApplicationId,
       status: ApplicationStatus,
       notes: string,
     ) => Effect.Effect<void, ApplicationMissing>;
+
+    /** Every attempt for one owned saved vacancy, newest first. */
+    readonly historyForSaved: (
+      user: UserId,
+      savedJob: SavedJobId,
+    ) => Effect.Effect<ReadonlyArray<SavedApplicationHistoryEntry>, SavedJobMissing>;
 
     /** Every application this profile has prepared, for their own history/export. */
     readonly history: (user: UserId) => Effect.Effect<ReadonlyArray<ApplicationRecord>>;

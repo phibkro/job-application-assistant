@@ -38,20 +38,23 @@ export const layer = Layer.effect(
     ): Effect.Effect<SavedJobId> =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;
-        const id = (yield* ids.next) as SavedJobId;
-        yield* withDatabase(
-          SavedJobRows.insert(
-            new SavedJob({
-              id,
-              profileId: profile,
-              canonicalJobId: job.id,
-              jobSnapshot: snapshotOf(job),
-              note,
-              createdAt: now,
-            }),
-          ),
-        );
-        return id;
+        const candidateId = (yield* ids.next) as SavedJobId;
+        const jobRow = new SavedJob({
+          id: candidateId,
+          profileId: profile,
+          canonicalJobId: job.id,
+          jobSnapshot: snapshotOf(job),
+          note,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const write = yield* withDatabase(SavedJobRows.upsertWrite(jobRow));
+        yield* database.atomic([write]);
+        const persisted = yield* withDatabase(SavedJobRows.findByProfileCanonical(profile, job.id));
+        if (persisted === undefined) {
+          return yield* Effect.die("saved job upsert committed without a row");
+        }
+        return persisted.id;
       });
 
     const resolve = (profile: ProfileId, saved: SavedJobId) =>

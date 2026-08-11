@@ -4,12 +4,15 @@ The repository uses progressive disclosure: start with the smallest document tha
 
 ## Five-minute orientation
 
-- [Product vision](internal/product/vision.md)
+- [Product vision and MVP boundary](internal/product/vision.md) — canonical mission for Job Application Assistant, with `job-index` retained as the repository/package identifier
+- [Current implementation brief](../memory-bank/projectbrief.md) — concise product and source shape
 - [Current architecture: Effect module map](internal/architecture/effect-module-map.md)
 - [Original prototype architecture (historical, superseded)](internal/architecture/mvp.md)
 - [ADLC overview](internal/lifecycle/adlc.md)
 - [Quality assurance strategy](internal/lifecycle/quality-assurance.md)
-- [Current project state](../memory-bank/activeContext.md)
+- [Current project state](../memory-bank/activeContext.md) — implementation claims, evidence limits, and stabilization focus
+
+The source currently declares a TypeScript/Effect Worker for every Alchemy stage. Treat that as implementation truth, not deployment proof: staging evidence is stale and production qualification remains open. The [current progress](../memory-bank/progress.md) records administrative and OpenAPI gaps. For Effect idioms, the official local source is `../effect`; the project remains pinned to `effect@4.0.0-beta.104` while that checkout reports beta.107, so exact compatibility still matters.
 
 ## Public documentation: Diátaxis
 
@@ -69,13 +72,14 @@ The six files under [`memory-bank/`](../memory-bank/) provide the small, always-
 
 ## Public reference additions
 
+- [Current HTTP API](public/reference/http-api.md)
 - [Licensing and network-source obligations](public/reference/licensing.md)
 
 - [Incremental saved-search explanation](public/explanation/incremental-saved-searches.md)
 
 ## Production documentation additions
 
-- [API v1](public/reference/api-v1.md)
+- [Historical API v1](public/reference/api-v1.md)
 - [Manage principals](public/how-to/manage-principals.md)
 - [Corpus maintenance](public/how-to/corpus-maintenance.md)
 - [Webhook delivery](public/how-to/webhooks.md)

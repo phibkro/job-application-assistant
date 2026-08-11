@@ -19,30 +19,33 @@
  * agrees, which is the point — the schema is a contract, and a slot that needs
  * a new column stops and asks rather than editing it mid-flight.
  */
-import * as fs from "node:fs"
-import * as path from "node:path"
-import { Answer } from "../../packages/domain/src/Answer.ts"
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { Answer } from "../../packages/domain/src/Answer.ts";
 import {
+  ActiveApplication,
   ApplicationRecord,
+  CustomLabel,
+  LabelAssignment,
   PlatformPolicyRecord,
   SavedJob,
-} from "../../packages/domain/src/Applications.ts"
-import { DeliveryPlatform, Submission } from "../../packages/domain/src/Delivery.ts"
-import { Freshness, Judgement } from "../../packages/domain/src/Freshness.ts"
+} from "../../packages/domain/src/Applications.ts";
+import { DeliveryPlatform, Submission } from "../../packages/domain/src/Delivery.ts";
+import { Freshness, Judgement } from "../../packages/domain/src/Freshness.ts";
 import {
   IngestionFailure,
   IngestionRun,
   SourceState,
-} from "../../packages/domain/src/Ingestion.ts"
-import { CanonicalJobRecord, OccurrenceRecord } from "../../packages/domain/src/Job.ts"
-import { Session } from "../../packages/domain/src/Access.ts"
-import { Principal } from "../../packages/domain/src/Principal.ts"
-import { ProfileRecord } from "../../packages/domain/src/Profile.ts"
-import { CatalogRecord } from "../../packages/domain/src/Source.ts"
-import { Subscription } from "../../packages/domain/src/Subscription.ts"
+} from "../../packages/domain/src/Ingestion.ts";
+import { CanonicalJobRecord, OccurrenceRecord } from "../../packages/domain/src/Job.ts";
+import { Session } from "../../packages/domain/src/Access.ts";
+import { Principal } from "../../packages/domain/src/Principal.ts";
+import { ProfileRecord } from "../../packages/domain/src/Profile.ts";
+import { CatalogRecord } from "../../packages/domain/src/Source.ts";
+import { Subscription } from "../../packages/domain/src/Subscription.ts";
 
-const ROOT = path.resolve(import.meta.dirname, "../..")
-const TARGET = path.join(ROOT, "db/schema.sql")
+const ROOT = path.resolve(import.meta.dirname, "../..");
+const TARGET = path.join(ROOT, "db/schema.sql");
 
 /** Column types, declared once because they cannot be read from the model. */
 const columnTypes: Record<string, string> = {
@@ -62,6 +65,8 @@ const columnTypes: Record<string, string> = {
   value: "TEXT NOT NULL",
   origin: "TEXT NOT NULL",
   name: "TEXT NOT NULL",
+  normalizedName: "TEXT NOT NULL",
+
   hostPattern: "TEXT NOT NULL",
   applicationUrl: "TEXT NOT NULL",
   title: "TEXT NOT NULL",
@@ -79,12 +84,17 @@ const columnTypes: Record<string, string> = {
   providerRef: "TEXT NOT NULL DEFAULT ''",
   tokenHash: "TEXT NOT NULL",
   apiKeyHash: "TEXT NOT NULL",
-  hydrationTag: "TEXT NOT NULL DEFAULT 'Unhydrated' CHECK (hydrationTag IN ('Unhydrated', 'Hydrated'))",
+  hydrationTag:
+    "TEXT NOT NULL DEFAULT 'Unhydrated' CHECK (hydrationTag IN ('Unhydrated', 'Hydrated'))",
+  labelId: "TEXT NOT NULL",
+  applicationId: "TEXT NOT NULL",
+
   statusTag: "TEXT NOT NULL CHECK (statusTag IN ('Active', 'Closed'))",
   savedJobId: "TEXT NOT NULL",
   note: "TEXT NOT NULL DEFAULT ''",
   method: "TEXT NOT NULL CHECK (method IN ('assisted', 'automated'))",
-  status: "TEXT NOT NULL CHECK (status IN ('ready', 'submitted', 'rejected', 'interview', 'offer', 'withdrawn'))",
+  status:
+    "TEXT NOT NULL CHECK (status IN ('ready', 'submitted', 'rejected', 'interview', 'offer', 'withdrawn'))",
   letter: "TEXT NOT NULL",
   generator: "TEXT NOT NULL",
   downgradeReason: "TEXT",
@@ -114,7 +124,8 @@ const columnTypes: Record<string, string> = {
   listingsUrl: "TEXT NOT NULL",
   feedUrl: "TEXT",
   tierTag: "TEXT NOT NULL CHECK (tierTag IN ('Feed', 'Scripted', 'Agent', 'Unknown'))",
-  policyTag: "TEXT NOT NULL DEFAULT 'Unreviewed' CHECK (policyTag IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed'))",
+  policyTag:
+    "TEXT NOT NULL DEFAULT 'Unreviewed' CHECK (policyTag IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed'))",
   priority: "TEXT NOT NULL",
   confidence: "TEXT NOT NULL",
   verifiedAt: "TEXT NOT NULL",
@@ -144,7 +155,7 @@ const columnTypes: Record<string, string> = {
   statusClosedAt: "TEXT",
   learnedAt: "TEXT",
   revokedAt: "TEXT",
-}
+};
 
 /**
  * Every table declares its key, because a `Model.Class` cannot express one.
@@ -156,13 +167,19 @@ const columnTypes: Record<string, string> = {
  * `rowid` as the key — and that is a decision on the page instead of an
  * omission that reads identically.
  */
-type Key = { readonly primaryKey: ReadonlyArray<string> } | { readonly appendOnly: "rowid" }
+type Key = { readonly primaryKey: ReadonlyArray<string> } | { readonly appendOnly: "rowid" };
 
 type TableSpec = Key & {
-  readonly model: unknown
-  readonly unique?: ReadonlyArray<ReadonlyArray<string>>
-  readonly indexes?: ReadonlyArray<ReadonlyArray<string>>
-}
+  readonly model: unknown;
+  readonly unique?: ReadonlyArray<ReadonlyArray<string>>;
+  readonly indexes?: ReadonlyArray<ReadonlyArray<string>>;
+  readonly foreignKeys?: ReadonlyArray<{
+    readonly columns: ReadonlyArray<string>;
+    readonly table: string;
+    readonly references: ReadonlyArray<string>;
+    readonly onDelete?: "CASCADE" | "RESTRICT";
+  }>;
+};
 
 const tables: Record<string, TableSpec> = {
   answers: {
@@ -245,13 +262,75 @@ const tables: Record<string, TableSpec> = {
     model: SavedJob,
     primaryKey: ["id"],
     // Bookmarking the same vacancy twice replaces the note, not the row.
-    unique: [["profileId", "canonicalJobId"]],
+    unique: [
+      ["profileId", "canonicalJobId"],
+      ["profileId", "id"],
+    ],
     indexes: [["profileId"]],
   },
   applications: {
     model: ApplicationRecord,
     primaryKey: ["id"],
+    unique: [["profileId", "id"]],
     indexes: [["profileId"], ["savedJobId"]],
+    foreignKeys: [
+      {
+        columns: ["profileId", "savedJobId"],
+        table: "saved_jobs",
+        references: ["profileId", "id"],
+        onDelete: "RESTRICT",
+      },
+    ],
+  },
+  custom_labels: {
+    model: CustomLabel,
+    primaryKey: ["id"],
+    unique: [
+      ["profileId", "normalizedName"],
+      ["profileId", "id"],
+    ],
+    indexes: [["profileId"]],
+  },
+  label_assignments: {
+    model: LabelAssignment,
+    primaryKey: ["profileId", "savedJobId", "labelId"],
+    indexes: [
+      ["profileId", "savedJobId"],
+      ["profileId", "labelId"],
+    ],
+    foreignKeys: [
+      {
+        columns: ["profileId", "savedJobId"],
+        table: "saved_jobs",
+        references: ["profileId", "id"],
+        onDelete: "CASCADE",
+      },
+      {
+        columns: ["profileId", "labelId"],
+        table: "custom_labels",
+        references: ["profileId", "id"],
+        onDelete: "CASCADE",
+      },
+    ],
+  },
+  active_applications: {
+    model: ActiveApplication,
+    primaryKey: ["savedJobId"],
+    unique: [["profileId", "applicationId"]],
+    foreignKeys: [
+      {
+        columns: ["profileId", "savedJobId"],
+        table: "saved_jobs",
+        references: ["profileId", "id"],
+        onDelete: "CASCADE",
+      },
+      {
+        columns: ["profileId", "applicationId"],
+        table: "applications",
+        references: ["profileId", "id"],
+        onDelete: "CASCADE",
+      },
+    ],
   },
   platform_policies: {
     model: PlatformPolicyRecord,
@@ -274,13 +353,13 @@ const tables: Record<string, TableSpec> = {
     appendOnly: "rowid",
     indexes: [["platformId", "occurredAt"]],
   },
-}
+};
 
 const fieldsOf = (model: unknown): ReadonlyArray<string> => {
-  const candidate = model as { select?: { fields?: object }; fields?: object }
-  const fields = candidate.select?.fields ?? candidate.fields ?? {}
-  return Object.keys(fields)
-}
+  const candidate = model as { select?: { fields?: object }; fields?: object };
+  const fields = candidate.select?.fields ?? candidate.fields ?? {};
+  return Object.keys(fields);
+};
 
 /** A key or index naming a column the model does not have is a hard error. */
 const checkColumns = (
@@ -291,10 +370,16 @@ const checkColumns = (
 ): void => {
   for (const column of columns) {
     if (!fields.includes(column)) {
-      throw new Error(`${table}: ${what} names ${column}, which the model does not declare`)
+      throw new Error(`${table}: ${what} names ${column}, which the model does not declare`);
     }
   }
-}
+};
+const migrations = [
+  {
+    name: "0001_saved-workspace.sql",
+    currentWhen: "EXISTS (SELECT 1 FROM pragma_table_info('saved_jobs') WHERE name = 'updatedAt')",
+  },
+] as const;
 
 const render = (): string => {
   const lines: Array<string> = [
@@ -303,56 +388,82 @@ const render = (): string => {
     "-- script and checked against the models. Re-run with --emit after a model",
     "-- changes. Nothing else may edit this file.",
     "",
-  ]
+  ];
   for (const [table, spec] of Object.entries(tables)) {
-    const fields = fieldsOf(spec.model)
+    const fields = fieldsOf(spec.model);
     if ("primaryKey" in spec) {
-      checkColumns(table, "primary key", spec.primaryKey, fields)
+      checkColumns(table, "primary key", spec.primaryKey, fields);
     }
     const columns = fields.map((field) => {
-      const type = columnTypes[field]
+      const type = columnTypes[field];
       if (type === undefined) {
         throw new Error(
           `no column type declared for ${table}.${field}; add one to scripts/ts/schema.ts`,
-        )
+        );
       }
-      return `  ${field} ${type}`
-    })
+      return `  ${field} ${type}`;
+    });
     const constraints =
-      "primaryKey" in spec ? [`  PRIMARY KEY (${spec.primaryKey.join(", ")})`] : []
+      "primaryKey" in spec ? [`  PRIMARY KEY (${spec.primaryKey.join(", ")})`] : [];
     for (const columnSet of spec.unique ?? []) {
-      checkColumns(table, "unique constraint", columnSet, fields)
-      constraints.push(`  UNIQUE (${columnSet.join(", ")})`)
+      checkColumns(table, "unique constraint", columnSet, fields);
+      constraints.push(`  UNIQUE (${columnSet.join(", ")})`);
+    }
+    for (const foreignKey of spec.foreignKeys ?? []) {
+      checkColumns(table, "foreign key", foreignKey.columns, fields);
+      if (foreignKey.columns.length !== foreignKey.references.length) {
+        throw new Error(`${table}: foreign key columns and references must have equal lengths`);
+      }
+      const action = foreignKey.onDelete === undefined ? "" : ` ON DELETE ${foreignKey.onDelete}`;
+      constraints.push(
+        `  FOREIGN KEY (${foreignKey.columns.join(", ")}) REFERENCES ${foreignKey.table} (${foreignKey.references.join(", ")})${action}`,
+      );
     }
     lines.push(
       `CREATE TABLE IF NOT EXISTS ${table} (`,
       [...columns, ...constraints].join(",\n"),
       ");",
       "",
-    )
+    );
     for (const columnSet of spec.indexes ?? []) {
-      checkColumns(table, "index", columnSet, fields)
-      const name = `idx_${table}_${columnSet.join("_")}`
-      lines.push(
-        `CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${columnSet.join(", ")});`,
-        "",
-      )
+      checkColumns(table, "index", columnSet, fields);
+      const name = `idx_${table}_${columnSet.join("_")}`;
+      lines.push(`CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${columnSet.join(", ")});`, "");
     }
   }
-  return lines.join("\n")
-}
+  lines.push(
+    "-- Wrangler records ordered D1 migrations in this table. A generated",
+    "-- snapshot already has each migration's target shape, so it records the",
+    "-- migration only when that shape is present. Existing databases without",
+    "-- the shape remain unmarked and are migrated after this snapshot runs.",
+    "CREATE TABLE IF NOT EXISTS d1_migrations (",
+    "  id INTEGER PRIMARY KEY AUTOINCREMENT,",
+    "  name TEXT UNIQUE,",
+    "  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
+    ");",
+    "",
+  );
+  for (const migration of migrations) {
+    lines.push(
+      "INSERT OR IGNORE INTO d1_migrations (name)",
+      `SELECT '${migration.name}' WHERE ${migration.currentWhen};`,
+      "",
+    );
+  }
+  return lines.join("\n");
+};
 
-const emitted = render()
+const emitted = render();
 
 if (process.argv.includes("--emit")) {
-  fs.mkdirSync(path.dirname(TARGET), { recursive: true })
-  fs.writeFileSync(TARGET, emitted)
-  process.stdout.write(`wrote ${path.relative(ROOT, TARGET)}\n`)
+  fs.mkdirSync(path.dirname(TARGET), { recursive: true });
+  fs.writeFileSync(TARGET, emitted);
+  process.stdout.write(`wrote ${path.relative(ROOT, TARGET)}\n`);
 } else {
-  const current = fs.existsSync(TARGET) ? fs.readFileSync(TARGET, "utf8") : ""
+  const current = fs.existsSync(TARGET) ? fs.readFileSync(TARGET, "utf8") : "";
   if (current !== emitted) {
-    process.stderr.write("db/schema.sql disagrees with the domain models; run with --emit\n")
-    process.exit(1)
+    process.stderr.write("db/schema.sql disagrees with the domain models; run with --emit\n");
+    process.exit(1);
   }
-  process.stdout.write("schema snapshot matches the domain models\n")
+  process.stdout.write("schema snapshot matches the domain models\n");
 }

@@ -18,7 +18,7 @@ base_url="${NAV_BASE_URL:-https://pam-stilling-feed.nav.no}"
 vars_file="${JOB_INDEX_DEV_VARS_FILE:-.dev.vars}"
 
 [ -f "${vars_file}" ] || {
-  echo "No ${vars_file}. Run 'just nav-token' (public) or 'just nav-key' first." >&2
+  echo "No ${vars_file}. Run 'just nav-key' first to configure a private token." >&2
   exit 1
 }
 token="$(sed -n 's/^NAV_API_TOKEN=//p' "${vars_file}" | tr -d '"')"

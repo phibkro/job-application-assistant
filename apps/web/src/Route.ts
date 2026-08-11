@@ -49,12 +49,20 @@ export const RouteBrowse = RouteKit.r("Browse", {
 export const RouteJobDetail = RouteKit.r("JobDetail", { jobId: S.String });
 export const RouteFeed = RouteKit.r("Feed", {});
 export const RouteProfile = RouteKit.r("Profile", {});
+export const RouteSaved = RouteKit.r("Saved", {});
 /** What an unmatched path parses to — the counterpart to `Model.ts`'s
  *  `PageNotFound`, reached when a link is stale, mistyped, or points at a
  *  route this build no longer serves. */
 export const RouteNotFound = RouteKit.r("NotFound", { path: S.String });
 
-export const Route = S.Union([RouteBrowse, RouteJobDetail, RouteFeed, RouteProfile, RouteNotFound]);
+export const Route = S.Union([
+  RouteBrowse,
+  RouteJobDetail,
+  RouteFeed,
+  RouteProfile,
+  RouteSaved,
+  RouteNotFound,
+]);
 export type Route = typeof Route.Type;
 
 const browseRouter = pipe(RouteKit.root, RouteKit.query(browseQuery), RouteKit.mapTo(RouteBrowse));
@@ -65,8 +73,15 @@ const jobDetailRouter = pipe(
 );
 const feedRouter = pipe(RouteKit.literal("feed"), RouteKit.mapTo(RouteFeed));
 const profileRouter = pipe(RouteKit.literal("profile"), RouteKit.mapTo(RouteProfile));
+const savedRouter = pipe(RouteKit.literal("saved"), RouteKit.mapTo(RouteSaved));
 
-const router = RouteKit.oneOf(browseRouter, jobDetailRouter, feedRouter, profileRouter);
+const router = RouteKit.oneOf(
+  browseRouter,
+  jobDetailRouter,
+  feedRouter,
+  profileRouter,
+  savedRouter,
+);
 
 /** Parses a URL into a `Route`, falling back to `RouteNotFound` rather than
  *  failing — there is always a screen to show, even for a stale link. */
@@ -84,6 +99,7 @@ export const href = (route: Route): string =>
       JobDetail: (value) => jobDetailRouter.build(value),
       Feed: () => feedRouter.build(),
       Profile: () => profileRouter.build(),
+      Saved: () => savedRouter.build(),
       NotFound: ({ path }) => path,
     }),
   );

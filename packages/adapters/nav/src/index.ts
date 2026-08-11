@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import type * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import { SourceUnavailable } from "../../../domain/src/Failure.ts";
 import type { AcquiredPage, HydrateOutcome, SourceAdapter } from "../../src/SourceAdapter.ts";
 import {
@@ -11,6 +12,16 @@ import {
   NAV_SOURCE_ID,
   summaryListing,
 } from "./decode.ts";
+import type { NavCredential } from "./credential.ts";
+
+export {
+  makeNavCredential,
+  makePrivateNavCredential,
+  makePublicNavCredential,
+  parsePublicToken,
+  PUBLIC_TOKEN_URL,
+} from "./credential.ts";
+export type { NavCredential } from "./credential.ts";
 
 const NAV_BASE_URL = "https://pam-stilling-feed.nav.no";
 
@@ -19,51 +30,59 @@ const resolveUrl = (path: string): string =>
     ? path
     : `${NAV_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 
+const readJson = (
+  response: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<unknown, SourceUnavailable> => {
+  if (response.status < 200 || response.status >= 300) {
+    return Effect.fail(new SourceUnavailable({ source: NAV_SOURCE_ID, status: response.status }));
+  }
+  return response.json.pipe(
+    Effect.mapError(() => new SourceUnavailable({ source: NAV_SOURCE_ID })),
+  );
+};
+
 const fetchJson = (
   client: HttpClient.HttpClient,
+  credential: NavCredential,
   url: string,
-  token: string | undefined,
   since?: Date,
 ): Effect.Effect<unknown, SourceUnavailable> =>
   Effect.gen(function* () {
-    const baseRequest = HttpClientRequest.get(url, {
-      headers: {
-        Accept: "application/json",
-        // RFC 1123, which is what the header is defined in and what NAV
-        // parses; an ISO timestamp here is accepted and ignored.
-        ...(since === undefined ? {} : { "If-Modified-Since": since.toUTCString() }),
-      },
-    });
-    const request =
-      token === undefined ? baseRequest : HttpClientRequest.bearerToken(baseRequest, token);
-    const response = yield* client
-      .execute(request)
-      .pipe(Effect.mapError(() => new SourceUnavailable({ source: NAV_SOURCE_ID })));
-    if (response.status < 200 || response.status >= 300) {
-      return yield* Effect.fail(
-        new SourceUnavailable({ source: NAV_SOURCE_ID, status: response.status }),
-      );
+    const execute = (token: string) => {
+      const baseRequest = HttpClientRequest.get(url, {
+        headers: {
+          Accept: "application/json",
+          // RFC 1123, which is what the header is defined in and what NAV
+          // parses; an ISO timestamp here is accepted and ignored.
+          ...(since === undefined ? {} : { "If-Modified-Since": since.toUTCString() }),
+        },
+      });
+      return client
+        .execute(HttpClientRequest.bearerToken(baseRequest, token))
+        .pipe(Effect.mapError(() => new SourceUnavailable({ source: NAV_SOURCE_ID })));
+    };
+    const token = yield* credential.get();
+    const response = yield* execute(token);
+    if (response.status === 401) {
+      yield* credential.invalidate(token);
+      const refreshed = yield* credential.get();
+      const retry = yield* execute(refreshed);
+      return yield* readJson(retry);
     }
-    return yield* response.json.pipe(
-      Effect.mapError(() => new SourceUnavailable({ source: NAV_SOURCE_ID })),
-    );
+    return yield* readJson(response);
   });
 
 /**
  * The NAV feed adapter, parameterised by the `HttpClient` it executes
- * requests through, the bearer token it presents, and the instant from which
- * a fresh sweep should start.
+ * requests through, the credential it resolves per request, and the instant
+ * from which a fresh sweep should start.
  *
  * NAV's feed rejects an unauthenticated request outright (verified against
- * the live endpoint: a 401, not a reduced-access response) — a fact this
- * adapter did not previously act on, because nothing had called it against
- * the real API yet. Both the client and the token travel as plain constructor
- * arguments rather than a module-level read of a global: this package is
- * imported into a Cloudflare Worker bundle, where `fetch` is a platform
- * capability, not a free function to reach for from inside a `SourceAdapter`
- * — production wiring hands in the one concrete `HttpClient`
- * `runtime/Layers.ts` builds, and this module's own tests hand in a fake that
- * touches no network at all (see `index.test.ts`).
+ * the live endpoint: a 401, not a reduced-access response). The credential
+ * capability owns acquisition and refresh, so this adapter never captures a
+ * token string or knows whether it came from a runtime secret or NAV's
+ * public endpoint. Production wiring hands in the one concrete `HttpClient`
+ * and shared credential; tests hand in fakes that touch no network.
  *
  * `since` is what makes this feed usable at all. NAV publishes an append-only
  * history from June 2023, and a sweep that starts at its head walks years of
@@ -78,7 +97,7 @@ const detailUrl = (externalId: string): string => resolveUrl(`/api/v1/feedentry/
 
 export const make = (
   client: HttpClient.HttpClient,
-  token: string | undefined,
+  credential: NavCredential,
   since?: Date,
 ): SourceAdapter["Service"] => ({
   supports: (platform) => Effect.succeed(platform === NAV_PLATFORM_ID),
@@ -96,8 +115,8 @@ export const make = (
       const fresh = !cursor.includes("/feed/");
       const feedJson = yield* fetchJson(
         client,
+        credential,
         resolveUrl(cursor),
-        token,
         fresh ? since : undefined,
       );
       const page = yield* decodeFeedPage(feedJson);
@@ -119,7 +138,7 @@ export const make = (
   // caller (`Hydration`) closes the vacancy rather than hydrating it empty.
   hydrate: (_platform, externalId) =>
     Effect.gen(function* () {
-      const detailJson = yield* fetchJson(client, detailUrl(externalId), token);
+      const detailJson = yield* fetchJson(client, credential, detailUrl(externalId));
       if (isClosedSince(detailJson)) {
         return { _tag: "ClosedSince" } satisfies HydrateOutcome;
       }

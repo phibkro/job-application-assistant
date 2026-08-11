@@ -1,20 +1,44 @@
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { isHydrated } from "@job-index/domain/Job";
 import type {
+  CustomLabelMissing,
   DraftMissing,
   EntitlementRequired,
+  InvalidApplicationTransition as DomainInvalidApplicationTransition,
+  LabelNameConflict,
   PolicyProhibited,
   ProfileIncomplete,
+  ReservedLabelMutation as DomainReservedLabelMutation,
+  SavedJobMissing,
+  StaleApplicationUpdate as DomainStaleApplicationUpdate,
 } from "@job-index/domain/Failure";
-import { api, CurrentPrincipal, ForbiddenByPlatform, NotFound, UpgradeRequired } from "../Api.ts";
+import {
+  api,
+  CurrentPrincipal,
+  ForbiddenByPlatform,
+  InvalidApplicationTransition,
+  LabelConflict,
+  NotFound,
+  ReservedLabelMutation,
+  StaleApplicationUpdate,
+  UpgradeRequired,
+} from "../Api.ts";
 import { Hydration } from "../services/Hydration.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
 import { Applications, statusForDecision } from "../services/Applications.ts";
+import { Saved } from "../services/Saved.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
-import { decodeApplicationId, decodeCanonicalJobId, decodeEnum, decodeSavedJobId } from "./wire.ts";
+import {
+  decodeApplicationId,
+  decodeCanonicalJobId,
+  decodeCustomLabelId,
+  decodeEnum,
+  decodeSavedJobId,
+} from "./wire.ts";
 
 const decodeGenerator = decodeEnum("template", "model");
 const decodeMethod = decodeEnum("assisted", "automated");
@@ -137,6 +161,181 @@ export const layer = HttpApiBuilder.group(api, "applications", (handlers) =>
           (missing) => new NotFound({ message: `no application with id ${missing.application}` }),
         );
         return { applicationId: params.id, status };
+      }),
+    )
+    .handle("listSaved", ({ query }) =>
+      Effect.gen(function* () {
+        const saved = yield* Saved;
+        const principal = yield* CurrentPrincipal;
+        const view = decodeEnum(
+          "all",
+          "active",
+          "needs-action",
+          "applied",
+          "closed",
+        )(query.view, "all");
+        const sort = decodeEnum(
+          "recently-saved",
+          "deadline-soon",
+          "recently-updated",
+        )(query.sort, "recently-saved");
+        return yield* saved.list(principal.profileId, {
+          view,
+          sort,
+          cursor: query.cursor,
+          label: query.label === undefined ? undefined : decodeCustomLabelId(query.label),
+        });
+      }),
+    )
+    .handle("listSavedLabels", () =>
+      Effect.gen(function* () {
+        const saved = yield* Saved;
+        const principal = yield* CurrentPrincipal;
+        const labels = yield* saved.labels(principal.profileId);
+        return {
+          data: labels.map((label) => ({
+            id: label.id,
+            name: label.name,
+            normalizedName: label.normalizedName,
+            createdAt: DateTime.formatIso(label.createdAt),
+            updatedAt: DateTime.formatIso(label.updatedAt),
+          })),
+        };
+      }),
+    )
+    .handle("createSavedLabel", ({ payload }) =>
+      Effect.gen(function* () {
+        const saved = yield* Saved;
+        const principal = yield* CurrentPrincipal;
+        const label = yield* saved.createLabel(principal.profileId, payload.name).pipe(
+          Effect.catchTags({
+            LabelNameConflict: (error: LabelNameConflict) =>
+              Effect.fail(
+                new LabelConflict({ name: error.name, normalizedName: error.normalizedName }),
+              ),
+            ReservedLabelMutation: (error: DomainReservedLabelMutation) =>
+              Effect.fail(new ReservedLabelMutation({ name: error.name })),
+          }),
+        );
+        return {
+          id: label.id,
+          name: label.name,
+          normalizedName: label.normalizedName,
+          createdAt: DateTime.formatIso(label.createdAt),
+          updatedAt: DateTime.formatIso(label.updatedAt),
+        };
+      }),
+    )
+    .handle("renameSavedLabel", ({ params, payload }) =>
+      Effect.gen(function* () {
+        const saved = yield* Saved;
+        const principal = yield* CurrentPrincipal;
+        const label = yield* saved
+          .renameLabel(principal.profileId, decodeCustomLabelId(params.id), payload.name)
+          .pipe(
+            Effect.catchTags({
+              CustomLabelMissing: (error: CustomLabelMissing) =>
+                Effect.fail(new NotFound({ message: `no label with id ${error.label}` })),
+              LabelNameConflict: (error: LabelNameConflict) =>
+                Effect.fail(
+                  new LabelConflict({ name: error.name, normalizedName: error.normalizedName }),
+                ),
+              ReservedLabelMutation: (error: DomainReservedLabelMutation) =>
+                Effect.fail(new ReservedLabelMutation({ name: error.name })),
+            }),
+          );
+        return {
+          id: label.id,
+          name: label.name,
+          normalizedName: label.normalizedName,
+          createdAt: DateTime.formatIso(label.createdAt),
+          updatedAt: DateTime.formatIso(label.updatedAt),
+        };
+      }),
+    )
+    .handle("deleteSavedLabel", ({ params }) =>
+      Effect.gen(function* () {
+        const saved = yield* Saved;
+        const principal = yield* CurrentPrincipal;
+        yield* saved
+          .deleteLabel(principal.profileId, decodeCustomLabelId(params.id))
+          .pipe(
+            Effect.catchTag("CustomLabelMissing", (error) =>
+              Effect.fail(new NotFound({ message: `no label with id ${error.label}` })),
+            ),
+          );
+        return { deleted: params.id };
+      }),
+    )
+    .handle("setSavedLabels", ({ params, payload }) =>
+      Effect.gen(function* () {
+        const saved = yield* Saved;
+        const principal = yield* CurrentPrincipal;
+        const savedJobId = decodeSavedJobId(params.id);
+        const labelIds = payload.labelIds.map((labelId) => decodeCustomLabelId(labelId));
+        yield* saved.setLabels(principal.profileId, savedJobId, labelIds).pipe(
+          Effect.catchTags({
+            SavedJobMissing: (error: SavedJobMissing) =>
+              Effect.fail(new NotFound({ message: `no saved job with id ${error.savedJob}` })),
+            CustomLabelMissing: (error: CustomLabelMissing) =>
+              Effect.fail(new NotFound({ message: `no label with id ${error.label}` })),
+            ReservedLabelMutation: (error: DomainReservedLabelMutation) =>
+              Effect.fail(new ReservedLabelMutation({ name: error.name })),
+          }),
+        );
+        return { savedJobId: params.id, labelIds: payload.labelIds };
+      }),
+    )
+    .handle("addApplicationEvent", ({ params, payload }) =>
+      Effect.gen(function* () {
+        const applications = yield* Applications;
+        const principal = yield* CurrentPrincipal;
+        const result = yield* applications
+          .recordEvent(
+            principal.profileId,
+            decodeApplicationId(params.id),
+            payload.event,
+            payload.notes,
+            payload.expectedUpdatedAt,
+          )
+          .pipe(
+            Effect.catchTags({
+              ApplicationMissing: () =>
+                Effect.fail(new NotFound({ message: `no application with id ${params.id}` })),
+              InvalidApplicationTransition: (error: DomainInvalidApplicationTransition) =>
+                Effect.fail(
+                  new InvalidApplicationTransition({
+                    applicationId: error.application,
+                    currentStatus: error.currentStatus,
+                    event: error.event,
+                    reason: error.reason,
+                  }),
+                ),
+              StaleApplicationUpdate: (error: DomainStaleApplicationUpdate) =>
+                Effect.fail(
+                  new StaleApplicationUpdate({
+                    applicationId: error.application,
+                    expectedUpdatedAt: error.expectedUpdatedAt,
+                    actualUpdatedAt: error.actualUpdatedAt,
+                  }),
+                ),
+            }),
+          );
+        return result;
+      }),
+    )
+    .handle("listSavedApplicationHistory", ({ params }) =>
+      Effect.gen(function* () {
+        const applications = yield* Applications;
+        const principal = yield* CurrentPrincipal;
+        const history = yield* applications
+          .historyForSaved(principal.profileId, decodeSavedJobId(params.id))
+          .pipe(
+            Effect.catchTag("SavedJobMissing", () =>
+              Effect.fail(new NotFound({ message: `no saved job with id ${params.id}` })),
+            ),
+          );
+        return { data: history };
       }),
     ),
 );

@@ -21,7 +21,8 @@ import { button, inputField, srOnlyLabelClass } from "./Shared.ts";
 
 const navLinkClass = (isActive: boolean): string =>
   clsx(
-    "rounded-md px-3 py-1.5 text-sm font-medium transition cursor-pointer",
+    "cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
     isActive
       ? "bg-indigo-50 text-indigo-700"
       : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
@@ -31,7 +32,7 @@ const isCurrentPage = (page: Page, tag: Page["_tag"]): boolean => page._tag === 
 
 export const nav = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.nav(
-    [h.Class("flex items-center gap-1")],
+    [h.AriaLabel("Primary"), h.Class("flex flex-wrap items-center gap-1")],
     [
       h.a(
         [
@@ -40,6 +41,7 @@ export const nav = (model: Model, h: HtmlBuilder<Message>): Html =>
           // the results already on screen — not the last *submitted*
           // query, which could be stale relative to a mid-typed edit.
           h.Href(Route.href(Route.RouteBrowse(model.browseQuery))),
+          ...(isCurrentPage(model.page, "Browse") ? [h.AriaCurrent("page")] : []),
         ],
         ["Browse"],
       ),
@@ -47,13 +49,23 @@ export const nav = (model: Model, h: HtmlBuilder<Message>): Html =>
         [
           h.Class(navLinkClass(isCurrentPage(model.page, "Feed"))),
           h.Href(Route.href(Route.RouteFeed())),
+          ...(isCurrentPage(model.page, "Feed") ? [h.AriaCurrent("page")] : []),
         ],
         ["Fresh feed"],
       ),
       h.a(
         [
+          h.Class(navLinkClass(isCurrentPage(model.page, "Saved"))),
+          h.Href(Route.href(Route.RouteSaved())),
+          ...(isCurrentPage(model.page, "Saved") ? [h.AriaCurrent("page")] : []),
+        ],
+        ["Saved"],
+      ),
+      h.a(
+        [
           h.Class(navLinkClass(isCurrentPage(model.page, "Profile"))),
           h.Href(Route.href(Route.RouteProfile())),
+          ...(isCurrentPage(model.page, "Profile") ? [h.AriaCurrent("page")] : []),
         ],
         ["Profile"],
       ),
@@ -70,7 +82,7 @@ export const nav = (model: Model, h: HtmlBuilder<Message>): Html =>
  */
 export const sessionPanel = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.div(
-    [h.Class("flex items-center gap-2")],
+    [h.Class("flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center")],
     model.session._tag === "Authenticated"
       ? [
           h.span([h.Class("text-sm text-gray-600")], ["Signed in."]),

@@ -2,7 +2,12 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as HttpClient from "effect/unstable/http/HttpClient";
-import { make as makeNavAdapter } from "@job-index/adapters/nav";
+import {
+  make as makeNavAdapter,
+  makePrivateNavCredential,
+  makePublicNavCredential,
+  type NavCredential,
+} from "@job-index/adapters/nav";
 import { retentionBoundary } from "@job-index/domain/Retention";
 import type { Accounts, Profiles } from "../services/Accounts.ts";
 import type { Applications } from "../services/Applications.ts";
@@ -14,6 +19,7 @@ import type { Hydration } from "../services/Hydration.ts";
 import type { Ingestion } from "../services/Ingestion.ts";
 import type { Judgements } from "../services/Judgements.ts";
 import type { Policy } from "../services/Policy.ts";
+import type { Saved } from "../services/Saved.ts";
 import type { SavedJobs } from "../services/SavedJobs.ts";
 import type { SourceCatalog } from "../services/SourceCatalog.ts";
 // `../db/index.ts` is the persistence slot's full surface, and it re-exports
@@ -53,6 +59,22 @@ const httpClient: HttpClient.HttpClient = Effect.runSync(
   Effect.provide(HttpClient.HttpClient, FetchHttpClient.layer),
 );
 
+const publicNavCredential = makePublicNavCredential(httpClient);
+let privateNavCredentialToken: string | undefined;
+let privateNavCredential: NavCredential | undefined;
+
+const navCredentialFor = (token: string | undefined): NavCredential => {
+  const value = token?.trim();
+  if (value === undefined || value.length === 0) {
+    return publicNavCredential;
+  }
+  if (privateNavCredential === undefined || privateNavCredentialToken !== value) {
+    privateNavCredential = makePrivateNavCredential(value);
+    privateNavCredentialToken = value;
+  }
+  return privateNavCredential;
+};
+
 /**
  * Every service the worker runs on, wired to one D1 binding.
  *
@@ -77,6 +99,7 @@ export type Services =
   | Hydration
   | Policy
   | SavedJobs
+  | Saved
   | SourceCatalog
   | Ingestion;
 
@@ -123,7 +146,11 @@ export const services = (env: Env): Layer.Layer<Services> => {
       tier: "Feed",
       // A fresh sweep starts at the retention boundary rather than at the
       // feed's first entry: what we will not keep, we need not read.
-      adapter: makeNavAdapter(httpClient, env.NAV_API_TOKEN, retentionBoundary(new Date())),
+      adapter: makeNavAdapter(
+        httpClient,
+        navCredentialFor(env.NAV_API_TOKEN),
+        retentionBoundary(new Date()),
+      ),
     },
   ]);
   const ingestion = ingestionLayer.pipe(

@@ -6,6 +6,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import type { PlatformId } from "../../../domain/src/Ids.ts";
 import { SourceAdapter } from "../../src/SourceAdapter.ts";
+import { makePrivateNavCredential, type NavCredential } from "./credential.ts";
 import { make } from "./index.ts";
 
 const fixture = (name: string): unknown =>
@@ -28,15 +29,12 @@ const clientOf = (respond: (url: string, headers: Headers) => Response): HttpCli
     ),
   );
 
-const layerOf = (client: HttpClient.HttpClient, token: string | undefined) =>
-  Layer.succeed(SourceAdapter, make(client, token));
+const layerOf = (client: HttpClient.HttpClient, token = "test-token") =>
+  Layer.succeed(SourceAdapter, make(client, makePrivateNavCredential(token)));
 
 describe("supports", () => {
   it("recognizes only the NAV platform id from the catalogue seed", async () => {
-    const layer = layerOf(
-      clientOf(() => new Response("{}")),
-      undefined,
-    );
+    const layer = layerOf(clientOf(() => new Response("{}")));
     const yes = await Effect.runPromise(
       Effect.provide(
         SourceAdapter.use((adapter) => adapter.supports(NAV_PLATFORM_ID)),
@@ -77,7 +75,7 @@ describe("page", () => {
     const page = await Effect.runPromise(
       Effect.provide(
         SourceAdapter.use((adapter) => adapter.page(NAV_PLATFORM_ID, "/api/v1/feed?last=true")),
-        layerOf(client, undefined),
+        layerOf(client),
       ),
     );
 
@@ -87,15 +85,13 @@ describe("page", () => {
     expect(page.listings).toHaveLength(1);
     expect(page.listings[0]?.externalId).toBe("active-vacancy-1");
     expect(page.listings[0]?.employerName).toBe("Example Technology AS");
-    // Built entirely from feed data — description is the placeholder, not a
-    // detail fetch's content, and the listing says so.
     expect(page.listings[0]?.hydrated).toBe(false);
     expect(calls).toBe(1);
   });
 
-  it("presents the bearer token on the feed request — the gap a live run once caught (a 401, not a reduced-access response)", async () => {
+  it("presents the bearer token on the feed request", async () => {
     const seenAuth: Array<string | null> = [];
-    const client = clientOf((url, headers) => {
+    const client = clientOf((_url, headers) => {
       seenAuth.push(headers.get("authorization"));
       return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
     });
@@ -110,13 +106,68 @@ describe("page", () => {
     expect(seenAuth).toEqual(["Bearer secret-token"]);
   });
 
+  it("refreshes once after a 401 and retries with the new credential", async () => {
+    const seenAuth: Array<string | null> = [];
+    const invalidated: Array<string> = [];
+    let calls = 0;
+    const credential: NavCredential = {
+      get: () => Effect.succeed(calls === 0 ? "stale-token" : "fresh-token"),
+      invalidate: (expectedToken) =>
+        Effect.sync(() => {
+          invalidated.push(expectedToken);
+        }),
+    };
+    const client = clientOf((_url, headers) => {
+      calls += 1;
+      seenAuth.push(headers.get("authorization"));
+      return calls === 1
+        ? new Response("unauthorized", { status: 401 })
+        : new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
+    });
+
+    const page = await Effect.runPromise(
+      make(client, credential).page(NAV_PLATFORM_ID, "/api/v1/feed?last=true"),
+    );
+
+    expect(page.listings).toHaveLength(1);
+    expect(seenAuth).toEqual(["Bearer stale-token", "Bearer fresh-token"]);
+    expect(invalidated).toEqual(["stale-token"]);
+  });
+
+  it("fails after the single retry also returns 401", async () => {
+    const seenAuth: Array<string | null> = [];
+    const invalidated: Array<string> = [];
+    let calls = 0;
+    const credential: NavCredential = {
+      get: () => Effect.succeed(calls === 0 ? "stale-token" : "fresh-token"),
+      invalidate: (expectedToken) =>
+        Effect.sync(() => {
+          invalidated.push(expectedToken);
+        }),
+    };
+    const client = clientOf((_url, headers) => {
+      calls += 1;
+      seenAuth.push(headers.get("authorization"));
+      return new Response("unauthorized", { status: 401 });
+    });
+
+    const exit = await Effect.runPromiseExit(
+      make(client, credential).page(NAV_PLATFORM_ID, "/api/v1/feed?last=true"),
+    );
+
+    expect(exit._tag).toBe("Failure");
+    expect(calls).toBe(2);
+    expect(seenAuth).toEqual(["Bearer stale-token", "Bearer fresh-token"]);
+    expect(invalidated).toEqual(["stale-token"]);
+  });
+
   it("surfaces a non-2xx feed response as SourceUnavailable rather than throwing", async () => {
     const client = clientOf(() => new Response("nope", { status: 503 }));
 
     const exit = await Effect.runPromiseExit(
       Effect.provide(
         SourceAdapter.use((adapter) => adapter.page(NAV_PLATFORM_ID, "/api/v1/feed?last=true")),
-        layerOf(client, undefined),
+        layerOf(client),
       ),
     );
 
@@ -130,20 +181,15 @@ describe("page", () => {
       return new Response(JSON.stringify(fixture("feed-page.json")), { status: 200 });
     };
     const since = new Date("2025-08-08T00:00:00.000Z");
-    const adapter = make(clientOf(respond), "token", since);
+    const adapter = make(clientOf(respond), makePrivateNavCredential("token"), since);
 
     await Effect.runPromise(
       Effect.exit(adapter.page(NAV_PLATFORM_ID, "https://pam-stilling-feed.nav.no/api/v1/feed")),
     );
-    // RFC 1123, because that is what the header is defined in. NAV accepts an
-    // ISO timestamp and ignores it, which looks exactly like it worked — the
-    // same shape as every query parameter one might guess at instead.
     expect(seen[0]).toBe(since.toUTCString());
 
     seen.length = 0;
     await Effect.runPromise(Effect.exit(adapter.page(NAV_PLATFORM_ID, "/api/v1/feed/abc-123")));
-    // A cursor naming a page is already a position. Re-sending the boundary
-    // would rewind the walk to it on every run.
     expect(seen[0]).toBeNull();
   });
 
@@ -168,7 +214,10 @@ describe("page", () => {
     );
 
     const exit = await Effect.runPromiseExit(
-      make(client, "token").page(NAV_PLATFORM_ID, "https://pam-stilling-feed.nav.no/api/v1/feed"),
+      make(client, makePrivateNavCredential("token")).page(
+        NAV_PLATFORM_ID,
+        "https://pam-stilling-feed.nav.no/api/v1/feed",
+      ),
     );
     expect(JSON.stringify(exit)).toContain("DecodeFailed");
   });
@@ -218,11 +267,6 @@ describe("hydrate", () => {
     expect(seenAuth).toEqual(["Bearer secret-token"]);
   });
 
-  /**
-   * The lifecycle case falsifier 7 names: an advert the feed still called
-   * active a moment ago has since closed. NAV answers with a status and no
-   * content — not a decode failure, and not a listing to hydrate empty.
-   */
   it("reports ClosedSince rather than DecodeFailed when the advert closed since the feed page was written", async () => {
     const client = clientOf(
       () =>
@@ -265,7 +309,7 @@ describe("hydrate", () => {
     const exit = await Effect.runPromiseExit(
       Effect.provide(
         SourceAdapter.use((adapter) => adapter.hydrate(NAV_PLATFORM_ID, "active-vacancy-1")),
-        layerOf(client, undefined),
+        layerOf(client),
       ),
     );
     expect(exit._tag).toBe("Failure");

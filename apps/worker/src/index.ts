@@ -10,9 +10,7 @@ import { services } from "./runtime/Layers.ts";
 import { platform } from "./runtime/Platform.ts";
 import { configFrom, layer as telemetry } from "./runtime/Telemetry.ts";
 import type { TelemetryConfig } from "./runtime/Telemetry.ts";
-import { Ingestion } from "./services/Ingestion.ts";
-import type { RunBudget } from "./services/Ingestion.ts";
-import { SourceCatalog } from "./services/SourceCatalog.ts";
+import { scheduledIngestion } from "./ingestion/scheduled.ts";
 import { SourceLeaseObject } from "./ingestion/SourceLeaseObject.ts";
 
 /**
@@ -41,15 +39,12 @@ export { SourceLeaseObject };
  * persistence slot's `layer(d1)` factory was shaped for. Rebuilding it per
  * request would reconstruct every layer on every call.
  *
- * ## What is not here yet
+ * ## Deployment boundary
  *
- * Nothing of the API. Every route group is served below. What is still
- * missing is the deploy: the Rust service continues to answer production
- * traffic, per RFC 0015's strangler migration, and `infra/alchemy.run.ts`
- * still points at it. `main` and `migrationsDir` move together at cutover —
- * `scheduled` below is wired and tested, but the cron trigger that would
- * actually invoke it on a schedule is declared in `infra/`, which moves at
- * the same cutover, not before.
+ * `infra/alchemy.run.ts` declares this Worker for every stage, but a source
+ * declaration is not deployment evidence. The scheduled program lives in
+ * `ingestion/scheduled.ts`; this composition root only supplies live services
+ * and hands its promise to Cloudflare's execution context.
  */
 
 /** Liveness, and what this deployment believes it is. Mirrors the Rust
@@ -121,50 +116,6 @@ export const appLayer = (
 let handler: ((request: Request) => Promise<Response>) | undefined;
 
 /**
- * Default bounds for a scheduled run. Generous relative to a single
- * scheduled-event invocation's CPU/wall-clock allowance, but still bounded —
- * `Ingestion.ts`'s own doc comment states why every one of these exists.
- * `leaseRecoveryMs` no longer has to "outlive the walk plus slack or get
- * stolen out from under it" — a `SourceLease` Durable Object admits one
- * collector at a time by construction, not by comparing this value against
- * a clock. It only bounds how long a genuinely crashed run — one that never
- * reaches `release` — blocks its source before the object's own recovery
- * alarm reclaims the lease on its behalf.
- */
-const DEFAULT_RUN_BUDGET: RunBudget = {
-  maxPages: 50,
-  maxObservations: 2000,
-  maxDurationMs: 25_000,
-  leaseRecoveryMs: 5 * 60 * 1000,
-};
-
-/**
- * Runs `Ingestion.collect` once for every catalogued platform.
- *
- * `LeaseHeld` is swallowed, not reported: it means another trigger is
- * already collecting that platform, which is the routine outcome for a
- * schedule that fires more often than one platform's sweep completes — not
- * a failure. `collect`'s contract promises no other typed failure, so
- * anything else that escapes here is a defect, and is deliberately left to
- * propagate: that is what should surface as a Cloudflare-visible error,
- * rather than being caught and hidden by this loop.
- */
-const runIngestion = (env: Env): Effect.Effect<void> =>
-  Effect.gen(function* () {
-    const catalog = yield* SourceCatalog;
-    const ingestion = yield* Ingestion;
-    const entries = yield* catalog.list();
-    yield* Effect.forEach(
-      entries,
-      (entry) =>
-        ingestion
-          .collect(entry.id, DEFAULT_RUN_BUDGET)
-          .pipe(Effect.catchTag("LeaseHeld", () => Effect.void)),
-      { discard: true },
-    );
-  }).pipe(Effect.provide(services(env)), Effect.provide(platform));
-
-/**
  * Cloudflare's `ExecutionContext`, typed structurally rather than imported
  * from `@cloudflare/workers-types` — see `db/D1.ts` for why: that package is
  * not installed anywhere in this workspace, and a real `ExecutionContext`
@@ -188,6 +139,10 @@ export default {
    * survivable, not the thing this handler should invite in the first place.
    */
   scheduled(_event: unknown, env: unknown, ctx: ScheduledContext): void {
-    ctx.waitUntil(Effect.runPromise(runIngestion(decodeEnv(env))));
+    ctx.waitUntil(
+      Effect.runPromise(
+        scheduledIngestion.pipe(Effect.provide(services(decodeEnv(env))), Effect.provide(platform)),
+      ),
+    );
   },
 };

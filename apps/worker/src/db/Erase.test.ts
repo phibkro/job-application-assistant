@@ -4,7 +4,13 @@ import * as Effect from "effect/Effect";
 import * as OptionMod from "effect/Option";
 import { Answer } from "@job-index/domain/Answer";
 import { Session } from "@job-index/domain/Access";
-import { ApplicationRecord, SavedJob } from "@job-index/domain/Applications";
+import {
+  ActiveApplication,
+  ApplicationRecord,
+  CustomLabel,
+  LabelAssignment,
+  SavedJob,
+} from "@job-index/domain/Applications";
 import { Submission } from "@job-index/domain/Delivery";
 import { Freshness, Judgement } from "@job-index/domain/Freshness";
 import { Subscription } from "@job-index/domain/Subscription";
@@ -19,6 +25,8 @@ import * as Answers from "./repositories/Answers.ts";
 import * as Sessions from "./repositories/Sessions.ts";
 import * as ApplicationRecords from "../applications/applicationRecords.ts";
 import * as SavedJobRows from "../applications/savedJobs.ts";
+import * as ActiveApplications from "../applications/activeApplications.ts";
+import * as Labels from "../applications/labels.ts";
 import * as Submissions from "./repositories/Submissions.ts";
 import * as Judgements from "./repositories/Judgements.ts";
 import * as FreshnessRows from "./repositories/Freshness.ts";
@@ -95,6 +103,7 @@ const seedAccount = (profileId: string) =>
         jobSnapshot: snapshot,
         note: "",
         createdAt: now,
+        updatedAt: now,
       }),
     );
     yield* ApplicationRecords.insert(
@@ -116,6 +125,35 @@ const seedAccount = (profileId: string) =>
         updatedAt: now,
       }),
     );
+    const database = yield* Database;
+    const labelId = `${profileId}-label`;
+    const labelWrite = yield* Labels.insertWrite(
+      new CustomLabel({
+        id: labelId as never,
+        profileId: profileId as never,
+        name: "Follow up",
+        normalizedName: "follow up",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const assignmentWrite = yield* Labels.assignmentWrite(
+      new LabelAssignment({
+        profileId: profileId as never,
+        savedJobId: `${profileId}-saved` as never,
+        labelId: labelId as never,
+        createdAt: now,
+      }),
+    );
+    const activeWrite = yield* ActiveApplications.insertWrite(
+      new ActiveApplication({
+        savedJobId: `${profileId}-saved` as never,
+        profileId: profileId as never,
+        applicationId: `${profileId}-application` as never,
+        updatedAt: now,
+      }),
+    );
+    yield* database.atomic([labelWrite, assignmentWrite, activeWrite]);
     yield* Submissions.insert(
       new Submission({
         id: `${profileId}-submission` as never,

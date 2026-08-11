@@ -2,15 +2,12 @@
 
 NAV's vacancy feed accepts a signed bearer JWT on every request. There are two supported operating modes.
 
-## Experiment mode
+## Runtime public mode
 
-Refresh NAV's rotating public token into ignored local Wrangler state:
-
-```sh
-just nav-token
-```
-
-`just setup` performs the same refresh opportunistically when no private key is configured. The public key is suitable for development and can rotate without notice. Running `just nav-token` explicitly switches the local configuration back to experiment mode.
+When `NAV_API_TOKEN` is absent, the Worker fetches NAV's rotating public token
+from `/api/publicToken` at runtime. The token is parsed and cached per Worker
+isolate, so local setup does not copy a public token into `.dev.vars`, bundles,
+or deployment state.
 
 ## Registered-consumer mode
 
@@ -34,7 +31,7 @@ The command:
 3. decodes non-secret token metadata and rejects an expired JWT;
 4. performs an authenticated request to the current feed tail;
 5. writes ignored `.dev.vars` with mode `0600`;
-6. marks the credential `NAV_TOKEN_SOURCE=private` so setup never replaces it.
+6. records the explicit private mode in `NAV_TOKEN_SOURCE`.
 
 NAV's implementation allows a private token to omit the expiry claim. Such a token remains authoritative until NAV revokes or replaces it.
 
@@ -62,10 +59,12 @@ NAV_PRIVATE_API_TOKEN="$TOKEN" just nav-key
 
 Do not place the literal token in committed files, command examples, CI logs, or issue reports. Use the CI platform's secret store when automating this command.
 
-## Fallback behavior
+## Runtime selection
 
-At runtime the Worker resolves credentials in this order:
+At runtime the Worker resolves credentials as follows:
 
-1. Cloudflare `NAV_API_TOKEN` secret;
-2. NAV's current public experiment token when `NAV_USE_PUBLIC_TOKEN=true`;
-3. fail the synchronization attempt without advancing the source cursor.
+1. a non-empty Cloudflare `NAV_API_TOKEN` secret selects private mode;
+2. when the secret is absent, the Worker fetches NAV's current public token
+   from `/api/publicToken`;
+3. a missing or malformed private token fails the request and never falls back
+   to the public endpoint.

@@ -1,8 +1,16 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Model from "effect/unstable/schema/Model";
-import { ApplicationId, CanonicalJobId, PlatformId, ProfileId, SavedJobId } from "./Ids.ts";
+import {
+  ApplicationId,
+  CanonicalJobId,
+  CustomLabelId,
+  PlatformId,
+  ProfileId,
+  SavedJobId,
+} from "./Ids.ts";
 import { JobSnapshot } from "./Job.ts";
+import { TransitionSystem } from "./TransitionSystem.ts";
 
 /**
  * Persistence for the application loop.
@@ -38,6 +46,107 @@ export const ApplicationStatus = Schema.Literals([
 ]);
 export type ApplicationStatus = typeof ApplicationStatus.Type;
 
+export const SystemLabelName = Schema.Literals(["saved", "closed", "expired", "occupied"]);
+export type SystemLabelName = typeof SystemLabelName.Type;
+
+export const SystemLabelEvidence = Schema.Struct({
+  reference: Schema.String,
+  authority: Schema.String,
+});
+export type SystemLabelEvidence = typeof SystemLabelEvidence.Type;
+
+export const SystemLabel = Schema.Struct({
+  name: SystemLabelName,
+  evidence: SystemLabelEvidence,
+});
+export type SystemLabel = typeof SystemLabel.Type;
+
+export type ApplicationAuthority = "application" | "human";
+
+export type ApplicationEvent =
+  | { readonly _tag: "Prepare"; readonly requiredAuthority: "application" }
+  | { readonly _tag: "ConfirmSubmission"; readonly requiredAuthority: "human" }
+  | { readonly _tag: "RecordInterview"; readonly requiredAuthority: "human" }
+  | { readonly _tag: "RecordOffer"; readonly requiredAuthority: "human" }
+  | { readonly _tag: "RecordRejection"; readonly requiredAuthority: "human" }
+  | { readonly _tag: "Withdraw"; readonly requiredAuthority: "human" };
+
+export const applicationEvents = {
+  prepare: { _tag: "Prepare", requiredAuthority: "application" } as const,
+  confirmSubmission: { _tag: "ConfirmSubmission", requiredAuthority: "human" } as const,
+  recordInterview: { _tag: "RecordInterview", requiredAuthority: "human" } as const,
+  recordOffer: { _tag: "RecordOffer", requiredAuthority: "human" } as const,
+  recordRejection: { _tag: "RecordRejection", requiredAuthority: "human" } as const,
+  withdraw: { _tag: "Withdraw", requiredAuthority: "human" } as const,
+} satisfies Record<string, ApplicationEvent>;
+
+export const applicationStatusTransitions = TransitionSystem.make<
+  ApplicationStatus,
+  ApplicationEvent,
+  ApplicationAuthority
+>({
+  transition: (state, event, authority) => {
+    if (authority !== event.requiredAuthority) {
+      return TransitionSystem.reject(
+        state,
+        event,
+        authority,
+        `event ${event._tag} requires ${event.requiredAuthority} authority`,
+      );
+    }
+
+    switch (event._tag) {
+      case "Prepare":
+        return "ready";
+      case "ConfirmSubmission":
+        return state === "ready"
+          ? "submitted"
+          : TransitionSystem.reject(
+              state,
+              event,
+              authority,
+              "only a ready attempt can be submitted",
+            );
+      case "RecordInterview":
+        return state === "submitted"
+          ? "interview"
+          : TransitionSystem.reject(
+              state,
+              event,
+              authority,
+              "an interview requires a submitted attempt",
+            );
+      case "RecordOffer":
+        return state === "submitted" || state === "interview"
+          ? "offer"
+          : TransitionSystem.reject(
+              state,
+              event,
+              authority,
+              "an offer requires a submitted or interviewed attempt",
+            );
+      case "RecordRejection":
+        return state === "submitted" || state === "interview"
+          ? "rejected"
+          : TransitionSystem.reject(
+              state,
+              event,
+              authority,
+              "a rejection requires a submitted or interviewed attempt",
+            );
+      case "Withdraw":
+        return state === "ready" || state === "submitted" || state === "interview"
+          ? "withdrawn"
+          : TransitionSystem.reject(
+              state,
+              event,
+              authority,
+              "terminal attempts cannot be withdrawn",
+            );
+    }
+  },
+});
+
 /** The four states `Source.AutomationPolicy` already names, flattened to one column. */
 export const PolicyTag = Schema.Literals(["Allowed", "AssistedOnly", "Prohibited", "Unreviewed"]);
 export type PolicyTag = typeof PolicyTag.Type;
@@ -62,6 +171,35 @@ export class SavedJob extends Model.Class<SavedJob>("SavedJob")({
   jobSnapshot: Model.JsonFromString(JobSnapshot),
   note: Schema.String,
   createdAt: Model.DateTimeInsert,
+  updatedAt: Model.DateTimeUpdate,
+}) {}
+
+export class CustomLabel extends Model.Class<CustomLabel>("CustomLabel")({
+  id: CustomLabelId,
+  profileId: ProfileId,
+  name: Schema.String,
+  normalizedName: Schema.String,
+  createdAt: Model.DateTimeInsert,
+  updatedAt: Model.DateTimeUpdate,
+}) {}
+
+export class LabelAssignment extends Model.Class<LabelAssignment>("LabelAssignment")({
+  profileId: ProfileId,
+  savedJobId: SavedJobId,
+  labelId: CustomLabelId,
+  createdAt: Model.DateTimeInsert,
+}) {}
+
+/**
+ * The one current application for a saved vacancy. The relation is separate
+ * from `ApplicationRecord` so replacing an attempt retains the old record as
+ * immutable history.
+ */
+export class ActiveApplication extends Model.Class<ActiveApplication>("ActiveApplication")({
+  savedJobId: SavedJobId,
+  profileId: ProfileId,
+  applicationId: ApplicationId,
+  updatedAt: Model.DateTimeUpdate,
 }) {}
 
 /**

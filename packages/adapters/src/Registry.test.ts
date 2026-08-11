@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import type { PlatformId } from "@job-index/domain/Ids";
-import { make as makeNavAdapter } from "@job-index/adapters/nav";
+import { make as makeNavAdapter, makePrivateNavCredential } from "@job-index/adapters/nav";
 import type { SourceAdapter } from "./SourceAdapter.ts";
 import { resolve, resolveHydrate } from "./Registry.ts";
 import type { Registration } from "./Registry.ts";
@@ -26,7 +26,7 @@ const inertNavAdapter = makeNavAdapter(
   clientOf((url) => {
     throw new Error(`unexpected request in test: ${url}`);
   }),
-  undefined,
+  makePrivateNavCredential("test-token"),
 );
 
 describe("resolve", () => {
@@ -41,7 +41,7 @@ describe("resolve", () => {
         }
         throw new Error(`unexpected request in test: ${url}`);
       }),
-      undefined,
+      makePrivateNavCredential("test-token"),
     );
     const registrations: ReadonlyArray<Registration> = [{ tier: "Feed", adapter: navAdapter }];
 
@@ -61,7 +61,7 @@ describe("resolve", () => {
         }
         throw new Error(`unexpected request in test: ${url}`);
       }),
-      undefined,
+      makePrivateNavCredential("test-token"),
     );
     const registrations: ReadonlyArray<Registration> = [{ tier: "Feed", adapter: navAdapter }];
 

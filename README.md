@@ -1,18 +1,32 @@
-# Job Index
+# Job Application Assistant
 
-A TypeScript/Effect Cloudflare Worker for a source-aware Norwegian job corpus.
-RFC 0015 strangled the original Rust/Cloudflare Worker prototype; this
-service now serves every route group, and the Rust implementation has been
-retired. It provides:
+`Job Application Assistant` is the working product name; repository and package
+identifiers remain `job-index`.
 
-1. live NAV ingestion into a canonical, deduplicated job corpus with provenance;
-2. a versioned public read API (`/api/v1/jobs`, source catalogue);
-3. a browse / save / draft / apply application flow with account profiles; and
-4. explicit local, preview, staging, and production environments.
+The approved mission and MVP boundary are canonical in the
+[product vision](docs/internal/product/vision.md): assist the full
+job-application process under human control, from permitted-source discovery
+and matching through reusable profile facts, application organization, and
+preparation for repetitive entry. In-app CV and application-letter writing are
+outside the MVP. ATS-friendly document assistance and Cloudflare Agents
+SDK/browser/computer-control support are future candidates, not committed
+architecture, and submission always requires explicit human approval.
 
-Principal (API-key) administration, owned saved-search webhook delivery, and
-corpus maintenance existed only in the retired Rust worker and have not been
-ported — see `memory-bank/progress.md` for the current gap list.
+## Current implementation
+
+The source contains a TypeScript/Effect v4 Cloudflare Worker with a canonical,
+provenance-preserving job corpus, NAV ingestion, a versioned read API, reusable
+profile facts, and the Saved application workspace. The workspace provides
+durable snapshots, custom labels, preset filters, drafts, assisted preparation,
+explicit submission confirmation, lifecycle actions, and prior-attempt history.
+`infra/alchemy.run.ts` declares that Worker for every Alchemy stage.
+The generated D1 schema, ordered migration ledger, and researched source catalog
+have executable check and deployment commands. Only NAV is registered as an
+ingestion adapter.
+
+These are source claims, not live deployment evidence. Staging evidence is
+stale. Production qualification, administrative routes, and generated OpenAPI
+coverage remain gaps; see [current progress](memory-bank/progress.md).
 
 ## Run it
 
@@ -25,14 +39,15 @@ cd job-index
 nix develop --command just preview
 ```
 
-`just preview` bundles the interface and the Worker, applies the generated
-schema and a small seed to a local D1 database, and serves the whole stack —
-sign in with the token `demo-token` to see the feed and the profile.
+`just preview` builds the interface and Worker, creates a clean local D1,
+applies the schema, migrations, source catalog, and demo seed, then serves the
+whole stack. Sign in with `demo-token`. Use **Saved** to exercise the complete
+save-to-submission-confirmation journey.
 
 ## Local development
 
 ```sh
-nix shell nixpkgs#bun -c bun run check   # TypeScript workspace: format, lint, typecheck, schema, bundle, tests
+nix shell nixpkgs#bun -c bun run check   # TypeScript workspace: format, lint, typecheck, schema, catalog, bundle, tests
 nix develop --command just check          # repository, credential, and script gates
 nix develop --command just verify         # just check + bun run check
 nix develop --command just preview        # the whole stack, served locally
@@ -57,11 +72,11 @@ just admin-key
 ./deploy-production
 ```
 
-Both currently deploy through `infra/alchemy.run.ts`'s Rust branch, which
-this cutover leaves in place — that file's stage repoint to the TypeScript
-worker is a separate, deliberately-not-yet-taken decision. `scripts/preview.sh`
-and `scripts/deploy-preview.sh` exercise the TypeScript worker directly,
-independent of that repoint.
+Both commands use the TypeScript Worker declared in `infra/alchemy.run.ts`.
+That declaration does not establish current live deployment evidence: staging
+evidence is stale, and production qualification remains open.
+`scripts/preview.sh` and `scripts/deploy-preview.sh` exercise the TypeScript
+Worker directly, independent of staging/production evidence.
 
 The first authenticated Cloudflare run may open `wrangler login`. A scoped
 `CLOUDFLARE_API_TOKEN` may be supplied instead.
@@ -73,19 +88,25 @@ API clients / browser interface / Cron Trigger
                  ↓
 TypeScript + Effect v4 Cloudflare Worker (apps/worker/)
                  ↓
-Cloudflare D1 corpus, accounts, applications
+Cloudflare D1 corpus, profiles, applications
                  ↓
 NAV official vacancy feed / other catalogued sources
 ```
 
 `packages/domain/` owns canonical identity, normalization, and matching as
-Effect Schema models. `apps/worker/src/Api.ts` declares the HTTP contract
-that the router, the interface, and the test suite are all derived from —
-see its doc comment for why that replaces a hand-kept OpenAPI document.
+Effect Schema models. `apps/worker/src/Api.ts` declares the HTTP contract that
+the router, interface, and test suite derive from. Scheduled ingestion now
+selects the Feed tier implemented by this deployment; production declares only
+the matching NAV ingestion cron.
+
+For Effect idioms, use the official local source at `../effect`. The project is
+pinned to `effect@4.0.0-beta.104`, while the checkout currently reports
+beta.107; check exact API compatibility before copying an example.
 
 ## Documentation
 
 - [Documentation map](docs/index.md)
+- [Product vision and MVP boundary](docs/internal/product/vision.md)
 - [Effect module specification](docs/internal/architecture/effect-module-map.md)
 - [RFC 0015: implementation language for the application product](docs/internal/rfcs/0015-implementation-language-for-the-application-product.md)
 - [Current agent context](memory-bank/activeContext.md)
@@ -93,8 +114,8 @@ see its doc comment for why that replaces a hand-kept OpenAPI document.
 
 ## License
 
-Job Index is **proprietary**. Copyright (c) 2026 Philip B. Krogh, all rights
-reserved. See [LICENSE](LICENSE).
+Job Application Assistant is **proprietary**. Copyright (c) 2026 Philip B.
+Krogh, all rights reserved. See [LICENSE](LICENSE).
 
 Possession of this source grants no right to use it. `packages/better-auth-effect-adapter`
 is the exception: it carries its own MIT licence, because it is written to be

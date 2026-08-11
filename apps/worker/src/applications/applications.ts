@@ -2,20 +2,32 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import { ApplicationRecord } from "@job-index/domain/Applications";
-import { DraftMissing, PolicyProhibited } from "@job-index/domain/Failure";
-import type { ApplicationId, UserId } from "@job-index/domain/Ids";
+import {
+  ApplicationRecord,
+  ActiveApplication,
+  applicationEvents,
+  applicationStatusTransitions,
+} from "@job-index/domain/Applications";
+import {
+  ApplicationMissing,
+  DraftMissing,
+  InvalidApplicationTransition,
+  PolicyProhibited,
+  SavedJobMissing,
+  StaleApplicationUpdate,
+} from "@job-index/domain/Failure";
+import type { ApplicationId, SavedJobId, UserId } from "@job-index/domain/Ids";
 import { Database } from "../services/Database.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
 import { Ids } from "../services/Ids.ts";
 import { Policy } from "../services/Policy.ts";
-import { ApplicationMissing } from "@job-index/domain/Failure";
 import { Applications } from "../services/Applications.ts";
 import type { ApplicationStatus, Prepared } from "../services/Applications.ts";
 import { decidePreparation } from "./decide.ts";
 import * as SavedJobs from "./savedJobs.ts";
+import * as ActiveApplications from "./activeApplications.ts";
 import * as ApplicationRecords from "./applicationRecords.ts";
 import { withDatabase } from "./db.ts";
 
@@ -116,7 +128,16 @@ export const layer = Layer.effect(
           createdAt: now,
           updatedAt: now,
         });
-        yield* withDb(ApplicationRecords.insert(application));
+        const active = new ActiveApplication({
+          savedJobId: savedJob,
+          profileId: user,
+          applicationId: application.id,
+          updatedAt: now,
+        });
+        yield* database.atomic([
+          yield* ApplicationRecords.insertWrite(application),
+          yield* ActiveApplications.upsertWrite(active),
+        ]);
 
         const prepared: Prepared = {
           application: application.id,
@@ -126,6 +147,96 @@ export const layer = Layer.effect(
           downgradeReason: decision.downgradeReason,
         };
         return prepared;
+      });
+
+    const recordEvent: ApplicationsShape["recordEvent"] = (
+      user,
+      application,
+      eventName,
+      notes,
+      expectedUpdatedAt,
+    ) =>
+      Effect.gen(function* () {
+        const existing = yield* withDb(ApplicationRecords.findByIdForProfile(application, user));
+        if (existing === undefined) {
+          return yield* Effect.fail(new ApplicationMissing({ application }));
+        }
+        const active = yield* withDb(
+          ActiveApplications.findByApplicationForProfile(application, user),
+        );
+        if (active === undefined) {
+          return yield* Effect.fail(new ApplicationMissing({ application }));
+        }
+        const actualUpdatedAt = DateTime.formatIso(existing.updatedAt);
+        if (actualUpdatedAt !== expectedUpdatedAt) {
+          return yield* Effect.fail(
+            new StaleApplicationUpdate({ application, expectedUpdatedAt, actualUpdatedAt }),
+          );
+        }
+        const event =
+          eventName === "confirm-submission"
+            ? applicationEvents.confirmSubmission
+            : eventName === "record-interview"
+              ? applicationEvents.recordInterview
+              : eventName === "record-offer"
+                ? applicationEvents.recordOffer
+                : eventName === "record-rejection"
+                  ? applicationEvents.recordRejection
+                  : applicationEvents.withdraw;
+        const transitioned = applicationStatusTransitions.apply(existing.status, event, "human");
+        if (transitioned._tag === "TransitionRejected") {
+          return yield* Effect.fail(
+            new InvalidApplicationTransition({
+              application,
+              currentStatus: existing.status,
+              event: eventName,
+              reason: transitioned.reason,
+            }),
+          );
+        }
+        const clockNow = yield* DateTime.now;
+        const now =
+          DateTime.toEpochMillis(clockNow) > DateTime.toEpochMillis(existing.updatedAt)
+            ? clockNow
+            : DateTime.addDuration(existing.updatedAt, 1);
+        const updated = new ApplicationRecord({
+          id: existing.id,
+          profileId: existing.profileId,
+          savedJobId: existing.savedJobId,
+          canonicalJobId: existing.canonicalJobId,
+          jobSnapshot: existing.jobSnapshot,
+          method: existing.method,
+          status: transitioned.state,
+          applicationUrl: existing.applicationUrl,
+          cv: existing.cv,
+          letter: existing.letter,
+          generator: existing.generator,
+          downgradeReason: existing.downgradeReason,
+          notes: notes ?? existing.notes,
+          createdAt: existing.createdAt,
+          updatedAt: now,
+        });
+        const affected = yield* withDb(
+          ApplicationRecords.updateIfUnchanged(updated, expectedUpdatedAt),
+        );
+        if (affected === 0) {
+          const current = yield* withDb(ApplicationRecords.findByIdForProfile(application, user));
+          if (current === undefined) {
+            return yield* Effect.fail(new ApplicationMissing({ application }));
+          }
+          return yield* Effect.fail(
+            new StaleApplicationUpdate({
+              application,
+              expectedUpdatedAt,
+              actualUpdatedAt: DateTime.formatIso(current.updatedAt),
+            }),
+          );
+        }
+        return {
+          applicationId: application,
+          status: transitioned.state,
+          updatedAt: DateTime.formatIso(now),
+        };
       });
 
     const setStatus = (
@@ -163,8 +274,25 @@ export const layer = Layer.effect(
         );
       });
 
+    const historyForSaved = (user: UserId, savedJob: SavedJobId) =>
+      Effect.gen(function* () {
+        const owned = yield* withDb(SavedJobs.findByIdForProfile(savedJob, user));
+        if (owned === undefined) return yield* Effect.fail(new SavedJobMissing({ savedJob }));
+        const rows = yield* withDb(ApplicationRecords.findHistoryForSaved(user, savedJob));
+        return rows.map((row) => ({
+          applicationId: row.applicationId,
+          status: row.status,
+          method: row.method,
+          applicationUrl: row.applicationUrl,
+          notes: row.notes,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          isCurrent: row.isCurrent === 1,
+        }));
+      });
+
     const history = (user: UserId) => withDb(ApplicationRecords.findByProfile(user));
 
-    return Applications.of({ prepare, setStatus, history });
+    return Applications.of({ prepare, recordEvent, setStatus, historyForSaved, history });
   }),
 );

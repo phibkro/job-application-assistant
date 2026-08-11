@@ -6,6 +6,16 @@ import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
 import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
 import * as Context from "effect/Context";
 import type { PrincipalId, ProfileId } from "@job-index/domain/Ids";
+import {
+  ApplicationMethod,
+  ApplicationStatus as DomainApplicationStatus,
+} from "@job-index/domain/Applications";
+import {
+  SavedItem as DomainSavedItem,
+  SavedPage as DomainSavedPage,
+  SavedSort as DomainSavedSort,
+  SavedView as DomainSavedView,
+} from "@job-index/domain/Saved";
 import { CanonicalJob } from "@job-index/domain/Job";
 import { CatalogEntry } from "@job-index/domain/Source";
 import { AnswerShape } from "@job-index/domain/Answer";
@@ -90,6 +100,39 @@ export class InvalidProfileJson extends Schema.TaggedError<InvalidProfileJson>()
   { httpApiStatus: 400 },
 ) {}
 
+export class LabelConflict extends Schema.TaggedError<LabelConflict>()(
+  "LabelConflict",
+  { name: Schema.String, normalizedName: Schema.String },
+  { httpApiStatus: 409 },
+) {}
+
+export class ReservedLabelMutation extends Schema.TaggedError<ReservedLabelMutation>()(
+  "ReservedLabelMutation",
+  { name: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
+export class InvalidApplicationTransition extends Schema.TaggedError<InvalidApplicationTransition>()(
+  "InvalidApplicationTransition",
+  {
+    applicationId: Schema.String,
+    currentStatus: Schema.String,
+    event: Schema.String,
+    reason: Schema.String,
+  },
+  { httpApiStatus: 409 },
+) {}
+
+export class StaleApplicationUpdate extends Schema.TaggedError<StaleApplicationUpdate>()(
+  "StaleApplicationUpdate",
+  {
+    applicationId: Schema.String,
+    expectedUpdatedAt: Schema.String,
+    actualUpdatedAt: Schema.String,
+  },
+  { httpApiStatus: 409 },
+) {}
+
 /**
  * Who the request is for, once the token has been checked.
  *
@@ -123,6 +166,56 @@ export class Authenticated extends HttpApiMiddleware.Service<
   error: Unauthorized,
   security: { session: HttpApiSecurity.bearer },
 }) {}
+
+export const SavedView = DomainSavedView;
+export type SavedView = typeof SavedView.Type;
+export const SavedSort = DomainSavedSort;
+export type SavedSort = typeof SavedSort.Type;
+export const ApplicationStatus = DomainApplicationStatus;
+export type ApplicationStatus = typeof ApplicationStatus.Type;
+export const ApplicationEvent = Schema.Literals([
+  "confirm-submission",
+  "record-interview",
+  "record-offer",
+  "record-rejection",
+  "withdraw",
+]);
+export type ApplicationEvent = typeof ApplicationEvent.Type;
+export const SavedItem = DomainSavedItem;
+export type SavedItem = typeof SavedItem.Type;
+export const SavedPage = DomainSavedPage;
+export type SavedPage = typeof SavedPage.Type;
+export const CustomLabel = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  normalizedName: Schema.String,
+  createdAt: Schema.String,
+  updatedAt: Schema.String,
+});
+export type CustomLabel = typeof CustomLabel.Type;
+export const CustomLabelsResponse = Schema.Struct({ data: Schema.Array(CustomLabel) });
+export type CustomLabelsResponse = typeof CustomLabelsResponse.Type;
+export const ApplicationEventResponse = Schema.Struct({
+  applicationId: Schema.String,
+  status: ApplicationStatus,
+  updatedAt: Schema.String,
+});
+export type ApplicationEventResponse = typeof ApplicationEventResponse.Type;
+export const SavedApplicationHistoryEntry = Schema.Struct({
+  applicationId: Schema.String,
+  status: ApplicationStatus,
+  method: ApplicationMethod,
+  applicationUrl: Schema.String,
+  notes: Schema.String,
+  createdAt: Schema.String,
+  updatedAt: Schema.String,
+  isCurrent: Schema.Boolean,
+});
+export type SavedApplicationHistoryEntry = typeof SavedApplicationHistoryEntry.Type;
+export const SavedApplicationHistoryResponse = Schema.Struct({
+  data: Schema.Array(SavedApplicationHistoryEntry),
+});
+export type SavedApplicationHistoryResponse = typeof SavedApplicationHistoryResponse.Type;
 
 const PageMeta = Schema.Struct({
   limit: Schema.Number,
@@ -296,6 +389,63 @@ const applications = HttpApiGroup.make("applications")
       /** approve · rework · decline — the human step in an automated run. */
       payload: Schema.Struct({ decision: Schema.String, notes: Schema.optional(Schema.String) }),
       success: Schema.Struct({ applicationId: Schema.String, status: Schema.String }),
+      error: [Unauthorized, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("listSaved", "/api/v1/me/saved", {
+      query: {
+        view: Schema.optional(SavedView),
+        label: Schema.optional(Schema.String),
+        sort: Schema.optional(SavedSort),
+        cursor: Schema.optional(Schema.String),
+      },
+      success: SavedPage,
+      error: Unauthorized,
+    }),
+    HttpApiEndpoint.get("listSavedLabels", "/api/v1/me/saved/labels", {
+      success: CustomLabelsResponse,
+      error: Unauthorized,
+    }),
+    HttpApiEndpoint.post("createSavedLabel", "/api/v1/me/saved/labels", {
+      payload: Schema.Struct({ name: Schema.String }),
+      success: CustomLabel,
+      error: [Unauthorized, LabelConflict, ReservedLabelMutation],
+    }),
+    HttpApiEndpoint.patch("renameSavedLabel", "/api/v1/me/saved/labels/:id", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ name: Schema.String }),
+      success: CustomLabel,
+      error: [Unauthorized, NotFound, LabelConflict, ReservedLabelMutation],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.delete("deleteSavedLabel", "/api/v1/me/saved/labels/:id", {
+      params: { id: Schema.String },
+      success: Schema.Struct({ deleted: Schema.String }),
+      error: [Unauthorized, NotFound],
+    }),
+    HttpApiEndpoint.put("setSavedLabels", "/api/v1/me/saved/:id/labels", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ labelIds: Schema.Array(Schema.String) }),
+      success: Schema.Struct({ savedJobId: Schema.String, labelIds: Schema.Array(Schema.String) }),
+      error: [Unauthorized, NotFound, ReservedLabelMutation],
+    }),
+    HttpApiEndpoint.post("addApplicationEvent", "/api/v1/me/applications/:id/events", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({
+        event: ApplicationEvent,
+        notes: Schema.optional(Schema.String),
+        expectedUpdatedAt: Schema.String,
+      }),
+      success: ApplicationEventResponse,
+      error: [Unauthorized, NotFound, InvalidApplicationTransition, StaleApplicationUpdate],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("listSavedApplicationHistory", "/api/v1/me/saved/:id/applications", {
+      params: { id: Schema.String },
+      success: SavedApplicationHistoryResponse,
       error: [Unauthorized, NotFound],
     }),
   )

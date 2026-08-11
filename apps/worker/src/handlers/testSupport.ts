@@ -13,6 +13,7 @@ import { Accounts, Profiles } from "../services/Accounts.ts";
 import { Drafting } from "../services/Drafting.ts";
 import { Entitlements } from "../services/Entitlements.ts";
 import { Applications } from "../services/Applications.ts";
+import { Saved } from "../services/Saved.ts";
 import { Hydration } from "../services/Hydration.ts";
 import { Judgements } from "../services/Judgements.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
@@ -66,10 +67,11 @@ const defaultProfiles = Layer.succeed(Profiles, {
 const defaultDrafting = Layer.succeed(Drafting, {
   compose: unstubbed("Drafting", "compose"),
 });
-
 const defaultApplications = Layer.succeed(Applications, {
   prepare: unstubbed("Applications", "prepare"),
+  recordEvent: unstubbed("Applications", "recordEvent"),
   setStatus: unstubbed("Applications", "setStatus"),
+  historyForSaved: unstubbed("Applications", "historyForSaved"),
   history: unstubbed("Applications", "history"),
 });
 
@@ -82,6 +84,15 @@ const defaultSavedJobs = Layer.succeed(SavedJobs, {
   save: unstubbed("SavedJobs", "save"),
   resolve: unstubbed("SavedJobs", "resolve"),
   list: unstubbed("SavedJobs", "list"),
+});
+
+const defaultSaved = Layer.succeed(Saved, {
+  list: unstubbed("Saved", "list"),
+  labels: unstubbed("Saved", "labels"),
+  createLabel: unstubbed("Saved", "createLabel"),
+  renameLabel: unstubbed("Saved", "renameLabel"),
+  deleteLabel: unstubbed("Saved", "deleteLabel"),
+  setLabels: unstubbed("Saved", "setLabels"),
 });
 
 const defaultJudgements = Layer.succeed(Judgements, {
@@ -103,6 +114,7 @@ export interface Fakes {
   readonly entitlements?: Layer.Layer<Entitlements>;
   readonly hydration?: Layer.Layer<Hydration>;
   readonly savedJobs?: Layer.Layer<SavedJobs>;
+  readonly saved?: Layer.Layer<Saved>;
   readonly judgements?: Layer.Layer<Judgements>;
   readonly sourceCatalog?: Layer.Layer<SourceCatalog>;
 }
@@ -128,6 +140,7 @@ export const buildHandler = (fakes: Fakes = {}) => {
     Layer.provide(fakes.entitlements ?? defaultEntitlements),
     Layer.provide(fakes.hydration ?? defaultHydration),
     Layer.provide(fakes.savedJobs ?? defaultSavedJobs),
+    Layer.provide(fakes.saved ?? defaultSaved),
     Layer.provide(fakes.judgements ?? defaultJudgements),
     Layer.provide(fakes.sourceCatalog ?? defaultSourceCatalog),
     Layer.provide(Etag.layer),

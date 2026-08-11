@@ -136,6 +136,7 @@ describe("profile (authenticated)", () => {
       jobSnapshot: snapshot,
       note: "",
       createdAt: now,
+      updatedAt: now,
     });
     const application = new ApplicationRecord({
       id: "app_1" as never,
@@ -170,7 +171,9 @@ describe("profile (authenticated)", () => {
       }),
       applications: Layer.succeed(Applications, {
         prepare: () => Effect.die("unused"),
+        recordEvent: () => Effect.die("unused"),
         setStatus: () => Effect.die("unused"),
+        historyForSaved: () => Effect.die("unused"),
         history: () => Effect.succeed([application]),
       }),
     });

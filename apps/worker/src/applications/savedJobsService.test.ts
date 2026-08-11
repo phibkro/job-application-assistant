@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer";
 import type { HydratedCanonicalJob } from "@job-index/domain/Job";
 import type { CanonicalJobId, ProfileId, SavedJobId, SourceId } from "@job-index/domain/Ids";
 import { layerSqlite } from "../db/Sqlite.ts";
+import { Database } from "../services/Database.ts";
 import { Ids } from "../services/Ids.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
 import { layer as savedJobsLayer } from "./savedJobsService.ts";
@@ -42,5 +43,55 @@ describe("SavedJobs.save against a fixed Ids", () => {
     );
 
     expect(id).toBe(fixedId);
+  });
+});
+
+describe("SavedJobs.save replacement", () => {
+  it("upserts one owner/canonical bookmark, preserving its id and creation time", async () => {
+    let calls = 0;
+    const layer = savedJobsLayer.pipe(
+      Layer.provideMerge(
+        Layer.mergeAll(
+          Layer.succeed(Ids, {
+            next: Effect.sync(() => (calls++ === 0 ? "saved-first" : "saved-discarded")),
+          }),
+          layerSqlite(),
+        ),
+      ),
+    );
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.gen(function* () {
+          const savedJobs = yield* SavedJobs;
+          const first = yield* savedJobs.save("profile-1" as ProfileId, job, "first note");
+          const second = yield* savedJobs.save("profile-1" as ProfileId, job, "replacement note");
+          const db = yield* Database;
+          const rows = yield* db.query<{
+            readonly id: string;
+            readonly profileId: string;
+            readonly canonicalJobId: string;
+            readonly note: string;
+            readonly createdAt: string;
+          }>(
+            "SELECT id, profileId, canonicalJobId, note, createdAt FROM saved_jobs WHERE profileId = ?",
+            ["profile-1"],
+          );
+          return { first, second, rows };
+        }),
+        layer,
+      ),
+    );
+
+    expect(result.first).toBe("saved-first");
+    expect(result.second).toBe("saved-first");
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({
+      id: "saved-first",
+      profileId: "profile-1",
+      canonicalJobId: "job-1",
+      note: "replacement note",
+    });
+    expect(result.rows[0]?.createdAt).toBeTruthy();
   });
 });

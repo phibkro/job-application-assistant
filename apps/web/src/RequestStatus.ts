@@ -7,14 +7,27 @@ import { ts } from "foldkit/schema";
 // look like, not a client-side guess that can drift from the server's.
 import {
   ForbiddenByPlatform,
+  InvalidApplicationTransition,
+  LabelConflict,
   NotFound,
+  ReservedLabelMutation,
+  StaleApplicationUpdate,
   UpgradeRequired,
   Unauthorized,
 } from "../../worker/src/Api.ts";
 // Re-exported so callers construct a `Problem` member through this module
 // — the one place that assembles the union — instead of reaching past it
 // to the worker contract directly.
-export { ForbiddenByPlatform, NotFound, UpgradeRequired, Unauthorized };
+export {
+  ForbiddenByPlatform,
+  InvalidApplicationTransition,
+  LabelConflict,
+  NotFound,
+  ReservedLabelMutation,
+  StaleApplicationUpdate,
+  UpgradeRequired,
+  Unauthorized,
+};
 
 /** A failure this app knows how to explain. `NetworkError` is the one member
  *  the wire contract does not declare: it covers a transport failure or a
@@ -25,6 +38,10 @@ export const Problem = S.Union([
   NotFound,
   UpgradeRequired,
   ForbiddenByPlatform,
+  LabelConflict,
+  ReservedLabelMutation,
+  InvalidApplicationTransition,
+  StaleApplicationUpdate,
   NetworkError,
 ]);
 export type Problem = typeof Problem.Type;

@@ -182,8 +182,10 @@ CREATE TABLE IF NOT EXISTS saved_jobs (
   jobSnapshot TEXT NOT NULL,
   note TEXT NOT NULL DEFAULT '',
   createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE (profileId, canonicalJobId)
+  UNIQUE (profileId, canonicalJobId),
+  UNIQUE (profileId, id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_saved_jobs_profileId ON saved_jobs (profileId);
@@ -204,12 +206,53 @@ CREATE TABLE IF NOT EXISTS applications (
   notes TEXT NOT NULL DEFAULT '',
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE (profileId, id),
+  FOREIGN KEY (profileId, savedJobId) REFERENCES saved_jobs (profileId, id) ON DELETE RESTRICT
 );
 
 CREATE INDEX IF NOT EXISTS idx_applications_profileId ON applications (profileId);
 
 CREATE INDEX IF NOT EXISTS idx_applications_savedJobId ON applications (savedJobId);
+
+CREATE TABLE IF NOT EXISTS custom_labels (
+  id TEXT NOT NULL,
+  profileId TEXT NOT NULL,
+  name TEXT NOT NULL,
+  normalizedName TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE (profileId, normalizedName),
+  UNIQUE (profileId, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_labels_profileId ON custom_labels (profileId);
+
+CREATE TABLE IF NOT EXISTS label_assignments (
+  profileId TEXT NOT NULL,
+  savedJobId TEXT NOT NULL,
+  labelId TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  PRIMARY KEY (profileId, savedJobId, labelId),
+  FOREIGN KEY (profileId, savedJobId) REFERENCES saved_jobs (profileId, id) ON DELETE CASCADE,
+  FOREIGN KEY (profileId, labelId) REFERENCES custom_labels (profileId, id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_label_assignments_profileId_savedJobId ON label_assignments (profileId, savedJobId);
+
+CREATE INDEX IF NOT EXISTS idx_label_assignments_profileId_labelId ON label_assignments (profileId, labelId);
+
+CREATE TABLE IF NOT EXISTS active_applications (
+  savedJobId TEXT NOT NULL,
+  profileId TEXT NOT NULL,
+  applicationId TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  PRIMARY KEY (savedJobId),
+  UNIQUE (profileId, applicationId),
+  FOREIGN KEY (profileId, savedJobId) REFERENCES saved_jobs (profileId, id) ON DELETE CASCADE,
+  FOREIGN KEY (profileId, applicationId) REFERENCES applications (profileId, id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS platform_policies (
   platformId TEXT NOT NULL,
@@ -251,3 +294,16 @@ CREATE TABLE IF NOT EXISTS ingestion_failures (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ingestion_failures_platformId_occurredAt ON ingestion_failures (platformId, occurredAt);
+
+-- Wrangler records ordered D1 migrations in this table. A generated
+-- snapshot already has each migration's target shape, so it records the
+-- migration only when that shape is present. Existing databases without
+-- the shape remain unmarked and are migrated after this snapshot runs.
+CREATE TABLE IF NOT EXISTS d1_migrations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+INSERT OR IGNORE INTO d1_migrations (name)
+SELECT '0001_saved-workspace.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('saved_jobs') WHERE name = 'updatedAt');

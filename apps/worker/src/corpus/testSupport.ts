@@ -196,5 +196,8 @@ export const makeTestDatabase = (): DatabaseShape => {
       }
     });
 
-  return { query, run, atomic };
+  const runAffected = (sql: string, bindings: ReadonlyArray<unknown>): Effect.Effect<number> =>
+    run(sql, bindings).pipe(Effect.as(1));
+
+  return { query, run, runAffected, atomic };
 };

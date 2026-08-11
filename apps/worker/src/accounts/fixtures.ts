@@ -196,6 +196,11 @@ export const fakeDatabaseLayer = (state: FakeState): Layer.Layer<Database> =>
       Effect.sync(() => runQuery(state, opOf(sql), bindings) as ReadonlyArray<A>),
     run: (sql: string, bindings: ReadonlyArray<unknown>) =>
       Effect.sync(() => runCommand(state, opOf(sql), bindings)),
+    runAffected: (sql: string, bindings: ReadonlyArray<unknown>) =>
+      Effect.sync(() => {
+        runCommand(state, opOf(sql), bindings);
+        return 1;
+      }),
     // Applied in order, with no rollback: this fake is a plain in-memory
     // store mutated synchronously, so there is no partial state for another
     // reader to observe. Real batch semantics are exercised against the

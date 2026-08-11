@@ -1,10 +1,11 @@
 import * as Match from "effect/Match";
 import type { Runtime } from "foldkit";
 import type { Document, Html, HtmlBuilder } from "foldkit/html";
-import { GotProfileMessage, UrlChanged, UrlRequested } from "./Message.ts";
+import { GotProfileMessage, GotSavedMessage, UrlChanged, UrlRequested } from "./Message.ts";
 import type { Message } from "./Message.ts";
 import { initialModel, Model, SessionAnonymous, SessionAuthenticated } from "./Model.ts";
 import * as ProfileSubmodel from "./profile/index.ts";
+import * as SavedSubmodel from "./saved/index.ts";
 import * as Route from "./Route.ts";
 import * as Session from "./Session.ts";
 import { update } from "./update.ts";
@@ -66,7 +67,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
             ],
             [
               h.div(
-                [h.Class("flex items-center gap-6")],
+                [h.Class("flex flex-wrap items-center gap-6")],
                 [
                   h.h1([h.Class("text-lg font-semibold text-gray-900")], ["Job Index"]),
                   nav(model, h),
@@ -93,7 +94,17 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                   model: model.profile,
                   view: ProfileSubmodel.view,
                   viewInputs: { isAuthenticated: model.session._tag === "Authenticated" },
-                  toParentMessage: (message) => GotProfileMessage({ message }),
+                  toParentMessage: (message) =>
+                    GotProfileMessage({ sessionEpoch: model.sessionEpoch, message }),
+                }),
+              Saved: () =>
+                h.submodel({
+                  slotId: "saved",
+                  model: model.saved,
+                  view: SavedSubmodel.view,
+                  viewInputs: { isAuthenticated: model.session._tag === "Authenticated" },
+                  toParentMessage: (message) =>
+                    GotSavedMessage({ sessionEpoch: model.sessionEpoch, message }),
                 }),
             }),
           ),

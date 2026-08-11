@@ -13,8 +13,8 @@ import * as Redacted from "effect/Redacted";
  * This replaces the `wrangler d1 create` / `wrangler deploy` steps that
  * scripts/deploy.sh used to perform. The release *gates* stay in that script,
  * because they are process rather than infrastructure: production credential
- * preflight, migration checks, the destructive/non-destructive smoke split,
- * and the evidence record. Alchemy answers "what exists"; deploy.sh answers
+ * preflight, migration checks, non-destructive smoke, safety boundaries, and
+ * the evidence record. Alchemy answers "what exists"; deploy.sh answers
  * "may this ship".
  *
  * The Worker is Rust compiled to WebAssembly. `main` points at the
@@ -76,9 +76,8 @@ const MAIL_VERIFIED_DESTINATION = "philib.krogh@gmail.com";
 
 /**
  * Production is published in two phases so a cron-enabled version can never
- * run before its credentials exist: the first deploy omits triggers and
- * disables synchronization, the second activates them. scripts/deploy.sh sets
- * this on the second pass only.
+ * run before its credentials exist: the first deploy omits triggers and the
+ * second activates them. scripts/deploy.sh sets this on the second pass only.
  */
 const ACTIVATE_SCHEDULES = process.env.JOB_INDEX_ACTIVATE_SCHEDULES === "1";
 
@@ -137,61 +136,39 @@ const secretBindings = () => {
 const environmentVars = {
   ENVIRONMENT: STAGE,
   ALLOW_DEMO_MUTATIONS: PRODUCTION ? "false" : "true",
-  ALLOW_NAV_SYNC_WITHOUT_TOKEN: PRODUCTION ? "false" : "true",
-  NAV_USE_PUBLIC_TOKEN: PRODUCTION ? "false" : "true",
-  // Ingestion only runs once the schedules are activated, which is the second
-  // phase of a production deploy.
-  NAV_SYNC_ENABLED: PRODUCTION && ACTIVATE_SCHEDULES ? "true" : "false",
-  NAV_DETAIL_FETCH_LIMIT: "40",
-  NAV_MAX_PAGES_PER_RUN: "4",
-  NAV_MAX_OBSERVATIONS_PER_RUN: "600",
-  NAV_MAX_DURATION_MS: "20000",
-  // How long a crashed run blocks NAV before its `SourceLease` Durable
-  // Object's recovery alarm reclaims it — not a value anything compares
-  // against a clock, unlike its D1-lease-era predecessor `NAV_LEASE_TTL_MS`.
-  NAV_LEASE_RECOVERY_MS: "90000",
 } as const;
 
 /**
- * Staggered so the three background jobs never contend for the same minute:
- * NAV ingestion, saved-search evaluation (which also runs due application
- * schedules), and webhook delivery each get their own budget.
+ * The Worker currently implements one scheduled job: NAV ingestion.
  *
- * Only production runs them. A staging deploy that also ingested would race
- * the production connector for the same NAV cursor.
+ * Only production runs it after the credential-first publication phase.
+ * Staging must not race the production connector for the same NAV cursor.
+ * Add another trigger only when the scheduled handler dispatches a distinct,
+ * implemented workload for it.
  */
-const CRONS =
-  PRODUCTION && ACTIVATE_SCHEDULES
-    ? [
-        "0,15,30,45 * * * *",
-        "2,7,12,17,22,27,32,37,42,47,52,57 * * * *",
-        "4,9,14,19,24,29,34,39,44,49,54,59 * * * *",
-      ]
-    : [];
+const INGESTION_CRON = "0,15,30,45 * * * *";
+
+const CRONS = PRODUCTION && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];
 
 export default Alchemy.Stack(
   "JobIndex",
   { providers: Cloudflare.providers(), state: State.localState() },
   Effect.gen(function* () {
-    // The system of record. Alchemy applies migrations/ itself, so schema and
-    // database are created by the same step that declares them — there is no
-    // window where the Worker is live against an unmigrated database.
+    // The system of record. Alchemy provisions the D1 resource, but it does
+    // not mutate application tables. The deploy script first applies the
+    // generated snapshot, then the ordered TypeScript-era migrations. For
+    // production it does that between the no-cron and cron-enabled publishes,
+    // so scheduled ingestion never reaches an earlier table shape.
+    //
+    // No `migrationsDir` here: Alchemy creates the resource before the deploy
+    // script can establish the generated baseline. Running an incremental
+    // ALTER migration during resource provisioning would therefore fail on a
+    // new database. `scripts/migrate-d1.sh` runs migrations after the snapshot
+    // and uses Wrangler's migration ledger to preserve existing deployments.
     const database = yield* Cloudflare.D1Database("Db", {
       name: `job-index-${STAGE}-db`,
       // Norwegian vacancies read from Norway.
       primaryLocationHint: "weur",
-      // The Rust service's ten ordered migrations, and only for the stages
-      // that run it. The TypeScript service starts on a new database from the
-      // generated snapshot (`db/schema.sql`, applied by
-      // `scripts/deploy-preview.sh`): nothing is back-filled, so there is no
-      // earlier shape to migrate from, and applying both leaves a database
-      // that matches neither — a `CREATE TABLE IF NOT EXISTS` quietly keeps
-      // the legacy shape and the next index fails against it. Found by
-      // deploying: "no such column: profileId".
-      // No migrationsDir: the schema is one generated snapshot
-      // (`db/schema.sql`), applied by the deploy script. Incremental
-      // migrations resume when a deployment exists whose shape must be
-      // preserved.
     });
 
     const email = yield* Cloudflare.SendEmail("Mail", {
@@ -249,7 +226,7 @@ export default Alchemy.Stack(
       // into a fixture set while someone read it would have confused both;
       // with a real corpus, a preview that does not refresh is the confusing
       // one. Every fifteen minutes is NAV's own cadence, not a guess.
-      crons: STAGE === "preview" ? ["0,15,30,45 * * * *"] : CRONS,
+      crons: STAGE === "preview" ? [INGESTION_CRON] : CRONS,
       observability: {
         enabled: true,
         logs: { enabled: true, invocationLogs: true },

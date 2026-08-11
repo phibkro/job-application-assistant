@@ -4,6 +4,8 @@ import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import { Command, Http, Navigation } from "foldkit";
 import { Profile } from "@job-index/domain/Profile";
+import { ApplicationEvent, SavedSort, SavedView } from "../../worker/src/Api.ts";
+import { CustomLabelId } from "@job-index/domain/Ids";
 import { makeClient } from "./Client.ts";
 import { Decision } from "./Message.ts";
 import * as Msg from "./Message.ts";
@@ -13,6 +15,11 @@ import * as Msg from "./Message.ts";
 // story with `profile/Model.ts` (see its own comment).
 import * as ProfileMessage from "./profile/Message.ts";
 import { NetworkError, Problem } from "./RequestStatus.ts";
+import * as SavedMessage from "./saved/Message.ts";
+import {
+  CustomLabel as SavedCustomLabel,
+  CustomLabelsResponse as SavedCustomLabelsResponse,
+} from "./saved/Model.ts";
 import * as Session from "./Session.ts";
 
 /**
@@ -181,6 +188,197 @@ export const SaveProfile = Command.define("SaveProfile", {
     ),
 });
 
+export const FetchSaved = Command.define("FetchSaved", {
+  args: {
+    view: SavedView,
+    label: S.OptionFromNullOr(CustomLabelId),
+    sort: SavedSort,
+    cursor: S.OptionFromNullOr(S.String),
+    append: S.Boolean,
+  },
+  messages: [SavedMessage.FetchSucceeded, SavedMessage.FetchFailed],
+  execute: ({ view, label, sort, cursor, append }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const page = yield* client.applications.listSaved({
+          query: {
+            view,
+            label: Option.getOrUndefined(label),
+            sort,
+            cursor: Option.getOrUndefined(cursor),
+          },
+        });
+        return SavedMessage.FetchSucceeded({ page, append });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(SavedMessage.FetchFailed({ problem: toProblem(error), append })),
+        ),
+      ),
+    ),
+});
+
+export const FetchSavedApplicationHistory = Command.define("FetchSavedApplicationHistory", {
+  args: { savedJobId: S.String },
+  messages: [SavedMessage.ApplicationHistorySucceeded, SavedMessage.ApplicationHistoryFailed],
+  execute: ({ savedJobId }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.applications.listSavedApplicationHistory({
+          params: { id: savedJobId },
+        });
+        return SavedMessage.ApplicationHistorySucceeded({ savedJobId, response });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            SavedMessage.ApplicationHistoryFailed({
+              savedJobId,
+              problem: toProblem(error),
+            }),
+          ),
+        ),
+      ),
+    ),
+});
+
+export const FetchSavedLabels = Command.define("FetchSavedLabels", {
+  messages: [SavedMessage.LabelsFetchSucceeded, SavedMessage.LabelsFetchFailed],
+  execute: withHttp(
+    Effect.gen(function* () {
+      const client = yield* makeClient(currentToken());
+      const response = yield* client.applications.listSavedLabels();
+      const labels = yield* S.decodeUnknownEffect(SavedCustomLabelsResponse)(response);
+      return SavedMessage.LabelsFetchSucceeded({ response: labels });
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.succeed(SavedMessage.LabelsFetchFailed({ problem: toProblem(error) })),
+      ),
+    ),
+  ),
+});
+
+export const CreateSavedLabel = Command.define("CreateSavedLabel", {
+  args: { name: S.String },
+  messages: [SavedMessage.LabelCreated, SavedMessage.CreateLabelFailed],
+  execute: ({ name }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.applications.createSavedLabel({ payload: { name } });
+        const label = yield* S.decodeUnknownEffect(SavedCustomLabel)(response);
+        return SavedMessage.LabelCreated({ label });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(SavedMessage.CreateLabelFailed({ problem: toProblem(error) })),
+        ),
+      ),
+    ),
+});
+
+export const RenameSavedLabel = Command.define("RenameSavedLabel", {
+  args: { labelId: CustomLabelId, name: S.String },
+  messages: [SavedMessage.LabelRenamed, SavedMessage.RenameLabelFailed],
+  execute: ({ labelId, name }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.applications.renameSavedLabel({
+          params: { id: labelId },
+          payload: { name },
+        });
+        const label = yield* S.decodeUnknownEffect(SavedCustomLabel)(response);
+        return SavedMessage.LabelRenamed({ label });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            SavedMessage.RenameLabelFailed({
+              labelId,
+              problem: toProblem(error),
+            }),
+          ),
+        ),
+      ),
+    ),
+});
+
+export const DeleteSavedLabel = Command.define("DeleteSavedLabel", {
+  args: { labelId: CustomLabelId },
+  messages: [SavedMessage.LabelDeleted, SavedMessage.DeleteLabelFailed],
+  execute: ({ labelId }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        yield* client.applications.deleteSavedLabel({ params: { id: labelId } });
+        return SavedMessage.LabelDeleted({ labelId });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            SavedMessage.DeleteLabelFailed({
+              labelId,
+              problem: toProblem(error),
+            }),
+          ),
+        ),
+      ),
+    ),
+});
+
+export const SetSavedLabels = Command.define("SetSavedLabels", {
+  args: { savedJobId: S.String, labelIds: S.Array(CustomLabelId) },
+  messages: [SavedMessage.LabelAssignmentSucceeded, SavedMessage.LabelAssignmentFailed],
+  execute: ({ savedJobId, labelIds }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        yield* client.applications.setSavedLabels({
+          params: { id: savedJobId },
+          payload: { labelIds },
+        });
+        return SavedMessage.LabelAssignmentSucceeded({ savedJobId, labelIds });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            SavedMessage.LabelAssignmentFailed({
+              savedJobId,
+              problem: toProblem(error),
+            }),
+          ),
+        ),
+      ),
+    ),
+});
+
+export const AddApplicationEvent = Command.define("AddApplicationEvent", {
+  args: {
+    savedJobId: S.String,
+    applicationId: S.String,
+    event: ApplicationEvent,
+    expectedUpdatedAt: S.String,
+  },
+  messages: [SavedMessage.ApplicationEventSucceeded, SavedMessage.ApplicationEventFailed],
+  execute: ({ savedJobId, applicationId, event, expectedUpdatedAt }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.applications.addApplicationEvent({
+          params: { id: applicationId },
+          payload: { event, expectedUpdatedAt },
+        });
+        return SavedMessage.ApplicationEventSucceeded({ savedJobId, response });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            SavedMessage.ApplicationEventFailed({
+              savedJobId,
+              problem: toProblem(error),
+            }),
+          ),
+        ),
+      ),
+    ),
+});
+
 export const SaveJob = Command.define("SaveJob", {
   args: { jobId: S.String, note: S.OptionFromNullOr(S.String) },
   messages: [Msg.SaveJobSucceeded, Msg.SaveJobFailed],
@@ -293,19 +491,21 @@ export const LoadUrl = Command.define("LoadUrl", {
 });
 
 export const PersistSessionToken = Command.define("PersistSessionToken", {
-  args: { token: S.String },
+  args: { token: S.String, sessionEpoch: S.Number },
   messages: [Msg.StorageSynced],
-  execute: ({ token }) =>
+  execute: ({ token, sessionEpoch }) =>
     Effect.sync(() => {
       Session.writeToken(token);
-      return Msg.StorageSynced();
+      return Msg.StorageSynced({ sessionEpoch });
     }),
 });
 
 export const ClearSessionToken = Command.define("ClearSessionToken", {
+  args: { sessionEpoch: S.Number },
   messages: [Msg.StorageSynced],
-  execute: Effect.sync(() => {
-    Session.clearToken();
-    return Msg.StorageSynced();
-  }),
+  execute: ({ sessionEpoch }) =>
+    Effect.sync(() => {
+      Session.clearToken();
+      return Msg.StorageSynced({ sessionEpoch });
+    }),
 });

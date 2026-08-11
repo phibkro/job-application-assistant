@@ -9,6 +9,8 @@ import * as Judgements from "./repositories/Judgements.ts";
 import * as Submissions from "./repositories/Submissions.ts";
 import * as Subscriptions from "./repositories/Subscriptions.ts";
 import * as ApplicationRecords from "../applications/applicationRecords.ts";
+import * as ActiveApplications from "../applications/activeApplications.ts";
+import * as Labels from "../applications/labels.ts";
 import * as SavedJobRows from "../applications/savedJobs.ts";
 
 /**
@@ -71,7 +73,10 @@ const purges: ReadonlyArray<{
 }> = [
   { table: "sessions", write: Sessions.deleteByProfileWrite },
   { table: "answers", write: Answers.deleteByProfileWrite },
+  { table: "label_assignments", write: Labels.deleteAssignmentsByProfileWrite },
+  { table: "active_applications", write: ActiveApplications.deleteByProfileWrite },
   { table: "applications", write: ApplicationRecords.deleteByProfileWrite },
+  { table: "custom_labels", write: Labels.deleteByProfileWrite },
   { table: "saved_jobs", write: SavedJobRows.deleteByProfileWrite },
   { table: "submissions", write: Submissions.deleteByProfileWrite },
   { table: "judgements", write: Judgements.deleteByProfileWrite },

@@ -13,22 +13,25 @@ cd "$ROOT"
 
 PORT="${PORT:-8799}"
 CONFIG="dev/preview.wrangler.jsonc"
+STATE_DIR=".preview/state"
 
 echo "==> building the interface"
 (cd apps/web && bun run build)
 
 echo "==> bundling the worker for workerd"
-mkdir -p .preview
+rm -rf "$STATE_DIR"
+mkdir -p "$STATE_DIR"
 bun build apps/worker/src/index.ts \
   --outfile=.preview/worker.js \
   --target=browser --format=esm \
   --conditions=workerd --conditions=worker \
   --external "cloudflare:*"
 
-echo "==> applying the generated schema and the researched catalogue and seed to the local database"
-wrangler d1 execute job-index-preview --local --config "$CONFIG" --file db/schema.sql >/dev/null
-wrangler d1 execute job-index-preview --local --config "$CONFIG" --file db/catalog-seed.sql >/dev/null
-wrangler d1 execute job-index-preview --local --config "$CONFIG" --file dev/preview-seed.sql >/dev/null
+echo "==> applying the generated schema, ordered migrations, researched catalogue, and seed"
+wrangler d1 execute job-index-preview --local --config "$CONFIG" --persist-to "$STATE_DIR" --file db/schema.sql >/dev/null
+WRANGLER_D1_PERSIST_TO="$STATE_DIR" ./scripts/migrate-d1.sh local job-index-preview "$CONFIG" >/dev/null
+wrangler d1 execute job-index-preview --local --config "$CONFIG" --persist-to "$STATE_DIR" --file db/catalog-seed.sql >/dev/null
+wrangler d1 execute job-index-preview --local --config "$CONFIG" --persist-to "$STATE_DIR" --file dev/preview-seed.sql >/dev/null
 
 cat <<BANNER
 
@@ -37,4 +40,4 @@ cat <<BANNER
 
 BANNER
 
-exec wrangler dev --config "$CONFIG" --port "$PORT" --local
+exec wrangler dev --config "$CONFIG" --port "$PORT" --local --persist-to "$STATE_DIR"

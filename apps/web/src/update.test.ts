@@ -1,6 +1,7 @@
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import { describe, expect, it } from "vitest";
+import * as SavedMessage from "./saved/Message.ts";
 import { Navigation, Url } from "foldkit";
 import { CanonicalJob } from "@job-index/domain/Job";
 import {
@@ -14,18 +15,27 @@ import {
   DraftSucceeded,
   FeedDismissSucceeded,
   FeedSucceeded,
+  GotSavedMessage,
   PrepareSucceeded,
   SaveJobClicked,
   SaveJobSucceeded,
   SessionCleared,
   SessionTokenInputChanged,
   SessionTokenSubmitted,
+  StorageSynced,
   UrlChanged,
   UrlRequested,
 } from "./Message.ts";
-import { NotFound, initialModel, PageNotFound } from "./Model.ts";
+import { NotFound, initialModel, PageNotFound, PageSaved } from "./Model.ts";
 import type { Model } from "./Model.ts";
-import { RouteBrowse, RouteFeed, RouteJobDetail, RouteNotFound, RouteProfile } from "./Route.ts";
+import {
+  RouteBrowse,
+  RouteFeed,
+  RouteJobDetail,
+  RouteNotFound,
+  RouteProfile,
+  RouteSaved,
+} from "./Route.ts";
 import { update } from "./update.ts";
 
 /**
@@ -120,6 +130,23 @@ describe("UrlChanged", () => {
     expect(model.page).toEqual({ _tag: "Profile" });
     expect(model.profile.profile._tag).toBe("Loading");
     expect(commands.map((c) => c.name)).toEqual(["FetchProfile"]);
+  });
+
+  it("loads Saved only for an authenticated owner", () => {
+    const [anonymous, anonymousCommands] = update(
+      initialModel,
+      UrlChanged({ route: RouteSaved() }),
+    );
+    expect(anonymous.page).toEqual(PageSaved());
+    expect(anonymousCommands).toEqual([]);
+
+    const [authenticated, commands] = update(
+      { ...initialModel, session: { _tag: "Authenticated", token: "secret" } },
+      UrlChanged({ route: RouteSaved() }),
+    );
+    expect(authenticated.saved.saved._tag).toBe("Loading");
+    expect(authenticated.saved.labels._tag).toBe("Loading");
+    expect(commands.map((command) => command.name)).toEqual(["FetchSaved", "FetchSavedLabels"]);
   });
 
   it("an unmatched path becomes PageNotFound, not a silent fallback to Browse", () => {
@@ -228,6 +255,55 @@ describe("session", () => {
     expect(commands.map((c) => c.name)).toEqual(["PersistSessionToken"]);
   });
 
+  it("waits for session persistence before loading Saved", () => {
+    const onSaved: Model = {
+      ...initialModel,
+      page: PageSaved(),
+      sessionTokenInput: "secret",
+    };
+    const [authenticated, persistCommands] = update(onSaved, SessionTokenSubmitted());
+    expect(persistCommands.map((command) => command.name)).toEqual(["PersistSessionToken"]);
+
+    const [loading, savedCommands] = update(
+      authenticated,
+      StorageSynced({ sessionEpoch: authenticated.sessionEpoch }),
+    );
+    expect(loading.saved.saved._tag).toBe("Loading");
+    expect(savedCommands.map((command) => command.name)).toEqual([
+      "FetchSaved",
+      "FetchSavedLabels",
+    ]);
+  });
+
+  it("ignores a Saved response from an earlier authenticated owner", () => {
+    const [ownerA] = update(
+      { ...initialModel, page: PageSaved(), sessionTokenInput: "owner-a" },
+      SessionTokenSubmitted(),
+    );
+    const [ownerALoading] = update(ownerA, StorageSynced({ sessionEpoch: ownerA.sessionEpoch }));
+    const [signedOut] = update(ownerALoading, SessionCleared());
+    const [ownerB] = update(
+      { ...signedOut, sessionTokenInput: "owner-b" },
+      SessionTokenSubmitted(),
+    );
+    const [ownerBLoading] = update(ownerB, StorageSynced({ sessionEpoch: ownerB.sessionEpoch }));
+
+    const [afterLateResponse, commands] = update(
+      ownerBLoading,
+      GotSavedMessage({
+        sessionEpoch: ownerA.sessionEpoch,
+        message: SavedMessage.FetchFailed({
+          problem: new NotFound({ message: "owner A response" }),
+          append: false,
+        }),
+      }),
+    );
+
+    expect(afterLateResponse).toBe(ownerBLoading);
+    expect(afterLateResponse.saved.saved._tag).toBe("Loading");
+    expect(commands).toEqual([]);
+  });
+
   it("SessionCleared resets the profile Submodel to its own init, not a hand-picked shape", () => {
     const signedIn: Model = {
       ...initialModel,
@@ -244,6 +320,7 @@ describe("session", () => {
     const [model, commands] = update(signedIn, SessionCleared());
     expect(model.session).toEqual({ _tag: "Anonymous" });
     expect(model.profile).toEqual(initialModel.profile);
+    expect(model.saved).toEqual(initialModel.saved);
     expect(model.applications).toEqual([]);
     expect(commands.map((c) => c.name)).toEqual(["ClearSessionToken"]);
   });

@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema";
 import {
   ApplicationId,
   CanonicalJobId,
+  CustomLabelId,
   ProfileId,
   SavedJobId,
   Sequence,
@@ -19,6 +20,7 @@ import {
 export const decodeCanonicalJobId = Schema.decodeUnknownSync(CanonicalJobId);
 export const decodeProfileId = Schema.decodeUnknownSync(ProfileId);
 export const decodeSavedJobId = Schema.decodeUnknownSync(SavedJobId);
+export const decodeCustomLabelId = Schema.decodeUnknownSync(CustomLabelId);
 export const decodeApplicationId = Schema.decodeUnknownSync(ApplicationId);
 
 const decodeSequence = Schema.decodeUnknownSync(Sequence);

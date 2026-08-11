@@ -19,20 +19,24 @@ describe("layerSqlite", () => {
       Effect.gen(function* () {
         const db = yield* Database;
         return yield* db.query<{ name: string }>(
-          "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+          "SELECT name FROM sqlite_master WHERE type = 'table' " +
+            "AND name NOT LIKE 'd1_%' AND name NOT LIKE 'sqlite_%' ORDER BY name",
           [],
         );
       }),
     );
     expect(rows.map((r) => r.name)).toEqual([
+      "active_applications",
       "answers",
       "applications",
       "canonical_jobs",
+      "custom_labels",
       "delivery_platforms",
       "freshness",
       "ingestion_failures",
       "ingestion_runs",
       "judgements",
+      "label_assignments",
       "occurrences",
       "platform_policies",
       "principals",
@@ -160,5 +164,26 @@ describe("layerSqlite", () => {
     );
     expect(outcome.exit._tag).toBe("Failure");
     expect(outcome.rowCount).toBe(0);
+  });
+  it("returns the SQLite changed-row count for compare-and-swap writes", async () => {
+    const counts = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const inserted = yield* db.runAffected(
+          "INSERT INTO freshness (profileId, seenThrough, updatedAt) VALUES (?, ?, ?)",
+          ["p1", 1, "2026-01-01T00:00:00.000Z"],
+        );
+        const matched = yield* db.runAffected(
+          "UPDATE freshness SET seenThrough = ? WHERE profileId = ?",
+          [2, "p1"],
+        );
+        const missed = yield* db.runAffected(
+          "UPDATE freshness SET seenThrough = ? WHERE profileId = ?",
+          [3, "missing"],
+        );
+        return [inserted, matched, missed];
+      }),
+    );
+    expect(counts).toEqual([1, 1, 0]);
   });
 });

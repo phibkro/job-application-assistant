@@ -82,6 +82,36 @@ export class ApplicationMissing extends Data.TaggedError("ApplicationMissing")<{
   readonly application: string;
 }> {}
 
+export class LabelNameConflict extends Data.TaggedError("LabelNameConflict")<{
+  readonly name: string;
+  readonly normalizedName: string;
+}> {}
+
+export class ReservedLabelMutation extends Data.TaggedError("ReservedLabelMutation")<{
+  readonly name: string;
+}> {}
+
+export class SavedJobMissing extends Data.TaggedError("SavedJobMissing")<{
+  readonly savedJob: string;
+}> {}
+
+export class CustomLabelMissing extends Data.TaggedError("CustomLabelMissing")<{
+  readonly label: string;
+}> {}
+
+export class InvalidApplicationTransition extends Data.TaggedError("InvalidApplicationTransition")<{
+  readonly application: string;
+  readonly currentStatus: string;
+  readonly event: string;
+  readonly reason: string;
+}> {}
+
+export class StaleApplicationUpdate extends Data.TaggedError("StaleApplicationUpdate")<{
+  readonly application: string;
+  readonly expectedUpdatedAt: string;
+  readonly actualUpdatedAt: string;
+}> {}
+
 export class DraftMissing extends Data.TaggedError("DraftMissing")<{
   readonly savedJob: string;
 }> {}

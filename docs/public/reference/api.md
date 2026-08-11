@@ -3,9 +3,8 @@
 > Status: proposed MVP interface — historical. This predates the implemented
 > API entirely (routes like `POST /api/collect` were never built as
 > written). The current contract is declared in `apps/worker/src/Api.ts`
-> (an Effect `HttpApi` declaration); `docs/public/reference/api-v1.md`
-> documents the versioned production routes the Rust worker shipped, which
-> only partially overlap with `Api.ts`'s current TypeScript routes.
+> and summarized in [`http-api.md`](http-api.md). The
+> [`api-v1.md`](api-v1.md) page documents the retired Rust API.
 
 ## `POST /api/collect`
 

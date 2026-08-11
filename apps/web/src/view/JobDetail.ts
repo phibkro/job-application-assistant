@@ -6,9 +6,10 @@ import type { CanonicalJob } from "@job-index/domain/Job";
 import { DecisionRequested, DraftRequested, PrepareRequested, SaveJobClicked } from "../Message.ts";
 import type { Message } from "../Message.ts";
 import * as Applications from "../Applications.ts";
+import * as Route from "../Route.ts";
 import { RequestIdle } from "../Model.ts";
 import type { ApplyStage, Model, RequestStatus } from "../Model.ts";
-import { button, card, pageClass, renderProblem } from "./Shared.ts";
+import { button, card, linkButton, pageClass, renderProblem, sectionHeading } from "./Shared.ts";
 
 const statusLabel = (job: CanonicalJob): string =>
   job.status._tag === "Active" ? "Active" : `Closed ${job.status.closedAt}`;
@@ -58,7 +59,10 @@ const jobBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
           h.Href(job.applicationUrl),
           h.Target("_blank"),
           h.Rel("noopener"),
-          h.Class("mt-4 inline-block text-sm font-medium text-indigo-700 hover:text-indigo-900"),
+          h.Class(
+            "mt-4 inline-block text-sm font-medium text-indigo-700 hover:text-indigo-900 " +
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
+          ),
         ],
         ["Original listing ↗"],
       ),
@@ -191,12 +195,7 @@ const decisionControls = (
  *  silently-swapped value the person has to notice on their own. The
  *  platform name is part of `reason`'s own text (see `Applications.Prepared`
  *  in the worker), so surfacing `reason` prominently surfaces the platform. */
-const downgradeNotice = (
-  applicationUrl: string,
-  method: string,
-  reason: string,
-  h: HtmlBuilder<Message>,
-): Html =>
+const downgradeNotice = (method: string, reason: string, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class("rounded-lg border border-amber-300 bg-amber-50 p-4")],
     [
@@ -205,13 +204,39 @@ const downgradeNotice = (
         [`Prepared as "${method}" instead of what was requested.`],
       ),
       h.p([h.Class("mt-1 text-sm text-amber-800")], [reason]),
+    ],
+  );
+
+const externalApplicationActions = (applicationUrl: string, h: HtmlBuilder<Message>): Html =>
+  h.section(
+    [h.Class("mt-4 space-y-3 rounded-md border border-indigo-200 bg-indigo-50 p-4")],
+    [
+      h.h3([h.Class("text-base font-semibold text-indigo-950")], ["External submission"]),
       h.p(
-        [h.Class("mt-2 text-sm text-amber-800")],
+        [h.Class("text-sm text-indigo-900")],
         [
-          "Apply at: ",
-          h.a(
-            [h.Href(applicationUrl), h.Target("_blank"), h.Rel("noopener"), h.Class("underline")],
-            [applicationUrl],
+          "Preparation never records a submission. Submit on the employer's site yourself, then explicitly confirm that external submission in Saved. That separate human confirmation is what changes the application status.",
+        ],
+      ),
+      h.div(
+        [h.Class("flex flex-wrap gap-2")],
+        [
+          linkButton(
+            {
+              label: "Open application site ↗",
+              href: applicationUrl,
+              target: "_blank",
+              rel: "noopener",
+            },
+            h,
+          ),
+          linkButton(
+            {
+              label: "Open Saved to confirm submission",
+              href: Route.href(Route.RouteSaved()),
+              variant: "secondary",
+            },
+            h,
           ),
         ],
       ),
@@ -270,12 +295,8 @@ const stageView = (
                   [h.Class("text-sm text-gray-700")],
                   [`Prepared via "${prepared.method}". Ready to decide.`],
                 )
-              : downgradeNotice(
-                  prepared.applicationUrl,
-                  prepared.method,
-                  prepared.downgradeReason,
-                  h,
-                ),
+              : downgradeNotice(prepared.method, prepared.downgradeReason, h),
+            externalApplicationActions(prepared.applicationUrl, h),
             h.div([h.Class("mt-3")], [draftPreview(prepared.cv, prepared.letter, h)]),
             h.div(
               [h.Class("mt-4")],
@@ -289,7 +310,7 @@ const stageView = (
           [
             decided.downgradeReason === null
               ? h.empty
-              : downgradeNotice(decided.applicationUrl, decided.method, decided.downgradeReason, h),
+              : downgradeNotice(decided.method, decided.downgradeReason, h),
             h.p(
               [
                 h.Class(
@@ -300,6 +321,9 @@ const stageView = (
               ],
               [`Decision recorded: ${decided.status}.`],
             ),
+            decided.status === "ready"
+              ? externalApplicationActions(decided.applicationUrl, h)
+              : h.empty,
           ],
           h,
         ),
@@ -309,9 +333,15 @@ const stageView = (
 
 const applyFlow = (model: Model, job: CanonicalJob, h: HtmlBuilder<Message>): Html => {
   if (model.session._tag === "Anonymous") {
-    return h.p(
-      [h.Class("text-sm text-gray-500")],
-      ["Enter a session token above to shortlist, draft, or apply."],
+    return h.section(
+      [h.Class("space-y-4")],
+      [
+        sectionHeading("Application", h),
+        h.p(
+          [h.Class("text-sm text-gray-500")],
+          ["Enter a session token above to shortlist, draft, or apply."],
+        ),
+      ],
     );
   }
   const record = Applications.find(model.applications, job.id);
@@ -321,9 +351,16 @@ const applyFlow = (model: Model, job: CanonicalJob, h: HtmlBuilder<Message>): Ht
   });
   const stage = Option.flatMap(record, (r) => r.stage);
 
-  return h.div(
-    [h.Class("space-y-4")],
+  return h.section(
+    [...(pending._tag === "Pending" ? [h.AriaBusy(true)] : []), h.Class("space-y-4")],
     [
+      sectionHeading("Application", h),
+      pending._tag === "Pending"
+        ? h.p(
+            [h.Role("status"), h.AriaLive("polite"), h.Class("text-sm text-gray-500")],
+            ["Updating application…"],
+          )
+        : h.empty,
       pending._tag === "Failed" ? renderProblem(pending.problem, h) : h.empty,
       Option.match(stage, {
         onNone: () =>
@@ -347,7 +384,8 @@ export const jobDetailView = (model: Model, h: HtmlBuilder<Message>): Html =>
     [
       AsyncData.matchDataSplitEmpty(model.jobDetail, {
         onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["No job selected."]),
-        onLoading: () => h.p([h.Class("text-sm text-gray-500")], ["Loading job…"]),
+        onLoading: () =>
+          h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading job…"]),
         onFailure: (problem) => renderProblem(problem, h),
         onData: (job) => h.div([h.Class("space-y-6")], [jobBody(job, h), applyFlow(model, job, h)]),
       }),

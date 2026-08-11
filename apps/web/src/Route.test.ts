@@ -1,7 +1,15 @@
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vitest";
 import { Url } from "foldkit";
-import { RouteBrowse, RouteFeed, RouteJobDetail, RouteProfile, href, parse } from "./Route.ts";
+import {
+  RouteBrowse,
+  RouteFeed,
+  RouteJobDetail,
+  RouteProfile,
+  RouteSaved,
+  href,
+  parse,
+} from "./Route.ts";
 
 const url = (pathAndQuery: string) =>
   Option.getOrThrow(Url.fromString(`https://job-index.example${pathAndQuery}`));
@@ -27,9 +35,10 @@ describe("parse", () => {
     expect(parse(url("/jobs/job-9"))).toEqual(RouteJobDetail({ jobId: "job-9" }));
   });
 
-  it("parses /feed and /profile", () => {
+  it("parses /feed, /profile, and /saved", () => {
     expect(parse(url("/feed"))).toEqual(RouteFeed());
     expect(parse(url("/profile"))).toEqual(RouteProfile());
+    expect(parse(url("/saved"))).toEqual(RouteSaved());
   });
 
   it("falls back to NotFound for a path no route matches, carrying the path", () => {
@@ -52,12 +61,13 @@ describe("href", () => {
     expect(parse(url(href(route)))).toEqual(route);
   });
 
-  it("round-trips JobDetail, Feed, and Profile", () => {
+  it("round-trips JobDetail, Feed, Profile, and Saved", () => {
     expect(parse(url(href(RouteJobDetail({ jobId: "job-9" }))))).toEqual(
       RouteJobDetail({ jobId: "job-9" }),
     );
     expect(parse(url(href(RouteFeed())))).toEqual(RouteFeed());
     expect(parse(url(href(RouteProfile())))).toEqual(RouteProfile());
+    expect(parse(url(href(RouteSaved())))).toEqual(RouteSaved());
   });
 
   it("builds a bare / for Browse with no filters set", () => {

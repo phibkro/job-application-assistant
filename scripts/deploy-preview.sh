@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # Deploys the TypeScript service to its own Cloudflare stage.
 #
-# Not a cutover. `staging` and `production` keep running the Rust worker; this
-# publishes the replacement beside them, with its own Worker name and its own
-# D1, so it can be exercised against real Cloudflare without touching what
-# serves today.
+# The preview stage has its own Worker name and D1 database. It exercises the
+# same TypeScript bundle without changing staging or production.
 #
 # The bundle is built by the same command `scripts/preview.sh` uses locally,
 # so what deploys is what was run.
@@ -31,12 +29,12 @@ echo "==> applying infrastructure"
 
 DB_NAME="job-index-${STAGE}-db"
 
-# The schema is a single generated snapshot rather than a migration series:
-# this database is new and nothing is back-filled, so there is no earlier shape
-# to move it from. Incremental migrations resume once a deployment exists whose
-# shape must be preserved. `IF NOT EXISTS` throughout makes re-running safe.
-echo "==> applying the generated schema and the researched catalogue to ${DB_NAME}"
+# The generated snapshot is the current shape. Wrangler then applies any
+# ordered migration that an existing preview database still lacks; a new
+# database is already marked current by the snapshot.
+echo "==> applying the generated schema, ordered migrations, and researched catalogue to ${DB_NAME}"
 wrangler d1 execute "$DB_NAME" --remote --file db/schema.sql --yes >/dev/null
+./scripts/migrate-d1.sh remote "$DB_NAME"
 wrangler d1 execute "$DB_NAME" --remote --file db/catalog-seed.sql --yes >/dev/null
 
 echo "==> done"

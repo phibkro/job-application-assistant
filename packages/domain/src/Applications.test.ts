@@ -23,6 +23,7 @@ const savedJob = new SavedJob({
   jobSnapshot: snapshot,
   note: "Sounds like a good fit.",
   createdAt: now,
+  updatedAt: now,
 });
 
 const applicationRecord = new ApplicationRecord({

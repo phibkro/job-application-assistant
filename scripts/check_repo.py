@@ -349,26 +349,29 @@ for path in sorted(path for path in ROOT.rglob("*") if ours(path)):
 
 # Production safety is declared in the Alchemy program rather than a Wrangler
 # config, so it is asserted against that file. These are the properties a
-# production deploy must not lose: no demo mutations, no public-token
-# fallback, and the three staggered bounded triggers.
+# production deploy must not lose: no demo mutations and no stale public-token
+# setup/build bindings.
 production_config = ROOT / "infra/alchemy.run.ts"
 if production_config.is_file():
     infra_text = production_config.read_text(encoding="utf-8")
     if 'ALLOW_DEMO_MUTATIONS: PRODUCTION ? "false" : "true"' not in infra_text:
         errors.append("production must disable demo mutations")
-    if 'NAV_USE_PUBLIC_TOKEN: PRODUCTION ? "false" : "true"' not in infra_text:
-        errors.append("production must not use NAV's rotating public token")
-    for cron in (
-        '"0,15,30,45 * * * *"',
+    if "NAV_USE_PUBLIC_TOKEN" in infra_text or "ALLOW_NAV_SYNC_WITHOUT_TOKEN" in infra_text:
+        errors.append("production must not declare obsolete NAV public-token flags")
+    if '"NAV_API_TOKEN"' not in infra_text:
+        errors.append("runtime private NAV token binding is missing")
+    ingestion_cron = 'const INGESTION_CRON = "0,15,30,45 * * * *";'
+    production_cron_guard = (
+        "const CRONS = PRODUCTION && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];"
+    )
+    if ingestion_cron not in infra_text or production_cron_guard not in infra_text:
+        errors.append("production must phase-gate the bounded ingestion trigger")
+    inactive_crons = (
         '"2,7,12,17,22,27,32,37,42,47,52,57 * * * *"',
         '"4,9,14,19,24,29,34,39,44,49,54,59 * * * *"',
-    ):
-        if cron not in infra_text:
-            errors.append("production must declare the three staggered bounded scheduled triggers")
-            break
-    # Ingestion must not start before the second phase of a production deploy.
-    if 'NAV_SYNC_ENABLED: PRODUCTION && ACTIVATE_SCHEDULES ? "true" : "false"' not in infra_text:
-        errors.append("production ingestion must activate only with its schedules")
+    )
+    if any(cron in infra_text for cron in inactive_crons):
+        errors.append("production must not schedule jobs the Worker does not implement")
 else:
     errors.append("missing infra/alchemy.run.ts")
 

@@ -23,17 +23,15 @@ dev/.wrangler/
 .idea/
 .vscode/
 
-# Cloudflare and generated deployment state
-#
-# infra/.alchemy/state IS tracked, deliberately: it is the only record of which
-# cloud resources exist, and losing it means Alchemy forgets a deployed Worker
-# and D1 rather than being able to update or destroy them. The log beside it is
-# noise and is not.
-/infra/.alchemy/log/
+# Cloudflare and generated deployment state. Alchemy state is local mutable
+# provider state and can contain resolved secret bindings, so it is never
+# repository evidence.
+/infra/.alchemy/
 /node_modules/
 /.wrangler/
 /.artifacts/
 .tools/
+/.serena/
 
 # Idempotent deployment state generated from the source template
 /wrangler.*.deploy.jsonc

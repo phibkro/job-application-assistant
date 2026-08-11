@@ -1,14 +1,10 @@
 # Deployment architecture
 
-> **Historical, partially superseded.** This predates both the Alchemy v2
-> infrastructure migration and RFC 0015's TypeScript cutover: the
-> `wrangler.<environment>.jsonc` templates, `wrangler.jsonc` alias, and
-> generated `wrangler.<environment>.deploy.jsonc` files it describes no
-> longer exist — staging/production infrastructure is declared in
-> `infra/alchemy.run.ts`. The Rust worker it describes throughout is
-> retired; see `memory-bank/techContext.md` for the current deployment
-> shape and `memory-bank/activeContext.md` for what still targets the
-> retired Rust branch of `infra/alchemy.run.ts`. Left as written below.
+> **Historical, superseded.** This predates Alchemy v2 and RFC 0015. The
+> Wrangler templates and Rust worker below no longer exist. Read
+> `scripts/deploy.sh`, `infra/alchemy.run.ts`, and
+> `docs/public/how-to/deploy.md` for the current deployment flow. The
+> historical design remains below as decision evidence.
 
 ## Environment topology
 

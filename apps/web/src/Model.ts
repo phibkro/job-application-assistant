@@ -3,6 +3,7 @@ import { AsyncData } from "foldkit";
 import { ts } from "foldkit/schema";
 import { CanonicalJob } from "@job-index/domain/Job";
 import * as ProfileSubmodel from "./profile/Model.ts";
+import * as SavedSubmodel from "./saved/Model.ts";
 // `Problem` and the request tri-state live below every cluster (see
 // `RequestStatus.ts`'s own docstring for why); re-exported from here too so
 // every existing call site that reached them through `Model.ts` keeps
@@ -52,11 +53,19 @@ export const PageBrowse = ts("Browse", {});
 export const PageJobDetail = ts("JobDetail", { jobId: S.String });
 export const PageFeed = ts("Feed", {});
 export const PageProfile = ts("Profile", {});
+export const PageSaved = ts("Saved", {});
 // Not named `NotFound` — that tag is already `RequestStatus.ts`'s Problem
 // variant, re-exported from this module; a second binding of the same name
 // would collide at the import site even though the two unions never mix.
 export const PageNotFound = ts("NotFound", { path: S.String });
-export const Page = S.Union([PageBrowse, PageJobDetail, PageFeed, PageProfile, PageNotFound]);
+export const Page = S.Union([
+  PageBrowse,
+  PageJobDetail,
+  PageFeed,
+  PageProfile,
+  PageSaved,
+  PageNotFound,
+]);
 export type Page = typeof Page.Type;
 
 // SESSION
@@ -125,6 +134,7 @@ export type ApplyRecord = typeof ApplyRecord.Type;
 export const Model = S.Struct({
   page: Page,
   session: SessionState,
+  sessionEpoch: S.Number,
   sessionTokenInput: S.String,
 
   browseQuery: BrowseQuery,
@@ -135,6 +145,7 @@ export const Model = S.Struct({
   feedResults: FeedAsyncData.schema,
 
   profile: ProfileSubmodel.Model,
+  saved: SavedSubmodel.Model,
 
   applications: S.Array(ApplyRecord),
 });
@@ -143,6 +154,7 @@ export type Model = typeof Model.Type;
 export const initialModel: Model = {
   page: PageBrowse(),
   session: SessionAnonymous(),
+  sessionEpoch: 0,
   sessionTokenInput: "",
 
   browseQuery: { term: "", location: "", status: "" },
@@ -153,6 +165,7 @@ export const initialModel: Model = {
   feedResults: FeedAsyncData.Idle(),
 
   profile: ProfileSubmodel.init(),
+  saved: SavedSubmodel.init(),
 
   applications: [],
 };

@@ -23,6 +23,14 @@ export class Database extends Context.Service<
     ) => Effect.Effect<ReadonlyArray<A>>;
     readonly run: (sql: string, bindings: ReadonlyArray<unknown>) => Effect.Effect<void>;
     /**
+     * Run one statement and return the number of rows it changed.
+     *
+     * Callers use this for compare-and-swap writes: a zero means the
+     * owner/key/version predicate no longer matched, so the caller must
+     * report a typed stale update rather than claiming success.
+     */
+    readonly runAffected: (sql: string, bindings: ReadonlyArray<unknown>) => Effect.Effect<number>;
+    /**
      * All-or-nothing, over a list of writes decided in advance.
      *
      * A list rather than "wrap this effect", because D1 has no interactive

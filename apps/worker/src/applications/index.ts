@@ -3,6 +3,7 @@ import { layer as applicationsLayer } from "./applications.ts";
 import { layer as entitlementsLayer } from "./entitlements.ts";
 import { layer as policyLayer } from "./policy.ts";
 import { layer as savedJobsLayer } from "./savedJobsService.ts";
+import { layer as savedLayer } from "./savedService.ts";
 
 /**
  * `Applications`, `Entitlements`, and `Policy`, wired together.
@@ -28,5 +29,5 @@ import { layer as savedJobsLayer } from "./savedJobsService.ts";
  * the vacancy is hydrated before bookmarking it.
  */
 export const layer = applicationsLayer.pipe(
-  Layer.provideMerge(Layer.mergeAll(entitlementsLayer, policyLayer, savedJobsLayer)),
+  Layer.provideMerge(Layer.mergeAll(entitlementsLayer, policyLayer, savedJobsLayer, savedLayer)),
 );

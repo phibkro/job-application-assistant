@@ -2,76 +2,37 @@
 
 ## Complete
 
-- AGPL-3.0-or-later licensing, later relicensed to proprietary (see RFC
-  0005/0008 amendments and `LICENSE`).
+- Proprietary licensing (see RFC 0005/0008 amendments and `LICENSE`).
 - Cybernetic ADLC, RFC process, policy, quality gates, and memory bank.
-- Rust/Cloudflare Worker/D1 vertical slice (WS-0001 through WS-0011):
-  canonicalization, provenance, deduplication, replay idempotency, live NAV
-  ingestion, incremental saved searches, principals, versioned API, webhook
-  outbox, and production qualification gates. **Retired** as of RFC 0015's
-  cutover — the historical record lives in `work/`, `evidence/`, and the RFCs
-  themselves, not in this file.
-- RFC 0015 strangler migration (WS-0012): `packages/domain/` reproduces
-  canonical identity in Effect Schema; `apps/worker/src/Api.ts` declares and
-  serves every route group the Rust worker used to; `apps/web/` is the
-  interface; the Rust crates, its ordered migrations, and every script that
-  only built/tested/smoked it are deleted.
-- Generated D1 schema snapshot (`db/schema.sql`) checked for drift against
-  the domain models by `bun run schema:check`, replacing the deleted
-  migration-integrity checks.
-- Local preview (`just preview`) serving the whole stack — API, interface,
-  and a seeded local D1 — for real-journey verification without a deploy.
-- `@cloudflare/vitest-pool-workers` adopted for the persistence/ingestion/DO
-  seam: `apps/worker/src/db/**` (except the two files below), `ingestion/
-  live.test.ts`, `ingestion/SourceLeaseObject.test.ts`, `corpus/live.test.ts`,
-  and `handlers/corpus.live.test.ts` now run *inside workerd*, against a real
-  local D1 binding and a real `SourceLeaseObject` Durable Object namespace
-  (`dev/test.wrangler.jsonc`, `vitest.workers.config.ts`), not `bun:sqlite` or
-  a hand-built fake. `apps/worker/src/db/transactionSemantics.live.test.ts`
-  pins the seam is real: D1 rejects a raw `BEGIN`; `Sqlite.test.ts`'s
-  companion test shows the identical statement silently succeeds under
-  `bun:sqlite`. The pool does not run under Bun — verified directly, it hangs
-  on a `ws` gap in Bun's WebSocket shim — so this is a second, Node-only
-  `vitest` invocation (`bun run test:workers`/`coverage:workers`, folded into
-  `bun run check` via `coverage:all`), never added to the shared Nix dev
-  shell (that already broke `bun:sqlite` resolution once — see `flake.nix`).
-  `layerSqlite`/`Sqlite.ts` stays: `accounts/live.test.ts`,
-  `applications/live.test.ts`, and `db/Sqlite.test.ts`/`db/Live.test.ts`
-  (which pins `Live.ts`'s `batch()` call-shape against `FakeD1.ts`, a claim no
-  real binding can expose) still use it, deliberately, on Bun.
+- RFC 0015 strangler migration (WS-0012): `packages/domain/` reproduces canonical identity in Effect Schema; `apps/worker/src/Api.ts` declares and serves every route group; `apps/web/` is the interface; the retired Rust implementation and its obsolete build/test/smoke tooling are historical only.
+- TypeScript/Effect service capabilities for canonicalization, provenance, deduplication, replay idempotency, NAV ingestion, incremental saved searches, profiles, drafting, applications, and the browse/save/prepare workflow.
+- Generated D1 schema snapshot (`db/schema.sql`) checked by `bun run schema:check`.
+- Generated source-catalog seed (`db/catalog-seed.sql`) checked by `bun run catalog:check`, from `scripts/ts/catalog.ts` and the researched platform index/observations.
+- Local preview (`just preview`) serving the TypeScript stack with a seeded local D1.
+- The approved Job Application Assistant mission and MVP boundary are recorded canonically in [`docs/internal/product/vision.md`](../docs/internal/product/vision.md); context docs link there instead of copying the full decision.
+- Scheduled ingestion target stabilization: `apps/worker/src/ingestion/scheduled.ts` selects the Feed tier implemented by this deployment, production declares only its ingestion cron, and `scheduled.test.ts` guards the target boundary.
+- Runtime NAV credentials: the adapter shares a cached public token or uses the private secret, invalidates only a failing token on 401, and retries once.
+- Saved application workspace: durable snapshots, owner-scoped custom labels, presets, compare-and-swap lifecycle events, current/prior attempts, note-preserving event updates, session-epoch isolation for late owner-scoped responses, and the `/saved` interface.
+- Ordered D1 migration support: generated snapshots mark current shapes, existing databases apply `migrations/*.sql`, and the runner records only successful migrations.
+- Local full-stack Saved evidence: save → draft → assisted preparation → approval → label assignment/filter → explicit submission confirmation → Applied preset → history.
 
-## Known gaps left by the cutover
+## Known gaps and evidence status
 
-These existed only in the retired Rust worker and have not been ported. Each
-is a real product decision, not an oversight to silently patch:
+These gaps are current boundaries or evidence limits, not claims that source code is absent where it is implemented:
 
-- **Administrative surface.** API-key principals (quotas, revocation, audit
-  log), owned saved-search webhook subscriptions and delivery, and corpus
-  maintenance (audit/dry-run reconcile/purge) have no TypeScript
-  implementation. `ADMIN_SYNC_TOKEN` is still required by production deploy
-  gates and `infra/alchemy.run.ts`'s secret bindings, but no TypeScript route
-  currently checks it.
-- **Production qualification.** The 50,000-job query-plan regression probe
-  and the local restore drill were written against the Rust worker's schema
-  and are deleted with it; nothing currently proves the TypeScript service's
-  indexes hold at scale or that a backup restores cleanly.
-- **Source catalog seeding.** `apps/worker/src/catalog`'s `source_catalog`
-  table has no generator; the Rust pipeline (`probe_sources.py` →
-  `import_source_index.py` → a migration file) targeted a schema and file
-  format that no longer exist.
-- **OpenAPI contract.** `openapi/job-index-v1.json` was hand-maintained for
-  the Rust routes and is deleted rather than left describing a service that
-  no longer runs them; nothing currently generates its replacement from
-  `Api.ts`.
-- **Staging/production cutover.** `infra/alchemy.run.ts` still deploys the
-  Rust worker for those two stages; repointing them at the TypeScript worker
-  is a deliberately separate decision, held by another writer.
+- **Administrative surface.** API-key principal administration (quotas, revocation, audit log), owned saved-search webhook subscriptions/delivery, and corpus maintenance (audit/dry-run reconcile/purge) are not implemented in the TypeScript service. `ADMIN_SYNC_TOKEN` is still required by production deploy gates and infrastructure secret bindings, but no TypeScript route currently checks it.
+- **Production qualification.** No current TypeScript evidence proves realistic-corpus query-plan capacity, a clean restore drill, or the black-box staging smoke path. Production qualification remains open.
+- **Staging evidence.** Existing staging evidence is stale; the current `infra/alchemy.run.ts` declaration (TypeScript Worker for every Alchemy stage) must not be mistaken for a current deployed revision.
+- **OpenAPI contract.** `openapi/job-index-v1.json` is not a current generated artifact; nothing currently generates a replacement from `apps/worker/src/Api.ts`.
 
-## Remaining WS-0012 acceptance evidence
+## Current stabilization focus
 
-- Phase 1 slots (persistence, corpus, acquisition, accounts, drafting,
-  delivery, applications, agenda, entitlements, handlers, interface, agent
-  session) continuing per `work/WS-0012-r1-typescript-migration-plan.md`.
-- Decide and execute the gaps above, or explicitly accept them as deferred.
-- Repoint `infra/alchemy.run.ts`'s staging/production stages once the above
-  is resolved; that is Phase 3 cutover, not this deletion pass.
+Prove NAV credential resolution and scheduled ingestion on a deployed revision.
+Local source, unit, D1, and browser evidence is current. Remote staging and
+production qualification evidence is not current.
+
+## Next work
+
+- Exercise scheduled NAV ingestion on a deployed revision, refresh staging evidence, and complete TypeScript production qualification.
+- Decide separately whether to port administrative capabilities and generate a replacement OpenAPI contract.
+- After MVP stabilization, evaluate future candidates from the [product vision](../docs/internal/product/vision.md): ATS-friendly document assistance and bounded Cloudflare Agents SDK/browser/computer-control support. These are not committed architecture, and submission still requires explicit human approval.

@@ -22,12 +22,9 @@ export interface Env {
   /** `staging` or `production`; whatever the deploy set, reported as-is. */
   readonly ENVIRONMENT: string;
   /**
-   * NAV's bearer token, whichever kind `scripts/refresh-nav-token.sh` wrote
-   * (public experiment or NAV-issued private consumer). Optional, not
-   * validated here: a deployment that has not configured it yet should still
-   * start — NAV ingestion then fails per-request as `SourceUnavailable`
-   * (a 401), landing in the ingestion failure ledger like any other
-   * connector problem, rather than the whole Worker refusing to boot.
+   * Optional runtime NAV consumer token. A non-empty value selects private
+   * mode; absence selects the public token endpoint at request time. The
+   * token is never bundled or copied into deployment evidence.
    */
   readonly NAV_API_TOKEN?: string;
 }

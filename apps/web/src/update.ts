@@ -5,7 +5,7 @@ import type { Update } from "foldkit";
 import { evo } from "foldkit/struct";
 import * as Applications from "./Applications.ts";
 import * as Commands from "./Commands.ts";
-import { GotProfileMessage } from "./Message.ts";
+import { GotProfileMessage, GotSavedMessage } from "./Message.ts";
 import type { Message } from "./Message.ts";
 import {
   ApplyStageDecided,
@@ -18,6 +18,7 @@ import {
   PageJobDetail,
   PageNotFound,
   PageProfile,
+  PageSaved,
   type Problem,
   RequestFailed,
   RequestIdle,
@@ -27,6 +28,7 @@ import {
   initialModel,
 } from "./Model.ts";
 import * as ProfileSubmodel from "./profile/index.ts";
+import * as SavedSubmodel from "./saved/index.ts";
 import * as Route from "./Route.ts";
 import { settle } from "./Settle.ts";
 
@@ -41,6 +43,30 @@ const ensureLoaded = <A>(
   load: Update.Commands<Message>[number],
 ): readonly [AsyncData.AsyncData<A, Problem>, Update.Commands<Message>] =>
   AsyncData.isIdle(current) ? [AsyncData.Loading(), [load]] : [current, []];
+
+const loadSavedIfNeeded = (model: Model): UpdateReturn => {
+  if (
+    model.session._tag === "Anonymous" ||
+    (!AsyncData.isIdle(model.saved.saved) && !AsyncData.isIdle(model.saved.labels))
+  ) {
+    return [model, []];
+  }
+  const [nextSaved, savedCommands] = SavedSubmodel.update(model.saved, SavedSubmodel.Requested());
+  return [
+    evo(model, { saved: () => nextSaved }),
+    Command.mapMessages(savedCommands, (childMessage) =>
+      GotSavedMessage({ sessionEpoch: model.sessionEpoch, message: childMessage }),
+    ),
+  ];
+};
+
+/** Mutations made in Job detail change Saved's durable read model. Dropping
+ * only that cache makes the next `/saved` visit reload it instead of showing
+ * the previously loaded owner's stale bookmark/application summary. */
+const invalidateSaved = (model: Model): Model => {
+  const [saved] = SavedSubmodel.update(model.saved, SavedSubmodel.Invalidated());
+  return evo(model, { saved: () => saved });
+};
 
 export const update = (model: Model, message: Message): UpdateReturn =>
   Match.value(message).pipe(
@@ -112,10 +138,14 @@ export const update = (model: Model, message: Message): UpdateReturn =>
               return [
                 evo(withPage, { profile: () => nextProfile }),
                 Command.mapMessages(profileCommands, (childMessage) =>
-                  GotProfileMessage({ message: childMessage }),
+                  GotProfileMessage({
+                    sessionEpoch: withPage.sessionEpoch,
+                    message: childMessage,
+                  }),
                 ),
               ];
             },
+            Saved: () => loadSavedIfNeeded(evo(model, { page: () => PageSaved() })),
             NotFound: ({ path }) => [evo(model, { page: () => PageNotFound({ path }) }), []],
           }),
         ),
@@ -129,9 +159,13 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       SessionTokenSubmitted: () => {
         const token = model.sessionTokenInput.trim();
         if (token === "") return [model, []];
+        const sessionEpoch = model.sessionEpoch + 1;
         return [
-          evo(model, { session: () => SessionAuthenticated({ token }) }),
-          [Commands.PersistSessionToken({ token })],
+          evo(model, {
+            session: () => SessionAuthenticated({ token }),
+            sessionEpoch: () => sessionEpoch,
+          }),
+          [Commands.PersistSessionToken({ token, sessionEpoch })],
         ];
       },
 
@@ -142,18 +176,31 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       // not by reaching into its fields: the root has no business knowing
       // what "empty" looks like inside another Model's shape, only that
       // its own `init` is the definition of empty.
-      SessionCleared: () => [
-        evo(model, {
-          session: () => SessionAnonymous(),
-          sessionTokenInput: () => "",
-          profile: () => ProfileSubmodel.init(),
-          feedResults: () => AsyncData.Idle(),
-          applications: () => [],
-        }),
-        [Commands.ClearSessionToken()],
-      ],
+      SessionCleared: () => {
+        const sessionEpoch = model.sessionEpoch + 1;
+        return [
+          evo(model, {
+            session: () => SessionAnonymous(),
+            sessionEpoch: () => sessionEpoch,
+            sessionTokenInput: () => "",
+            profile: () => ProfileSubmodel.init(),
+            saved: () => SavedSubmodel.init(),
+            feedResults: () => AsyncData.Idle(),
+            applications: () => [],
+          }),
+          [Commands.ClearSessionToken({ sessionEpoch })],
+        ];
+      },
 
-      StorageSynced: () => [model, []],
+      // A storage completion belongs only to the session transition that
+      // scheduled it. An older owner's late completion cannot start a fetch
+      // under the current owner's model.
+      StorageSynced: ({ sessionEpoch }) =>
+        sessionEpoch !== model.sessionEpoch
+          ? [model, []]
+          : model.page._tag === "Saved"
+            ? loadSavedIfNeeded(model)
+            : [model, []],
 
       // BROWSE
 
@@ -260,7 +307,8 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       // `profile/`); the root only forwards the wrapped Message to its
       // `update` and lifts the Commands it hands back into its own
       // Message universe.
-      GotProfileMessage: ({ message: profileMessage }) => {
+      GotProfileMessage: ({ sessionEpoch, message: profileMessage }) => {
+        if (sessionEpoch !== model.sessionEpoch) return [model, []];
         const [nextProfile, profileCommands] = ProfileSubmodel.update(
           model.profile,
           profileMessage,
@@ -268,7 +316,18 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         return [
           evo(model, { profile: () => nextProfile }),
           Command.mapMessages(profileCommands, (childMessage) =>
-            GotProfileMessage({ message: childMessage }),
+            GotProfileMessage({ sessionEpoch: model.sessionEpoch, message: childMessage }),
+          ),
+        ];
+      },
+
+      GotSavedMessage: ({ sessionEpoch, message: savedMessage }) => {
+        if (sessionEpoch !== model.sessionEpoch) return [model, []];
+        const [nextSaved, savedCommands] = SavedSubmodel.update(model.saved, savedMessage);
+        return [
+          evo(model, { saved: () => nextSaved }),
+          Command.mapMessages(savedCommands, (childMessage) =>
+            GotSavedMessage({ sessionEpoch: model.sessionEpoch, message: childMessage }),
           ),
         ];
       },
@@ -283,15 +342,17 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         [Commands.SaveJob({ jobId, note: Option.none() })],
       ],
       SaveJobSucceeded: ({ jobId, savedJobId }) => [
-        evo(model, {
-          applications: (records) =>
-            Applications.upsert(records, jobId, (r) =>
-              evo(r, {
-                stage: () => Option.some(ApplyStageSaved({ savedJobId, note: Option.none() })),
-                pending: () => RequestIdle(),
-              }),
-            ),
-        }),
+        invalidateSaved(
+          evo(model, {
+            applications: (records) =>
+              Applications.upsert(records, jobId, (r) =>
+                evo(r, {
+                  stage: () => Option.some(ApplyStageSaved({ savedJobId, note: Option.none() })),
+                  pending: () => RequestIdle(),
+                }),
+              ),
+          }),
+        ),
         [],
       ],
       SaveJobFailed: ({ jobId, problem }) => [applyFailed(model, jobId, problem), []],
@@ -334,26 +395,28 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         letter,
         downgradeReason,
       }) => [
-        evo(model, {
-          applications: (records) =>
-            Applications.upsert(records, jobId, (r) =>
-              evo(r, {
-                stage: () =>
-                  Option.some(
-                    ApplyStagePrepared({
-                      savedJobId,
-                      applicationId,
-                      method,
-                      applicationUrl,
-                      cv,
-                      letter,
-                      downgradeReason,
-                    }),
-                  ),
-                pending: () => RequestIdle(),
-              }),
-            ),
-        }),
+        invalidateSaved(
+          evo(model, {
+            applications: (records) =>
+              Applications.upsert(records, jobId, (r) =>
+                evo(r, {
+                  stage: () =>
+                    Option.some(
+                      ApplyStagePrepared({
+                        savedJobId,
+                        applicationId,
+                        method,
+                        applicationUrl,
+                        cv,
+                        letter,
+                        downgradeReason,
+                      }),
+                    ),
+                  pending: () => RequestIdle(),
+                }),
+              ),
+          }),
+        ),
         [],
       ],
       PrepareFailed: ({ jobId, problem }) => [applyFailed(model, jobId, problem), []],
@@ -366,33 +429,35 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         [Commands.DecideApplication({ jobId, applicationId, decision })],
       ],
       DecisionSucceeded: ({ jobId, applicationId, status }) => [
-        evo(model, {
-          applications: (records) =>
-            Applications.upsert(records, jobId, (r) =>
-              evo(r, {
-                pending: () => RequestIdle(),
-                stage: () =>
-                  Option.match(r.stage, {
-                    onNone: () => r.stage,
-                    onSome: (stage) =>
-                      stage._tag === "Prepared" || stage._tag === "Decided"
-                        ? Option.some(
-                            ApplyStageDecided({
-                              savedJobId: stage.savedJobId,
-                              applicationId,
-                              method: stage.method,
-                              applicationUrl: stage.applicationUrl,
-                              cv: stage.cv,
-                              letter: stage.letter,
-                              downgradeReason: stage.downgradeReason,
-                              status,
-                            }),
-                          )
-                        : r.stage,
-                  }),
-              }),
-            ),
-        }),
+        invalidateSaved(
+          evo(model, {
+            applications: (records) =>
+              Applications.upsert(records, jobId, (r) =>
+                evo(r, {
+                  pending: () => RequestIdle(),
+                  stage: () =>
+                    Option.match(r.stage, {
+                      onNone: () => r.stage,
+                      onSome: (stage) =>
+                        stage._tag === "Prepared" || stage._tag === "Decided"
+                          ? Option.some(
+                              ApplyStageDecided({
+                                savedJobId: stage.savedJobId,
+                                applicationId,
+                                method: stage.method,
+                                applicationUrl: stage.applicationUrl,
+                                cv: stage.cv,
+                                letter: stage.letter,
+                                downgradeReason: stage.downgradeReason,
+                                status,
+                              }),
+                            )
+                          : r.stage,
+                    }),
+                }),
+              ),
+          }),
+        ),
         [],
       ],
       DecisionFailed: ({ jobId, problem }) => [applyFailed(model, jobId, problem), []],
@@ -409,4 +474,4 @@ const applyFailed = (model: Model, jobId: string, problem: Problem): Model =>
 
 // Re-exported so `entry.ts` and tests share one definition of "the app's
 // starting Model" without importing `Model.ts` twice under different names.
-export { initialModel, PageBrowse, PageFeed, PageProfile };
+export { initialModel, PageBrowse, PageFeed, PageProfile, PageSaved };

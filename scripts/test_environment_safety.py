@@ -18,49 +18,48 @@ assert "triggers" not in preview_config
 
 infra = (ROOT / "infra/alchemy.run.ts").read_text()
 
-# Production must not expose the demo mutations, unauthenticated NAV sync, or
-# public-token fallback that the other environments rely on.
-for guard in (
-    'ALLOW_DEMO_MUTATIONS: PRODUCTION ? "false" : "true"',
-    'ALLOW_NAV_SYNC_WITHOUT_TOKEN: PRODUCTION ? "false" : "true"',
-    'NAV_USE_PUBLIC_TOKEN: PRODUCTION ? "false" : "true"',
-):
-    assert guard in infra, guard
+# Production must not expose the demo mutations or stale public-token
+# fallback bindings. Private mode remains available through the explicit
+# NAV_API_TOKEN secret.
+assert 'ALLOW_DEMO_MUTATIONS: PRODUCTION ? "false" : "true"' in infra
+assert '"NAV_API_TOKEN"' in infra
+for obsolete in ("ALLOW_NAV_SYNC_WITHOUT_TOKEN", "NAV_USE_PUBLIC_TOKEN"):
+    assert obsolete not in infra, obsolete
 
-# Ingestion and its triggers activate only on the second phase of a production
-# deploy, so a cron-enabled version can never run before its credentials exist.
-assert 'NAV_SYNC_ENABLED: PRODUCTION && ACTIVATE_SCHEDULES ? "true" : "false"' in infra
-assert "PRODUCTION && ACTIVATE_SCHEDULES" in infra
+# Triggers activate only on the second phase of a production deploy, so
+# scheduled ingestion cannot run before its credentials exist.
+production_cron_guard = (
+    "const CRONS = PRODUCTION && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];"
+)
+assert production_cron_guard in infra
 assert 'process.env.JOB_INDEX_ACTIVATE_SCHEDULES === "1"' in infra
-for cron in (
-    '"0,15,30,45 * * * *"',
+assert 'const INGESTION_CRON = "0,15,30,45 * * * *";' in infra
+for inactive_cron in (
     '"2,7,12,17,22,27,32,37,42,47,52,57 * * * *"',
     '"4,9,14,19,24,29,34,39,44,49,54,59 * * * *"',
 ):
-    assert cron in infra, cron
+    assert inactive_cron not in infra, inactive_cron
 
-# Every stage's database gets its schema from the same place: one generated
-# snapshot, applied by the deploy script that publishes the Worker.
-#
-# Alchemy must NOT apply migrations. It used to, for the Rust stages, and that
-# is how the first preview deploy failed — the ten ordered migrations ran
-# against a new database, `CREATE TABLE IF NOT EXISTS` kept the legacy shape,
-# and the generated snapshot's next index failed against it.
+# Every stage starts from one generated snapshot. Ordered TypeScript-era
+# migrations then preserve databases created by an earlier snapshot. Alchemy
+# must not apply them: it provisions the resource before the deploy script can
+# establish the generated baseline, so a migration that alters an application
+# table would run too early on a new database.
 # Comments are not code: the file explains at length why it does not set this,
 # and an assertion that reads prose would be satisfied by the explanation.
 infra_code = re.sub(r"/\*[\s\S]*?\*/", "", infra)
 infra_code = re.sub(r"(^|[^:])//.*$", r"\1", infra_code, flags=re.MULTILINE)
 assert "migrationsDir" not in infra_code, (
-    "Alchemy must not apply migrations; the deploy applies the generated snapshot"
+    "Alchemy must not apply migrations; the deploy establishes the snapshot first"
 )
 
-# ...which makes the deploy scripts the only thing standing between a published
-# Worker and an empty database. Both paths, because collapsing the stages onto
-# TypeScript once removed this for staging and production while leaving preview
-# working, and nothing would have failed until a query ran.
+# The deploy paths must establish the snapshot, apply ordered migrations, and
+# seed the catalogue. Otherwise a new relation can exist beside an old parent
+# table until the first authenticated request finds the mismatch.
 for script in ("scripts/deploy.sh", "scripts/deploy-preview.sh"):
     text = (ROOT / script).read_text()
     assert "db/schema.sql" in text, f"{script} must apply the generated schema"
+    assert "migrate-d1.sh" in text, f"{script} must apply ordered D1 migrations"
     assert "db/catalog-seed.sql" in text, f"{script} must seed the researched catalogue"
 
 justfile = (ROOT / "justfile").read_text()
@@ -78,6 +77,14 @@ assert "bootstrap-publish" in deploy
 assert "deploy_stack 0" in deploy
 assert "deploy_stack 1" in deploy
 assert "JOB_INDEX_ACTIVATE_SCHEDULES" in deploy
+production_phase = deploy.rsplit('if [ "${environment}" = "production" ]; then', 1)[
+    1
+].split("else", 1)[0]
+assert (
+    production_phase.index("deploy_stack 0")
+    < production_phase.index("apply_database")
+    < production_phase.index("deploy_stack 1")
+)
 # A freshly published Worker is smoked only once it answers.
 assert "/api/health" in deploy
 

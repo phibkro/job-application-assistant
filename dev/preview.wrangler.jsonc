@@ -8,14 +8,19 @@
   "compatibility_date": "2026-05-25",
   "vars": { "ENVIRONMENT": "local" },
   "d1_databases": [
-    { "binding": "DB", "database_name": "job-index-preview", "database_id": "local" }
+    {
+      "binding": "DB",
+      "database_name": "job-index-preview",
+      "database_id": "local",
+      "migrations_dir": "../db/migrations",
+    },
   ],
   // One Durable Object per source, admitting one `Ingestion.collect` run at
   // a time for it. `class_name` must match what `apps/worker/src/index.ts`
   // exports — Cloudflare finds the class by name against the bundled main
   // module, not by any binding key.
   "durable_objects": {
-    "bindings": [{ "name": "SOURCE_LEASE", "class_name": "SourceLeaseObject" }]
+    "bindings": [{ "name": "SOURCE_LEASE", "class_name": "SourceLeaseObject" }],
   },
   // Wrangler requires an explicit migration the first time a Durable Object
   // class appears — `infra/alchemy.run.ts` computes the equivalent
@@ -30,6 +35,6 @@
     "not_found_handling": "single-page-application",
     // ...but the API is the Worker's, and an asset router that answered
     // /api/* first would shadow every endpoint with the app shell.
-    "run_worker_first": ["/api/*"]
-  }
+    "run_worker_first": ["/api/*"],
+  },
 }

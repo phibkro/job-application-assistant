@@ -9,7 +9,6 @@
   "source_integrity": "editable-source-no-runtime-checksum",
   "compatibility_date": "2026-05-25",
   "commands": [
-    "just nav-token",
     "just nav-key",
     "just admin-key",
     "just check",
@@ -23,7 +22,7 @@
   "features": [
     "TypeScript/Effect Cloudflare Worker serving every route group (RFC 0015)",
     "live NAV ingestion with a real SQL persistence layer",
-    "NAV public and private consumer credential configuration",
+    "NAV runtime public endpoint and private consumer credential mode",
     "generated D1 schema snapshot, checked for drift against the domain models",
     "browse, save, draft, and apply application flow",
     "non-destructive production smoke suite (health/about/public read)",

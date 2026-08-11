@@ -88,4 +88,27 @@ describe("Live layer", () => {
     );
     expect(d1.batchCalls).toEqual([]);
   });
+  it("returns D1's changed-row count for compare-and-swap writes", async () => {
+    const d1 = makeFakeD1();
+    const counts = await runWith(
+      d1,
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const inserted = yield* db.runAffected(
+          "INSERT INTO freshness (profileId, seenThrough, updatedAt) VALUES (?, ?, ?)",
+          ["p1", 1, "2026-01-01T00:00:00.000Z"],
+        );
+        const matched = yield* db.runAffected(
+          "UPDATE freshness SET seenThrough = ? WHERE profileId = ?",
+          [2, "p1"],
+        );
+        const missed = yield* db.runAffected(
+          "UPDATE freshness SET seenThrough = ? WHERE profileId = ?",
+          [3, "missing"],
+        );
+        return [inserted, matched, missed];
+      }),
+    );
+    expect(counts).toEqual([1, 1, 0]);
+  });
 });

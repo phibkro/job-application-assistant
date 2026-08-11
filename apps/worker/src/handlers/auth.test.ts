@@ -13,13 +13,10 @@ import { buildHandler } from "./testSupport.ts";
  * `Accounts`. `feed.fresh` stands in as "any guarded endpoint" — the
  * assertions are about the 401, not about feed.
  *
- * `Api.ts` declares its error classes with no `HttpApiSchema.status`
- * annotation, so every declared error — this 401 included — currently
- * serializes as HTTP 500. Verified by running the real request below rather
- * than assumed; see the handoff report. The body's `_tag` is what actually
- * distinguishes "rejected" from "accepted" until `Api.ts` gains status
- * annotations, so these assertions check the body, and pin the current
- * (wrong) status as a documented fact rather than silently accepting it.
+ * `Api.ts` gives `Unauthorized` an `httpApiStatus` annotation of 401.
+ * These real-router assertions pin both the tagged body and that status, so a
+ * future schema change cannot silently turn an authentication rejection into
+ * an internal-server response.
  */
 const alice = "alice" as ProfileId;
 

@@ -161,7 +161,6 @@ for raw in lines:
     stripped = raw.strip()
     if stripped in {
         "# NAV-issued private consumer token; managed by just nav-key.",
-        "# Rotating NAV public experiment token; managed by just nav-token.",
     }:
         continue
     if stripped and not stripped.startswith("#") and "=" in stripped:

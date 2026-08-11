@@ -6,21 +6,11 @@ staging smoke suite are gone with it). This is the tutorial for what
 currently runs: the TypeScript/Effect service, served locally against a
 seeded database.
 
-## 1. Prepare the NAV token
+## 1. Prepare NAV authentication
 
-Setup fetches NAV's current public experiment token into the ignored
-`.dev.vars` file. The token is reused while it has more than 24 hours
-remaining:
-
-```sh
-just setup
-```
-
-Force a refresh at any time with:
-
-```sh
-just nav-token
-```
+The Worker obtains NAV's public token at runtime when no private secret is
+configured. `just setup` checks the toolchain and does not persist a public
+token in `.dev.vars`.
 
 A NAV-issued private consumer key can be configured instead:
 
@@ -58,16 +48,30 @@ curl http://127.0.0.1:8799/api/v1/jobs
 curl http://127.0.0.1:8799/api/health
 ```
 
-## 4. Deploy the preview stage
+## 4. Exercise the Saved workspace
+
+1. Open a vacancy and select **Shortlist this job**.
+2. Select **Draft CV & letter**.
+3. Select **Prepare (assisted)**.
+4. Approve the prepared attempt.
+5. Open **Saved**.
+6. Create and assign a custom label.
+7. Confirm an external submission only after you submit on the external site.
+8. Open the application history.
+
+The Saved page keeps the frozen vacancy snapshot and prior attempts. It also
+shows the current application state and its next human action.
+
+
+## 5. Deploy the preview stage
 
 ```sh
 nix develop --command just deploy-preview
 ```
 
-This deploys the same bundle to its own Cloudflare stage (`preview`), with
-its own Worker name and D1 database, independent of staging/production —
-RFC 0015's strangler migration keeps the TypeScript service exercisable
-against real Cloudflare without touching what `staging`/`production`
-currently serve. See [`docs/public/how-to/deploy.md`](../how-to/deploy.md)
-for the staging/production entry points, which still deploy the retired
-Rust worker until `infra/alchemy.run.ts`'s stages are repointed.
+This command deploys the same TypeScript bundle to an independent Cloudflare
+preview stage. It does not change staging or production.
+
+All Alchemy stages now declare the TypeScript Worker. A source declaration is
+not deployment evidence. See [`docs/public/how-to/deploy.md`](../how-to/deploy.md)
+for the staging and production procedures.

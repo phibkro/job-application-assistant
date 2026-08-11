@@ -109,10 +109,9 @@ run_logged() {
   "$@" 2>&1 | tee "${log_dir}/${name}.log"
 }
 
-# Infrastructure is declared in infra/alchemy.run.ts and applied by Alchemy:
-# the D1 database, its schema, the Worker, its bindings, and its cron triggers.
-# This script keeps what Alchemy is not: the gates. Everything above decided
-# whether this deploy may proceed; everything below proves that it worked.
+# Alchemy declares the D1 database, Worker, bindings, and cron triggers in
+# infra/alchemy.run.ts. This script runs the gates, deploys that stack, applies
+# the generated database files, and records smoke evidence.
 #
 # Secrets are passed through the environment because the Worker's binding set
 # is declared in full on each deploy — uploading them separately afterwards
@@ -134,22 +133,6 @@ if [ ! -d infra/node_modules ]; then
   run_logged infra-install bash -c "cd infra && bun install"
 fi
 
-# Production publishes in two phases so a cron-enabled version never runs
-# before its credentials exist: triggers and synchronization are off in the
-# first pass and activated in the second.
-if [ "${environment}" = "production" ]; then
-  run_logged bootstrap-publish deploy_stack 0
-  run_logged publish deploy_stack 1
-else
-  run_logged publish deploy_stack 0
-fi
-unset private_nav_token admin_token
-
-nav_auth_mode="public-fallback"
-if grep -q 'NAV_API_TOKEN' "${log_dir}/publish.log" 2>/dev/null; then
-  nav_auth_mode="private-secret"
-fi
-
 read_stack_output() {
   python3 - "$1" <<'PYOUT'
 import json
@@ -169,22 +152,40 @@ print(value.get(key, "") if isinstance(value, dict) else "")
 PYOUT
 }
 
-database_id="$(read_stack_output databaseId)"
-database_name="$(read_stack_output database)"
+apply_database() {
+  database_id="$(read_stack_output databaseId)"
+  database_name="$(read_stack_output database)"
+  if [ -z "${database_id}" ] || [ -z "${database_name}" ]; then
+    echo "Alchemy did not report the D1 database." >&2
+    exit 1
+  fi
 
-# Alchemy no longer applies migrations: the TypeScript service starts from one
-# generated snapshot, and it used to be the Rust stages alone that had ordered
-# migrations to run. Collapsing those stages onto TypeScript therefore removed
-# the only step that gave staging and production a schema — a Worker deployed
-# against an empty database, which is exactly what the environment-safety gate
-# is written to refuse.
-#
-# IF NOT EXISTS throughout, so re-running is safe, and the catalogue seed uses
-# INSERT OR REPLACE so a re-run re-asserts the researched rows rather than
-# duplicating them.
-echo "Applying the generated schema and researched catalogue to ${database_name}..."
-wrangler d1 execute "${database_name}" --remote --file db/schema.sql --yes >/dev/null
-wrangler d1 execute "${database_name}" --remote --file db/catalog-seed.sql --yes >/dev/null
+  # The snapshot creates new databases at the current shape. On an existing
+  # database it leaves earlier tables in place; Wrangler then applies only the
+  # ordered migrations whose target shape the snapshot could not mark current.
+  echo "Applying the generated schema, ordered migrations, and researched catalogue to ${database_name}..."
+  wrangler d1 execute "${database_name}" --remote --file db/schema.sql --yes >/dev/null
+  ./scripts/migrate-d1.sh remote "${database_name}"
+  wrangler d1 execute "${database_name}" --remote --file db/catalog-seed.sql --yes >/dev/null
+}
+
+# Production publishes without cron triggers, upgrades the database, and only
+# then publishes the cron-enabled version. A scheduled ingestion can therefore
+# never reach a table shape from the previous release.
+if [ "${environment}" = "production" ]; then
+  run_logged bootstrap-publish deploy_stack 0
+  apply_database
+  run_logged publish deploy_stack 1
+else
+  run_logged publish deploy_stack 0
+  apply_database
+fi
+
+nav_auth_mode="public-runtime"
+if [ -n "${private_nav_token}" ]; then
+  nav_auth_mode="private-secret"
+fi
+unset private_nav_token admin_token
 
 deployment_url="$(read_stack_output url)"
 
@@ -208,13 +209,10 @@ until curl --fail --silent --show-error --max-time 10 "${deployment_url}/api/hea
   sleep 2
 done
 
-# The Rust worker's destructive staging journey (scripts/smoke.sh) went with
-# the crate that served the routes it exercised — saved-search webhooks,
-# principals, and maintenance have no TypeScript implementation yet, so there
-# was nothing left to port a destructive smoke suite against. Every stage now
-# runs the same non-destructive check smoke-production.sh performs, which is
-# the whole live route surface the TypeScript service currently promises to
-# keep identical to the Rust one (health/about) plus a public-read proof.
+# The retired Rust worker's destructive journey exercised routes that no
+# longer exist. The current smoke is deliberately non-destructive: it proves
+# health, service identity, and a public corpus read. It is deployment evidence
+# for those paths only, not full production qualification.
 SMOKE_OUTPUT_DIR="${log_dir}/smoke" ./scripts/smoke-production.sh "${deployment_url}"
 
 python3 - "${environment}" "${deployment_url}" "${config}" "${database_name}" "${database_id}" "${nav_auth_mode}" "${source_code_url}" > "${state_dir}/${environment}.json" <<'PY'

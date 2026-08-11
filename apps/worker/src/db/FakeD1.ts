@@ -33,7 +33,12 @@ export const makeFakeD1 = (): D1Database & { readonly batchCalls: Array<number> 
     },
     all: async <T>() => ({ results: db.query<T>(sql).all(...bound.map(normalizeBinding)) }),
     run: async () => {
-      db.query(sql).run(...bound.map(normalizeBinding));
+      const result = db.query(sql).run(...bound.map(normalizeBinding));
+      if (typeof result === "object" && result !== null && "changes" in result) {
+        const changes = result.changes;
+        return { meta: { changes: typeof changes === "number" ? changes : 0 } };
+      }
+      return { meta: { changes: 0 } };
     },
   });
 
@@ -52,8 +57,8 @@ export const makeFakeD1 = (): D1Database & { readonly batchCalls: Array<number> 
         // statements "execute and commit, sequentially, non-concurrently" —
         // parallelizing this fake would misrepresent the exact ordering
         // guarantee it exists to pin (e.g. Answers.upsert's delete-then-insert).
-        // eslint-disable-next-line no-await-in-loop
         for (const s of statements) {
+          // eslint-disable-next-line no-await-in-loop
           await s.run();
         }
         db.exec("COMMIT");

@@ -11,6 +11,14 @@ const bind = (
   bindings: ReadonlyArray<unknown>,
 ): D1PreparedStatement => statement.bind(...bindings.map(normalizeBinding));
 
+const changesOf = (result: unknown): number => {
+  if (typeof result !== "object" || result === null || !("meta" in result)) return 0;
+  const meta = result.meta;
+  if (typeof meta !== "object" || meta === null || !("changes" in meta)) return 0;
+  const changes = meta.changes;
+  return typeof changes === "number" ? changes : 0;
+};
+
 /**
  * Builds the `Database` service implementation over a real D1 binding.
  *
@@ -45,6 +53,12 @@ const build = (d1: D1Database): Context.Service.Shape<typeof Database> => {
       Effect.orDie,
     );
 
+  const realRunAffected = (sql: string, bindings: ReadonlyArray<unknown>): Effect.Effect<number> =>
+    Effect.tryPromise(() => bind(d1.prepare(sql), bindings).run()).pipe(
+      Effect.map(changesOf),
+      Effect.orDie,
+    );
+
   // An empty batch is a no-op rather than an error: a sweep that decides
   // nothing needs writing is a normal outcome, not a caller mistake.
   const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
@@ -54,7 +68,7 @@ const build = (d1: D1Database): Context.Service.Shape<typeof Database> => {
           d1.batch(writes.map((write) => bind(d1.prepare(write.sql), write.bindings))),
         ).pipe(Effect.asVoid, Effect.orDie);
 
-  return { query: realQuery, run: realRun, atomic };
+  return { query: realQuery, run: realRun, runAffected: realRunAffected, atomic };
 };
 
 /**

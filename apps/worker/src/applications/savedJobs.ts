@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import { SavedJob } from "@job-index/domain/Applications";
-import type { ProfileId, SavedJobId } from "@job-index/domain/Ids";
+import type { CanonicalJobId, ProfileId, SavedJobId } from "@job-index/domain/Ids";
 import { Database } from "../services/Database.ts";
 import type { Write } from "../services/Database.ts";
 import {
@@ -21,6 +21,20 @@ import {
  */
 const TABLE = "saved_jobs";
 
+export const upsertWrite = (job: SavedJob): Effect.Effect<Write, never, Database> =>
+  Effect.gen(function* () {
+    const variant = (SavedJob as never as { insert: object }).insert as never;
+    const encoded = yield* encodeVariant<SavedJob>(variant)(job);
+    const columns = columnsOf(variant);
+    return {
+      sql:
+        `INSERT INTO ${TABLE} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")}) ` +
+        "ON CONFLICT (profileId, canonicalJobId) DO UPDATE SET " +
+        "jobSnapshot = excluded.jobSnapshot, note = excluded.note, updatedAt = excluded.updatedAt",
+      bindings: columns.map((column) => encoded[column]),
+    };
+  });
+
 export const insert = (job: SavedJob): Effect.Effect<void, never, Database> =>
   Effect.gen(function* () {
     const db = yield* Database;
@@ -34,6 +48,36 @@ export const findById = (id: SavedJobId): Effect.Effect<SavedJob | undefined, ne
   Effect.gen(function* () {
     const db = yield* Database;
     const rows = yield* db.query<unknown>(`SELECT * FROM ${TABLE} WHERE id = ?`, [id]);
+    return rows[0] === undefined
+      ? undefined
+      : yield* decodeRow<SavedJob>(SavedJob as never)(rows[0]);
+  });
+
+export const findByProfileCanonical = (
+  profileId: ProfileId,
+  canonicalJobId: CanonicalJobId,
+): Effect.Effect<SavedJob | undefined, never, Database> =>
+  Effect.gen(function* () {
+    const db = yield* Database;
+    const rows = yield* db.query<unknown>(
+      `SELECT * FROM ${TABLE} WHERE profileId = ? AND canonicalJobId = ?`,
+      [profileId, canonicalJobId],
+    );
+    return rows[0] === undefined
+      ? undefined
+      : yield* decodeRow<SavedJob>(SavedJob as never)(rows[0]);
+  });
+
+export const findByIdForProfile = (
+  id: SavedJobId,
+  profileId: ProfileId,
+): Effect.Effect<SavedJob | undefined, never, Database> =>
+  Effect.gen(function* () {
+    const db = yield* Database;
+    const rows = yield* db.query<unknown>(`SELECT * FROM ${TABLE} WHERE id = ? AND profileId = ?`, [
+      id,
+      profileId,
+    ]);
     return rows[0] === undefined
       ? undefined
       : yield* decodeRow<SavedJob>(SavedJob as never)(rows[0]);
