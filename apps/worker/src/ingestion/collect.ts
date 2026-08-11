@@ -187,8 +187,20 @@ export const makeCollect =
             const page = attempt.success;
 
             for (const raw of page.listings) {
+              const observationNow = yield* DateTime.now;
+              const listingContinuation = decideContinuation(budget, {
+                pages,
+                observations,
+                elapsedMs:
+                  DateTime.toEpochMillis(observationNow) - DateTime.toEpochMillis(startedAt),
+              });
+              if (listingContinuation._tag === "BudgetExhausted") {
+                return listingContinuation;
+              }
+
               resolvedSourceId ??= raw.sourceId;
               const observed = yield* deps.corpus.observe(normalize(raw));
+              observations += 1;
               if (observed._tag !== "Unchanged") {
                 canonicalChanges += 1;
                 lastChangedId = observed.id;
@@ -197,7 +209,6 @@ export const makeCollect =
 
             walk = foldPage(walk, page);
             pages += 1;
-            observations += page.listings.length;
 
             const checkpointNow = yield* DateTime.now;
             yield* Effect.provideService(

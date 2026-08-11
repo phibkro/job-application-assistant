@@ -27,9 +27,10 @@ export type Continuation =
   | { readonly _tag: "BudgetExhausted"; readonly boundary: "pages" | "observations" | "duration" };
 
 /**
- * Whether the walk may fetch another page. Checked before every fetch, never
- * after: a page not yet begun costs nothing to abandon, which is what keeps
- * "checkpoint whole pages only" true without needing to discard partial work.
+ * Whether the walk may start more work. Checked before every page fetch and
+ * every observation. If a budget ends inside a page, the caller does not
+ * advance that page's cursor; the next run safely replays its idempotent
+ * observations instead of losing the page's unprocessed suffix.
  */
 export const decideContinuation = (budget: RunBudgetLike, progress: Progress): Continuation => {
   if (progress.pages >= budget.maxPages) {

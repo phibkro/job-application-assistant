@@ -199,6 +199,38 @@ describe("Ingestion.collect on a real D1 binding", () => {
     expect(report.stoppedReason).toBe("reached tail");
   });
 
+  it("stops inside an oversized page instead of letting one page escape the observation budget", async () => {
+    const first = listing("within-budget");
+    const second = listing("past-budget");
+    const script: PageScript = {
+      start: { listings: [first, second], cursor: "tail", more: false },
+    };
+    const result = await run(
+      script,
+      "start",
+      Effect.gen(function* () {
+        const ingestion = yield* Ingestion;
+        const corpus = yield* Corpus;
+        const report = yield* ingestion.collect(PLATFORM, {
+          ...BUDGET,
+          maxObservations: 1,
+        });
+        return {
+          report,
+          first: yield* corpus.get(normalize(first).canonicalJobId),
+          second: yield* corpus.get(normalize(second).canonicalJobId),
+        };
+      }),
+    );
+
+    expect(result.report.pages).toBe(0);
+    expect(result.report.observations).toBe(1);
+    expect(result.report.cursorAfter).toBe("start");
+    expect(result.report.stoppedReason).toBe("budget exhausted: observations");
+    expect(result.first).toBeDefined();
+    expect(result.second).toBeUndefined();
+  });
+
   it("a run that exhausts its page budget checkpoints where it stopped and does not close anything", async () => {
     const script: PageScript = {
       start: { listings: [listing("1")], cursor: "page-2", more: true },
