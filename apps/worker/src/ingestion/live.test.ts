@@ -144,6 +144,19 @@ const BUDGET: RunBudget = {
   leaseRecoveryMs: 60_000,
 };
 
+const unusedCorpus: Corpus["Service"] = {
+  observe: () => Effect.die("unused"),
+  get: () => Effect.die("unused"),
+  changedSince: () => Effect.die("unused"),
+  search: () => Effect.die("unused"),
+  fresh: () => Effect.die("unused"),
+  markOffered: () => Effect.die("unused"),
+  closeAbsent: () => Effect.die("unused"),
+  occurrenceFor: () => Effect.die("unused"),
+  hydrateDetail: () => Effect.die("unused"),
+  closeEarly: () => Effect.die("unused"),
+};
+
 /**
  * `ingestionLayer` needs `Corpus`, and `corpusLayer` needs `Database` —
  * `Layer.provideMerge` twice, not `Layer.mergeAll`, because `mergeAll` only
@@ -157,6 +170,7 @@ const testLayer = (
   script: PageScript,
   startCursor: string,
   sourceLease: SourceLease["Service"] = fakeSourceLease(),
+  corpusOverride?: Corpus["Service"],
 ) => {
   const deps = Layer.mergeAll(
     databaseLayer(env.DB),
@@ -165,7 +179,10 @@ const testLayer = (
     Layer.succeed(SourceLease, sourceLease),
     Layer.succeed(Ids, { next: Effect.sync(() => crypto.randomUUID()) }),
   );
-  const withCorpus = Layer.provideMerge(corpusLayer, deps);
+  const withCorpus =
+    corpusOverride === undefined
+      ? Layer.provideMerge(corpusLayer, deps)
+      : Layer.mergeAll(deps, Layer.succeed(Corpus, corpusOverride));
   return Layer.provideMerge(ingestionLayer, withCorpus);
 };
 
@@ -173,7 +190,11 @@ const run = <A, E>(
   script: PageScript,
   startCursor: string,
   effect: Effect.Effect<A, E, Ingestion | Corpus | Database>,
-): Promise<A> => Effect.runPromise(Effect.provide(effect, testLayer(script, startCursor)));
+  corpusOverride?: Corpus["Service"],
+): Promise<A> =>
+  Effect.runPromise(
+    Effect.provide(effect, testLayer(script, startCursor, fakeSourceLease(), corpusOverride)),
+  );
 
 describe("Ingestion.collect on a real D1 binding", () => {
   it("reaches the tail in one run, folds every listing, and closes nothing the first time (nothing was ever active before)", async () => {
@@ -229,6 +250,32 @@ describe("Ingestion.collect on a real D1 binding", () => {
     expect(result.report.stoppedReason).toBe("budget exhausted: observations");
     expect(result.first).toBeDefined();
     expect(result.second).toBeUndefined();
+  });
+
+  it("interrupts one stalled observation at the duration boundary and records the partial run", async () => {
+    const report = await run(
+      {
+        start: { listings: [listing("stalled")], cursor: "tail", more: false },
+      },
+      "start",
+      Effect.gen(function* () {
+        const ingestion = yield* Ingestion;
+        return yield* ingestion.collect(PLATFORM, {
+          ...BUDGET,
+          maxDurationMs: 25,
+        });
+      }),
+      {
+        ...unusedCorpus,
+        observe: () => Effect.never,
+      },
+    );
+
+    expect(report.pages).toBe(0);
+    expect(report.observations).toBe(0);
+    expect(report.cursorAfter).toBe("start");
+    expect(report.stoppedReason).toBe("budget exhausted: duration");
+    expect(report.durationMs).toBeLessThan(1_000);
   });
 
   it("a run that exhausts its page budget checkpoints where it stopped and does not close anything", async () => {

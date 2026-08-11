@@ -188,18 +188,28 @@ export const makeCollect =
 
             for (const raw of page.listings) {
               const observationNow = yield* DateTime.now;
+              const observationElapsedMs =
+                DateTime.toEpochMillis(observationNow) - DateTime.toEpochMillis(startedAt);
               const listingContinuation = decideContinuation(budget, {
                 pages,
                 observations,
-                elapsedMs:
-                  DateTime.toEpochMillis(observationNow) - DateTime.toEpochMillis(startedAt),
+                elapsedMs: observationElapsedMs,
               });
               if (listingContinuation._tag === "BudgetExhausted") {
                 return listingContinuation;
               }
 
+              const observedAttempt = yield* Effect.result(
+                deps.corpus
+                  .observe(normalize(raw))
+                  .pipe(Effect.timeout(budget.maxDurationMs - observationElapsedMs)),
+              );
+              if (Result.isFailure(observedAttempt)) {
+                return { _tag: "BudgetExhausted", boundary: "duration" } as const;
+              }
+
               resolvedSourceId ??= raw.sourceId;
-              const observed = yield* deps.corpus.observe(normalize(raw));
+              const observed = observedAttempt.success;
               observations += 1;
               if (observed._tag !== "Unchanged") {
                 canonicalChanges += 1;
