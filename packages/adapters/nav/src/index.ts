@@ -24,7 +24,7 @@ export {
 export type { NavCredential } from "./credential.ts";
 
 const NAV_BASE_URL = "https://pam-stilling-feed.nav.no";
-const FEED_PAGE_SIZE = 10;
+const FEED_PAGE_SIZE = 5;
 
 const resolveUrl = (path: string): string =>
   path.startsWith("http://") || path.startsWith("https://")
@@ -88,8 +88,8 @@ const fetchJson = (
  * `since` makes a fresh sweep start at the retention boundary rather than
  * walking NAV's append-only history from June 2023. `pageSize` is the other
  * operational bound: NAV defaults to 1,000 entries, which cannot be folded
- * into D1 before one scheduled run's duration budget expires. Ten entries
- * leave enough time to finish and checkpoint a page; every request sets this
+ * into D1 before one scheduled run's subrequest budget expires. Five entries
+ * leave enough capacity to finish and checkpoint a page; every request sets this
  * value because NAV's `next_url` does not carry the requested size forward.
  * `If-Modified-Since` is sent only on a fresh sweep; once the cursor names a
  * page, the cursor is the position.
