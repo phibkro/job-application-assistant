@@ -2,7 +2,8 @@ import * as S from "effect/Schema";
 import { Navigation } from "foldkit";
 import { m } from "foldkit/message";
 import { CanonicalJob } from "@job-index/domain/Job";
-import { JobPage, Problem } from "./Model.ts";
+import { MatchedJob } from "../../worker/src/Api.ts";
+import { JobPageSchema, MatchPageSchema, Problem } from "./Model.ts";
 import * as ProfileMessage from "./profile/Message.ts";
 import * as SavedMessage from "./saved/Message.ts";
 import { Route } from "./Route.ts";
@@ -49,7 +50,7 @@ export const BrowseLocationChanged = m("BrowseLocationChanged", { value: S.Strin
 export const BrowseStatusChanged = m("BrowseStatusChanged", { value: S.String });
 export const BrowseSearchSubmitted = m("BrowseSearchSubmitted");
 export const BrowseNextPageRequested = m("BrowseNextPageRequested");
-export const BrowseJobsSucceeded = m("BrowseJobsSucceeded", { page: JobPage });
+export const BrowseJobsSucceeded = m("BrowseJobsSucceeded", { page: JobPageSchema });
 export const BrowseJobsFailed = m("BrowseJobsFailed", { problem: Problem });
 /**
  * A press, which is a decision — see `design-specs/deferred-hydration.md`.
@@ -66,18 +67,19 @@ export const BrowseJobsFailed = m("BrowseJobsFailed", { problem: Problem });
 export const BrowseJobPressed = m("BrowseJobPressed", { jobId: S.String });
 
 // Job detail
-export const JobFetchSucceeded = m("JobFetchSucceeded", { job: CanonicalJob });
+export const PublicJobFetchSucceeded = m("PublicJobFetchSucceeded", { job: CanonicalJob });
+export const MatchDetailFetchSucceeded = m("MatchDetailFetchSucceeded", { matchedJob: MatchedJob });
 export const JobFetchFailed = m("JobFetchFailed", { problem: Problem });
 /** `PrefetchJob`'s sole completion Message, win or lose — see `BrowseJobPressed`. */
 export const PrefetchSettled = m("PrefetchSettled");
 
 // Feed
 export const FeedRequested = m("FeedRequested");
-export const FeedSucceeded = m("FeedSucceeded", { page: JobPage });
+export const FeedSucceeded = m("FeedSucceeded", { page: MatchPageSchema });
 export const FeedFailed = m("FeedFailed", { problem: Problem });
 export const FeedDismissClicked = m("FeedDismissClicked", {
   jobId: S.String,
-  verdict: S.String,
+  verdict: S.Literals(["dismissed", "not_now", "irrelevant"]),
   reason: S.OptionFromNullOr(S.String),
 });
 export const FeedDismissSucceeded = m("FeedDismissSucceeded", { jobId: S.String });
@@ -155,7 +157,8 @@ export const Message = S.Union([
   BrowseJobsSucceeded,
   BrowseJobsFailed,
   BrowseJobPressed,
-  JobFetchSucceeded,
+  PublicJobFetchSucceeded,
+  MatchDetailFetchSucceeded,
   JobFetchFailed,
   PrefetchSettled,
   FeedRequested,

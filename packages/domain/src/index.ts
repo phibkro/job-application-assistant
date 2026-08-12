@@ -17,5 +17,6 @@ export * as Freshness from "./Freshness.ts";
 export * as Ids from "./Ids.ts";
 export * as Job from "./Job.ts";
 export * as Profile from "./Profile.ts";
+export * as Match from "./Match.ts";
 export * as Source from "./Source.ts";
 export * as Subscription from "./Subscription.ts";

@@ -17,6 +17,11 @@ import {
   SavedView as DomainSavedView,
 } from "@job-index/domain/Saved";
 import { CanonicalJob } from "@job-index/domain/Job";
+import {
+  MatchAssessment as DomainMatchAssessment,
+  MatchEvidence as DomainMatchEvidence,
+  MatchedJob as DomainMatchedJob,
+} from "@job-index/domain/Match";
 import { CatalogEntry } from "@job-index/domain/Source";
 import { AnswerShape } from "@job-index/domain/Answer";
 import { Profile } from "@job-index/domain/Profile";
@@ -231,6 +236,19 @@ export const JobPage = Schema.Struct({
   data: Schema.Array(CanonicalJob),
   meta: PageMeta,
 });
+export type JobPage = typeof JobPage.Type;
+
+export const MatchAssessment = DomainMatchAssessment;
+export type MatchAssessment = typeof MatchAssessment.Type;
+export const MatchEvidence = DomainMatchEvidence;
+export type MatchEvidence = typeof MatchEvidence.Type;
+export const MatchedJob = DomainMatchedJob;
+export type MatchedJob = typeof MatchedJob.Type;
+export const MatchPage = Schema.Struct({
+  data: Schema.Array(MatchedJob),
+  meta: PageMeta,
+});
+export type MatchPage = typeof MatchPage.Type;
 
 /**
  * Browsing the corpus. Unauthenticated reads stay possible so the catalogue is
@@ -269,8 +287,13 @@ const feed = HttpApiGroup.make("feed")
   .add(
     HttpApiEndpoint.get("fresh", "/api/v1/me/feed", {
       query: { limit: Schema.optional(Schema.String) },
-      success: JobPage,
+      success: MatchPage,
       error: Unauthorized,
+    }),
+    HttpApiEndpoint.get("getMatch", "/api/v1/me/matches/:id", {
+      params: { id: Schema.String },
+      success: MatchedJob,
+      error: Schema.Union([Unauthorized, NotFound]),
     }),
     HttpApiEndpoint.post("dismiss", "/api/v1/me/feed/:id/dismiss", {
       params: { id: Schema.String },

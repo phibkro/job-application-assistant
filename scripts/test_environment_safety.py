@@ -75,6 +75,24 @@ for script in ("scripts/deploy.sh", "scripts/deploy-preview.sh"):
     assert "migrate-d1.sh" in text, f"{script} must apply ordered D1 migrations"
     assert "db/catalog-seed.sql" in text, f"{script} must seed the researched catalogue"
 
+# Pull-request previews contain deterministic seed data, never live NAV
+# ingestion, and teardown can target only a validated numeric PR stage.
+preview_deploy = (ROOT / "scripts/deploy-preview.sh").read_text()
+preview_destroy = (ROOT / "scripts/destroy-preview.sh").read_text()
+preview_workflow = (ROOT / ".github/workflows/pr-preview.yml").read_text()
+assert "dev/preview-seed.sql" in preview_deploy
+assert "NAV_API_TOKEN" not in preview_deploy
+assert 'STAGE="pr-$1"' in preview_deploy
+assert "job-index-${STAGE}-typescript-db" in infra
+assert 'bun alchemy destroy --stage "$STAGE" --yes' in preview_destroy
+for forbidden_stage in ("preview", "staging", "production"):
+    assert f'STAGE="{forbidden_stage}"' not in preview_destroy
+assert "types: [opened, reopened, synchronize, closed]" in preview_workflow
+assert "cancel-in-progress: false" in preview_workflow
+assert "github.event.pull_request.head.repo.full_name == github.repository" in preview_workflow
+assert './scripts/deploy-preview.sh "${{ github.event.pull_request.number }}"' in preview_workflow
+assert './scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"' in preview_workflow
+
 
 justfile = (ROOT / "justfile").read_text()
 for recipe in ["deploy-staging:", "deploy-production:", "admin-key:"]:

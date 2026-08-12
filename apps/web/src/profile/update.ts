@@ -68,6 +68,18 @@ export const update = (model: Model, message: Message.Message): UpdateReturn =>
         editProfileForm(model, (f) => evo(f, { educationText: () => value })),
         [],
       ],
+      DesiredRolesTextChanged: ({ value }) => [
+        editProfileForm(model, (f) => evo(f, { desiredRolesText: () => value })),
+        [],
+      ],
+      DesiredLocationsTextChanged: ({ value }) => [
+        editProfileForm(model, (f) => evo(f, { desiredLocationsText: () => value })),
+        [],
+      ],
+      ExcludedTermsTextChanged: ({ value }) => [
+        editProfileForm(model, (f) => evo(f, { excludedTermsText: () => value })),
+        [],
+      ],
 
       ExperienceAdded: () => [
         editProfileForm(model, (f) =>

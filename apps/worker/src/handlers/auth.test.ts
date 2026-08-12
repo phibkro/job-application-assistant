@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type { Credential } from "@job-index/domain/Access";
 import type { PrincipalId, ProfileId } from "@job-index/domain/Ids";
-import { Accounts } from "../services/Accounts.ts";
+import { Accounts, Profiles } from "../services/Accounts.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { buildHandler } from "./testSupport.ts";
 
@@ -88,6 +88,22 @@ describe("the Authenticated middleware", () => {
         occurrenceFor: () => Effect.die("unused"),
         hydrateDetail: () => Effect.die("unused"),
         closeEarly: () => Effect.die("unused"),
+      }),
+      profiles: Layer.succeed(Profiles, {
+        get: () =>
+          Effect.succeed({
+            headline: "",
+            summary: "",
+            location: "",
+            languages: "",
+            skills: [],
+            experience: [],
+            education: [],
+          }),
+        set: () => Effect.die("unused"),
+        answers: () => Effect.die("unused"),
+        answer: () => Effect.die("unused"),
+        unanswered: () => Effect.die("unused"),
       }),
     });
     const res = await handler(

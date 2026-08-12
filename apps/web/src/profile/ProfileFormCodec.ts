@@ -20,6 +20,9 @@ export const fromProfile = (profile: Profile): ProfileForm => ({
   languages: profile.languages,
   skillsText: profile.skills.join("\n"),
   educationText: profile.education.join("\n"),
+  desiredRolesText: (profile.preferences?.desiredRoles ?? []).join("\n"),
+  desiredLocationsText: (profile.preferences?.desiredLocations ?? []).join("\n"),
+  excludedTermsText: (profile.preferences?.excludedTerms ?? []).join("\n"),
   experience: profile.experience.map((entry) =>
     ExperienceEntry.fromExperience(crypto.randomUUID(), entry),
   ),
@@ -32,5 +35,10 @@ export const toProfile = (form: ProfileForm): Profile => ({
   languages: form.languages,
   skills: linesOf(form.skillsText),
   education: linesOf(form.educationText),
+  preferences: {
+    desiredRoles: linesOf(form.desiredRolesText),
+    desiredLocations: linesOf(form.desiredLocationsText),
+    excludedTerms: linesOf(form.excludedTermsText),
+  },
   experience: form.experience.map(ExperienceEntry.toExperience),
 });

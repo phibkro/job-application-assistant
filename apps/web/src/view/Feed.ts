@@ -1,75 +1,108 @@
 import * as Option from "effect/Option";
 import { AsyncData } from "foldkit";
 import type { HtmlBuilder, Html } from "foldkit/html";
-import type { CanonicalJob } from "@job-index/domain/Job";
+import type { MatchedJob } from "../../../worker/src/Api.ts";
 import { FeedDismissClicked, FeedRequested } from "../Message.ts";
 import type { Message } from "../Message.ts";
 import type { Model } from "../Model.ts";
 import * as Route from "../Route.ts";
-import { button, card, linkButton, pageClass, renderProblem, sectionHeading } from "./Shared.ts";
+import {
+  button,
+  card,
+  linkButton,
+  matchAssessmentView,
+  pageClass,
+  renderProblem,
+  sectionHeading,
+} from "./Shared.ts";
 
-const feedItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
-  h.keyed("li")(
+const feedItem = (matched: MatchedJob, h: HtmlBuilder<Message>): Html => {
+  const { job, assessment } = matched;
+  return h.keyed("li")(
     job.id,
-    [h.Class("flex items-center justify-between gap-4 py-3")],
+    [
+      h.DataAttribute("job-title", job.title),
+      h.DataAttribute("fit", assessment.fit),
+      h.Class("space-y-4 py-5"),
+    ],
     [
       h.div(
-        [h.Class("min-w-0")],
+        [h.Class("flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between")],
         [
-          h.p([h.Class("truncate font-medium text-gray-900")], [job.title]),
-          h.p(
-            [h.Class("truncate text-sm text-gray-500")],
-            [`${job.employerName} — ${job.location}`],
+          h.div(
+            [h.Class("min-w-0")],
+            [
+              h.h3([h.Class("font-medium text-gray-900")], [job.title]),
+              h.p(
+                [h.Class("mt-1 text-sm text-gray-500")],
+                [`${job.employerName} — ${job.location}`],
+              ),
+            ],
+          ),
+          h.div(
+            [h.Class("flex shrink-0 gap-2")],
+            [
+              linkButton(
+                {
+                  label: "View",
+                  variant: "secondary",
+                  href: Route.href(Route.RouteJobDetail({ jobId: job.id })),
+                },
+                h,
+              ),
+              button(
+                {
+                  label: "Dismiss",
+                  variant: "ghost",
+                  onClick: FeedDismissClicked({
+                    jobId: job.id,
+                    verdict: "dismissed",
+                    reason: Option.none(),
+                  }),
+                },
+                h,
+              ),
+            ],
           ),
         ],
       ),
-      h.div(
-        [h.Class("flex shrink-0 gap-2")],
-        [
-          linkButton(
-            {
-              label: "View",
-              variant: "secondary",
-              href: Route.href(Route.RouteJobDetail({ jobId: job.id })),
-            },
-            h,
-          ),
-          button(
-            {
-              label: "Dismiss",
-              variant: "ghost",
-              onClick: FeedDismissClicked({
-                jobId: job.id,
-                verdict: "not_interested",
-                reason: Option.none(),
-              }),
-            },
-            h,
-          ),
-        ],
-      ),
+      matchAssessmentView(assessment, h),
     ],
   );
+};
 
 export const feedView = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class(pageClass)],
     [
       sectionHeading("Fresh feed", h),
-      h.p([h.Class("text-sm text-gray-500")], ["Vacancies you have not already been offered."]),
+      h.p(
+        [h.Class("text-sm text-gray-500")],
+        ["A ranked shortlist with the profile evidence behind every fit."],
+      ),
       button({ label: "Refresh", variant: "secondary", onClick: FeedRequested() }, h),
       AsyncData.matchDataSplitEmpty(model.feedResults, {
         onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["Not loaded yet."]),
-        onLoading: () => h.p([h.Class("text-sm text-gray-500")], ["Loading…"]),
+        onLoading: () =>
+          h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading matches…"]),
         onFailure: (problem) => renderProblem(problem, h),
         onData: (page) =>
           page.data.length === 0
-            ? h.p([h.Class("text-sm text-gray-500")], ["Nothing new since your last check."])
+            ? h.div(
+                [h.Class("space-y-2 rounded-lg border border-gray-200 bg-white p-4")],
+                [
+                  h.p([h.Class("font-medium text-gray-900")], ["Your shortlist is up to date."]),
+                  h.p(
+                    [h.Class("text-sm text-gray-500")],
+                    ["Adjust your profile preferences or refresh after new vacancies arrive."],
+                  ),
+                ],
+              )
             : card(
                 [
                   h.ul(
                     [h.Class("divide-y divide-gray-100")],
-                    page.data.map((job) => feedItem(job, h)),
+                    page.data.map((matched) => feedItem(matched, h)),
                   ),
                 ],
                 h,

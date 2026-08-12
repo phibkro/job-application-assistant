@@ -2,6 +2,7 @@ import clsx from "clsx";
 import * as Match from "effect/Match";
 import { Button, Checkbox, Input, Select, Textarea } from "@foldkit/ui";
 import type { HtmlBuilder, Html } from "foldkit/html";
+import type { MatchAssessment, MatchEvidence } from "../../../worker/src/Api.ts";
 import type { Problem } from "../RequestStatus.ts";
 
 // Shared view vocabulary: every page composes these instead of writing its
@@ -310,6 +311,60 @@ export const checkboxField = <M>(
         ),
     },
     h,
+  );
+
+const evidenceText = (evidence: MatchEvidence): string =>
+  `${evidence.profileValue} matches ${evidence.jobField}: ${evidence.jobValue}`;
+
+export const matchAssessmentView = <M>(assessment: MatchAssessment, h: HtmlBuilder<M>): Html =>
+  h.section(
+    [
+      h.DataAttribute("match-assessment", ""),
+      h.DataAttribute("fit", assessment.fit),
+      h.Class("space-y-3 rounded-md border border-gray-200 bg-gray-50 p-4"),
+    ],
+    [
+      h.div(
+        [h.Class("flex flex-wrap items-baseline justify-between gap-2")],
+        [
+          h.h3(
+            [h.Class("text-sm font-semibold capitalize text-gray-900")],
+            [`${assessment.fit} fit`],
+          ),
+          h.p([h.Class("text-sm font-medium text-gray-600")], [`Score ${assessment.score}`]),
+        ],
+      ),
+      assessment.reasons.length === 0
+        ? h.p([h.Class("text-sm text-gray-600")], ["No preference evidence matched yet."])
+        : h.div(
+            [h.Class("space-y-1")],
+            [
+              h.p(
+                [h.Class("text-xs font-semibold uppercase tracking-wide text-gray-500")],
+                ["Reasons"],
+              ),
+              h.ul(
+                [h.Class("list-disc space-y-1 pl-5 text-sm text-gray-700")],
+                assessment.reasons.map((reason) => h.li([], [evidenceText(reason)])),
+              ),
+            ],
+          ),
+      assessment.concerns.length === 0
+        ? h.empty
+        : h.div(
+            [h.Class("space-y-1")],
+            [
+              h.p(
+                [h.Class("text-xs font-semibold uppercase tracking-wide text-amber-800")],
+                ["Concerns"],
+              ),
+              h.ul(
+                [h.Class("list-disc space-y-1 pl-5 text-sm text-amber-900")],
+                assessment.concerns.map((concern) => h.li([], [concern])),
+              ),
+            ],
+          ),
+    ],
   );
 
 // ---- NOT FOUND ----------------------------------------------------------

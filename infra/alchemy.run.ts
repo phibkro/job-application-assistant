@@ -1,6 +1,5 @@
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
-import * as State from "alchemy/State";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 
@@ -33,6 +32,7 @@ import * as Redacted from "effect/Redacted";
 
 const STAGE = process.env.ALCHEMY_STAGE ?? "staging";
 const PRODUCTION = STAGE === "production";
+const PR_STAGE = /^pr-[1-9][0-9]*$/.test(STAGE);
 
 /**
  * Every stage runs the TypeScript service. The Rust worker it replaced is
@@ -42,11 +42,9 @@ const PRODUCTION = STAGE === "production";
  * else on Rust — was the strangler migration in an infrastructure file. It has
  * served its purpose: the replacement was deployed beside the original,
  * exercised against real Cloudflare, and only then given the other stages.
- *
- * What remains stage-dependent is real: the custom domain belongs to preview,
- * and ingestion's schedule belongs to stages that should actually collect.
+ * What remains stage-dependent is real: custom domains, email, schedules, and
+ * legacy resources belong only to the shared environments.
  */
-
 /**
  * Where the TypeScript service answers, beside its workers.dev URL.
  *
@@ -140,8 +138,6 @@ const environmentVars = {
 } as const;
 
 /**
- * The Worker currently implements one scheduled job: NAV ingestion.
- *
  * Production activates it in the credential-first deployment's second phase.
  * Staging accepts the same explicit activation flag for bounded qualification;
  * the normal staging deployment always supplies `0`.
@@ -155,16 +151,16 @@ const CRONS = SCHEDULES_ALLOWED && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];
 
 export default Alchemy.Stack(
   "JobIndex",
-  { providers: Cloudflare.providers(), state: State.localState() },
+  { providers: Cloudflare.providers(), state: Cloudflare.state() },
   Effect.gen(function* () {
-    // RFC 0015 starts the TypeScript service on a new database; the Rust
-    // staging/production schema is intentionally not back-filled. Keep the
-    // legacy `Db` resource declared so Alchemy preserves it, but never bind it
-    // to the replacement Worker.
-    yield* Cloudflare.D1Database("Db", {
-      name: `job-index-${STAGE}-db`,
-      primaryLocationHint: "weur",
-    });
+    // Shared environments retain the legacy resource for safe cutover. PR
+    // stages are disposable and must contain only the TypeScript stack.
+    if (!PR_STAGE) {
+      yield* Cloudflare.D1Database("Db", {
+        name: `job-index-${STAGE}-db`,
+        primaryLocationHint: "weur",
+      });
+    }
 
     // The TypeScript system of record has a distinct logical and physical
     // identity, so a state rebuild cannot adopt the legacy database by name.
@@ -180,11 +176,12 @@ export default Alchemy.Stack(
       primaryLocationHint: "weur",
     });
 
-    const email = yield* Cloudflare.SendEmail("Mail", {
-      destinationAddress: MAIL_VERIFIED_DESTINATION,
-      allowedSenderAddresses: [MAIL_FROM],
-    });
-
+    const email = PR_STAGE
+      ? undefined
+      : yield* Cloudflare.SendEmail("Mail", {
+          destinationAddress: MAIL_VERIFIED_DESTINATION,
+          allowedSenderAddresses: [MAIL_FROM],
+        });
     // One Durable Object per source, admitting one `Ingestion.collect` run
     // at a time for it — see `apps/worker/src/ingestion/SourceLeaseObject.ts`.
     // `className`
@@ -219,23 +216,16 @@ export default Alchemy.Stack(
       // The workers.dev URL stays on alongside the custom domain: it is what
       // the smoke checks hit, and it keeps working if DNS is mid-change.
       url: true,
-      domain: STAGE === "preview" ? PREVIEW_DOMAINS : undefined,
+      domain: PR_STAGE || STAGE !== "preview" ? undefined : PREVIEW_DOMAINS,
       env: {
         DB: database,
-        EMAIL: email,
+        ...(email ? { EMAIL: email } : {}),
         SOURCE_LEASE: sourceLease,
         ...environmentVars,
-        // The sender is configuration, not a secret: it appears in the
-        // From header of every message this service sends.
         MAIL_FROM,
         ...secretBindings(),
       },
-      // Preview collects on a schedule too, now that there is something to
-      // collect. It used to hold four invented vacancies, and a cron writing
-      // into a fixture set while someone read it would have confused both;
-      // with a real corpus, a preview that does not refresh is the confusing
-      // one. Every fifteen minutes is NAV's own cadence, not a guess.
-      crons: STAGE === "preview" ? [INGESTION_CRON] : CRONS,
+      crons: PR_STAGE ? [] : STAGE === "preview" ? [INGESTION_CRON] : CRONS,
       observability: {
         enabled: true,
         logs: { enabled: true, invocationLogs: true },

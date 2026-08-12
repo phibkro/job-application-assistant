@@ -1,17 +1,40 @@
 #!/usr/bin/env bash
-# Deploys the TypeScript service to its own Cloudflare stage.
+# Deploys either the shared preview stage or an isolated pull-request stage.
 #
-# The preview stage has its own Worker name and D1 database. It exercises the
-# same TypeScript bundle without changing staging or production.
-#
-# The bundle is built by the same command `scripts/preview.sh` uses locally,
-# so what deploys is what was run.
+# `preview` keeps the operator-controlled shared preview. A pull request number
+# or `pr-N` selects a disposable stage with seeded data and no live ingestion.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-STAGE="preview"
+case "${1:-preview}" in
+  preview)
+    STAGE="preview"
+    ;;
+  [1-9]*)
+    case "$1" in
+      *[!0-9]*)
+        echo "preview stage must be preview, a positive PR number, or pr-N" >&2
+        exit 2
+        ;;
+    esac
+    STAGE="pr-$1"
+    ;;
+  pr-[1-9]*)
+    case "${1#pr-}" in
+      *[!0-9]*)
+        echo "preview stage must be preview, a positive PR number, or pr-N" >&2
+        exit 2
+        ;;
+    esac
+    STAGE="$1"
+    ;;
+  *)
+    echo "preview stage must be preview, a positive PR number, or pr-N" >&2
+    exit 2
+    ;;
+esac
 
 echo "==> building the interface"
 (cd apps/web && bun run build)
@@ -27,14 +50,52 @@ bun build apps/worker/src/index.ts \
 echo "==> applying infrastructure"
 (cd infra && ALCHEMY_STAGE="$STAGE" bun alchemy deploy --stage "$STAGE" --yes)
 
-DB_NAME="job-index-${STAGE}-db"
+read_stack_output() {
+  python3 - "$1" "$STAGE" <<'PYOUT'
+import json
+import pathlib
+import sys
 
-# The generated snapshot is the current shape. Wrangler then applies any
-# ordered migration that an existing preview database still lacks; a new
-# database is already marked current by the snapshot.
-echo "==> applying the generated schema, ordered migrations, and researched catalogue to ${DB_NAME}"
-wrangler d1 execute "$DB_NAME" --remote --file db/schema.sql --yes >/dev/null
-./scripts/migrate-d1.sh remote "$DB_NAME"
-wrangler d1 execute "$DB_NAME" --remote --file db/catalog-seed.sql --yes >/dev/null
+key, stage = sys.argv[1:]
+state = sorted(pathlib.Path("infra/.alchemy/state/JobIndex").glob(f"{stage}/**/__stack_output__.json"))
+if not state:
+    raise SystemExit("")
+value = json.loads(state[-1].read_text())
+for candidate in ("output", "value", "data"):
+    if isinstance(value, dict) and candidate in value:
+        value = value[candidate]
+print(value.get(key, "") if isinstance(value, dict) else "")
+PYOUT
+}
 
-echo "==> done"
+DB_NAME="$(read_stack_output database)"
+DB_ID="$(read_stack_output databaseId)"
+DEPLOYMENT_URL="$(read_stack_output url)"
+if [ -z "$DB_NAME" ] || [ -z "$DB_ID" ] || [ -z "$DEPLOYMENT_URL" ]; then
+  echo "Alchemy did not report the isolated preview resources." >&2
+  exit 1
+fi
+
+DATABASE_CONFIG="$(mktemp --suffix=.jsonc)"
+trap 'rm -f "$DATABASE_CONFIG"' EXIT
+cat >"$DATABASE_CONFIG" <<JSON
+{
+  "name": "job-index-preview-database-apply",
+  "compatibility_date": "2026-05-25",
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "$DB_NAME",
+    "database_id": "$DB_ID"
+  }]
+}
+JSON
+
+echo "==> applying schema and seed data to ${DB_NAME}"
+CI=1 wrangler d1 execute "$DB_NAME" --remote --config "$DATABASE_CONFIG" --file db/schema.sql --yes >/dev/null
+./scripts/migrate-d1.sh remote "$DB_NAME" "$DB_ID"
+CI=1 wrangler d1 execute "$DB_NAME" --remote --config "$DATABASE_CONFIG" --file db/catalog-seed.sql --yes >/dev/null
+if [ "$STAGE" != "preview" ]; then
+  CI=1 wrangler d1 execute "$DB_NAME" --remote --config "$DATABASE_CONFIG" --file dev/preview-seed.sql --yes >/dev/null
+fi
+
+echo "==> preview ready: ${DEPLOYMENT_URL}"

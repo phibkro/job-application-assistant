@@ -106,18 +106,24 @@ export const update = (model: Model, message: Message): UpdateReturn =>
               );
               return [evo(withPage, { browseResults: () => browseResults }), cmds];
             },
-            // Always refetches, unlike every other arm here: a deep link
-            // straight to a job's detail page is the one entry a previous
-            // screen never had the chance to warm the cache for, so
-            // `ensureLoaded`'s "already have it" guard would be wrong for
-            // exactly the case this route exists to serve.
-            JobDetail: ({ jobId }) => [
-              evo(model, {
-                page: () => PageJobDetail({ jobId }),
-                jobDetail: () => AsyncData.Loading(),
-              }),
-              [Commands.FetchJob({ jobId })],
-            ],
+            JobDetail: ({ jobId }) =>
+              model.session._tag === "Authenticated"
+                ? [
+                    evo(model, {
+                      page: () => PageJobDetail({ jobId }),
+                      publicJobDetail: () => AsyncData.Idle(),
+                      matchDetail: () => AsyncData.Loading(),
+                    }),
+                    [Commands.FetchMatchDetail({ jobId })],
+                  ]
+                : [
+                    evo(model, {
+                      page: () => PageJobDetail({ jobId }),
+                      publicJobDetail: () => AsyncData.Loading(),
+                      matchDetail: () => AsyncData.Idle(),
+                    }),
+                    [Commands.FetchPublicJob({ jobId })],
+                  ],
             Feed: () => {
               const withPage = evo(model, { page: () => PageFeed() });
               const [feedResults, cmds] = ensureLoaded(withPage.feedResults, Commands.FetchFeed());
@@ -186,6 +192,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
             profile: () => ProfileSubmodel.init(),
             saved: () => SavedSubmodel.init(),
             feedResults: () => AsyncData.Idle(),
+            matchDetail: () => AsyncData.Idle(),
             applications: () => [],
           }),
           [Commands.ClearSessionToken({ sessionEpoch })],
@@ -265,11 +272,18 @@ export const update = (model: Model, message: Message): UpdateReturn =>
 
       // JOB DETAIL
 
-      JobFetchSucceeded: ({ job }) => [
-        evo(model, { jobDetail: () => AsyncData.Success({ data: job }) }),
+      PublicJobFetchSucceeded: ({ job }) => [
+        evo(model, { publicJobDetail: () => AsyncData.Success({ data: job }) }),
         [],
       ],
-      JobFetchFailed: ({ problem }) => [evo(model, { jobDetail: (r) => settle(r, problem) }), []],
+      MatchDetailFetchSucceeded: ({ matchedJob }) => [
+        evo(model, { matchDetail: () => AsyncData.Success({ data: matchedJob }) }),
+        [],
+      ],
+      JobFetchFailed: ({ problem }) =>
+        model.session._tag === "Authenticated"
+          ? [evo(model, { matchDetail: (r) => settle(r, problem) }), []]
+          : [evo(model, { publicJobDetail: (r) => settle(r, problem) }), []],
       PrefetchSettled: () => [model, []],
 
       // FEED
@@ -293,7 +307,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           feedResults: (r) =>
             AsyncData.map(r, (page) => ({
               ...page,
-              data: page.data.filter((job) => job.id !== jobId),
+              data: page.data.filter(({ job }) => job.id !== jobId),
             })),
         }),
         [],
