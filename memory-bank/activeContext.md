@@ -22,7 +22,7 @@ The approved product direction is the Job Application Assistant mission and MVP 
 - Staging revision `c00d67d` passed the full deployment gate and HTTP smoke. Four public NAV runs each folded one page, checkpointed the cursor, and wrote a run report in 4.9-7.8 seconds. Staging schedules are disabled after this bounded qualification.
 - Saved data is owner-scoped in SQL. D1 stores frozen vacancy snapshots, custom labels, active-attempt pointers, and complete prior attempts. Application updates use optimistic concurrency through `expectedUpdatedAt`, preserve existing notes when an event omits them, and the web model rejects late profile/Saved messages from an earlier session epoch.
 - `scripts/migrate-d1.sh` and `d1_migrations` upgrade existing D1 databases. `scripts/preview.sh` starts from a clean local state so schema drift cannot poison the demo.
-- A local browser smoke proved save, draft, assisted preparation, approval, custom-label assignment/filtering, explicit submission confirmation, the Applied preset, and history. This is local evidence only.
+- A local browser smoke proved real NAV ingestion, checkpointed one-page runs, browse pagination, search, detail hydration, save, draft, assisted preparation, approval, custom-label filtering, submission confirmation, and history. This is local evidence only.
 - Project license is proprietary (see RFC 0005/0008 amendments).
 
 ## Current command surface
@@ -35,7 +35,7 @@ bun run check           # TypeScript workspace: format, lint, typecheck, schema,
 bun run test:workers    # the workerd-real half of the suite alone (D1 + Durable Object), via Node
 bun run coverage:all    # both coverage runs; bun run check already includes this
 just verify             # just check + bun run check
-just preview            # local TypeScript stack: API + interface + seeded D1
+just preview            # local stack; /__scheduled runs one bounded real NAV ingestion page
 just soak               # bounded staging soak; use seven days for acceptance
 ./deploy                # deploy staging with schedules disabled
 ./deploy-production     # explicit production deployment command; qualification remains open

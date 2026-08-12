@@ -37,7 +37,9 @@ cat <<BANNER
 
   Job Index preview: http://127.0.0.1:${PORT}
   Sign in with the token  demo-token  to see the feed and the profile.
+  Ingest one bounded NAV page:
+    curl -fsS 'http://127.0.0.1:${PORT}/__scheduled?cron=%2A%20%2A%20%2A%20%2A%20%2A'
 
 BANNER
 
-exec wrangler dev --config "$CONFIG" --port "$PORT" --local --persist-to "$STATE_DIR"
+exec wrangler dev --config "$CONFIG" --port "$PORT" --local --persist-to "$STATE_DIR" --test-scheduled

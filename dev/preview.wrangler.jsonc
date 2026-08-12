@@ -33,8 +33,8 @@
     // The interface routes client-side, so a deep link must reach it rather
     // than 404 on a file that was never written.
     "not_found_handling": "single-page-application",
-    // ...but the API is the Worker's, and an asset router that answered
-    // /api/* first would shadow every endpoint with the app shell.
-    "run_worker_first": ["/api/*"],
+    // API requests and Wrangler's local scheduled-event probe must reach the
+    // Worker before the single-page application fallback.
+    "run_worker_first": ["/api/*", "/__scheduled*"],
   },
 }

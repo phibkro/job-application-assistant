@@ -8,7 +8,7 @@
 - TypeScript/Effect service capabilities for canonicalization, provenance, deduplication, replay idempotency, NAV ingestion, incremental saved searches, profiles, drafting, applications, and the browse/save/prepare workflow.
 - Generated D1 schema snapshot (`db/schema.sql`) checked by `bun run schema:check`.
 - Generated source-catalog seed (`db/catalog-seed.sql`) checked by `bun run catalog:check`, from `scripts/ts/catalog.ts` and the researched platform index/observations.
-- Local preview (`just preview`) serving the TypeScript stack with a seeded local D1.
+- Local preview (`just preview`) serving the TypeScript stack with a seeded local D1 and a Wrangler scheduled-event endpoint for bounded real NAV ingestion.
 - The approved Job Application Assistant mission and MVP boundary are recorded canonically in [`docs/internal/product/vision.md`](../docs/internal/product/vision.md); context docs link there instead of copying the full decision.
 - Scheduled ingestion targets only the Feed tier. NAV requests 5-entry pages, and each scheduled invocation attempts one checkpointable page.
 - Runtime NAV credentials use a cached public token or a private secret. A 401 refreshes only the failed token.
@@ -16,7 +16,7 @@
 - Ordered D1 migration support: generated snapshots mark current shapes, existing databases apply `migrations/*.sql`, and the runner records only successful migrations.
 - TypeScript D1 isolation: staging/production retain the legacy database resource unbound and use a separately identified `TypeScriptDb`, preventing the RFC 0015 cutover from adopting the Rust schema.
 - Staging and production deployments build the web and Worker artifacts immediately before Alchemy publishes them. A deploy cannot reuse an artifact from an earlier preview or checkout.
-- Local full-stack Saved evidence: save → draft → assisted preparation → approval → label assignment/filter → explicit submission confirmation → Applied preset → history.
+- Local full-stack evidence: real NAV ingestion → checkpoint → browse pagination → search → detail hydration, plus save → draft → assisted preparation → approval → label filter → submission confirmation → Applied preset → history.
 
 ## Known gaps and evidence status
 

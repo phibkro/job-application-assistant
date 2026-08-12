@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 preview_config = (ROOT / "dev/preview.wrangler.jsonc").read_text()
 assert '"ENVIRONMENT": "local"' in preview_config
 assert "triggers" not in preview_config
+preview_script = (ROOT / "scripts/preview.sh").read_text()
+assert '"/__scheduled*"' in preview_config
+assert "--test-scheduled" in preview_script
 
 infra = (ROOT / "infra/alchemy.run.ts").read_text()
 
