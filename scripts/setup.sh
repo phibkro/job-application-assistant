@@ -9,6 +9,9 @@ for command in "${required[@]}"; do
   }
 done
 
+bun install --frozen-lockfile
+bun install --cwd infra --frozen-lockfile
+
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   ./scripts/install-hooks.sh
 fi
