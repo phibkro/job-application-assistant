@@ -181,29 +181,30 @@ run_logged worker-build bun build apps/worker/src/index.ts \
   --conditions=workerd --conditions=worker \
   --external "cloudflare:*"
 
-read_stack_output() {
-  python3 - "$1" <<'PYOUT'
+read_resource_attribute() {
+  local resource="$1"
+  local attribute="$2"
+  (
+    cd infra
+    bun run alchemy state get --stack JobIndex --stage "${environment}" --fqn "${resource}"
+  ) | python3 -c '
 import json
-import pathlib
 import sys
 
-key = sys.argv[1]
-state = sorted(pathlib.Path("infra/.alchemy/state").rglob("__stack_output__.json"))
-if not state:
+attribute = sys.argv[1]
+text = sys.stdin.read()
+start = text.find("{")
+if start < 0:
     raise SystemExit("")
-payload = json.loads(state[-1].read_text())
-value = payload
-for candidate in ("output", "value", "data"):
-    if isinstance(value, dict) and candidate in value:
-        value = value[candidate]
-print(value.get(key, "") if isinstance(value, dict) else "")
-PYOUT
+value = json.loads(text[start:]).get("attr", {}).get(attribute, "")
+print(value if isinstance(value, str) else "")
+' "$attribute"
 }
 
 apply_database() {
   database_config=""
-  database_id="$(read_stack_output databaseId)"
-  database_name="$(read_stack_output database)"
+  database_id="$(read_resource_attribute TypeScriptDb databaseId)"
+  database_name="$(read_resource_attribute TypeScriptDb databaseName)"
   if [ -z "${database_id}" ] || [ -z "${database_name}" ]; then
     echo "Alchemy did not report the D1 database." >&2
     exit 1
@@ -258,7 +259,7 @@ if [ -n "${private_nav_token}" ]; then
 fi
 unset private_nav_token admin_token
 
-deployment_url="$(read_stack_output url)"
+deployment_url="$(read_resource_attribute Api url)"
 
 if [ -z "${deployment_url}" ]; then
   echo "Alchemy did not report a deployed URL." >&2

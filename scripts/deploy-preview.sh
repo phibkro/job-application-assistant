@@ -50,27 +50,29 @@ bun build apps/worker/src/index.ts \
 echo "==> applying infrastructure"
 (cd infra && ALCHEMY_STAGE="$STAGE" bun run alchemy deploy --stage "$STAGE" --yes)
 
-read_stack_output() {
-  python3 - "$1" "$STAGE" <<'PYOUT'
+read_resource_attribute() {
+  local resource="$1"
+  local attribute="$2"
+  (
+    cd infra
+    bun run alchemy state get --stack JobIndex --stage "$STAGE" --fqn "$resource"
+  ) | python3 -c '
 import json
-import pathlib
 import sys
 
-key, stage = sys.argv[1:]
-state = sorted(pathlib.Path("infra/.alchemy/state/JobIndex").glob(f"{stage}/**/__stack_output__.json"))
-if not state:
+attribute = sys.argv[1]
+text = sys.stdin.read()
+start = text.find("{")
+if start < 0:
     raise SystemExit("")
-value = json.loads(state[-1].read_text())
-for candidate in ("output", "value", "data"):
-    if isinstance(value, dict) and candidate in value:
-        value = value[candidate]
-print(value.get(key, "") if isinstance(value, dict) else "")
-PYOUT
+value = json.loads(text[start:]).get("attr", {}).get(attribute, "")
+print(value if isinstance(value, str) else "")
+' "$attribute"
 }
 
-DB_NAME="$(read_stack_output database)"
-DB_ID="$(read_stack_output databaseId)"
-DEPLOYMENT_URL="$(read_stack_output url)"
+DB_NAME="$(read_resource_attribute TypeScriptDb databaseName)"
+DB_ID="$(read_resource_attribute TypeScriptDb databaseId)"
+DEPLOYMENT_URL="$(read_resource_attribute Api url)"
 if [ -z "$DB_NAME" ] || [ -z "$DB_ID" ] || [ -z "$DEPLOYMENT_URL" ]; then
   echo "Alchemy did not report the isolated preview resources." >&2
   exit 1
