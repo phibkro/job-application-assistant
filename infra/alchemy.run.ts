@@ -26,8 +26,8 @@ import * as Redacted from "effect/Redacted";
  *
  * Stages map to the service's environments:
  *
- *   bun alchemy deploy --stage staging
- *   bun alchemy deploy --stage production
+ *   bun run alchemy deploy --stage staging
+ *   bun run alchemy deploy --stage production
  */
 
 const STAGE = process.env.ALCHEMY_STAGE ?? "staging";

@@ -48,7 +48,7 @@ bun build apps/worker/src/index.ts \
   --external "cloudflare:*"
 
 echo "==> applying infrastructure"
-(cd infra && ALCHEMY_STAGE="$STAGE" bun alchemy deploy --stage "$STAGE" --yes)
+(cd infra && ALCHEMY_STAGE="$STAGE" bun run alchemy deploy --stage "$STAGE" --yes)
 
 read_stack_output() {
   python3 - "$1" "$STAGE" <<'PYOUT'

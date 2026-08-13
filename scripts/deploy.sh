@@ -160,7 +160,7 @@ deploy_stack() {
     JOB_INDEX_ACTIVATE_SCHEDULES="${phase}" \
     NAV_API_TOKEN="${private_nav_token}" \
     ADMIN_SYNC_TOKEN="${admin_token}" \
-    bun alchemy deploy --stage "${environment}" --yes
+    bun run alchemy deploy --stage "${environment}" --yes
   )
 }
 

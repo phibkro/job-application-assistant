@@ -30,5 +30,5 @@ case "${1:-}" in
     ;;
 esac
 
-(cd infra && ALCHEMY_STAGE="$STAGE" bun alchemy destroy --stage "$STAGE" --yes)
+(cd infra && ALCHEMY_STAGE="$STAGE" bun run alchemy destroy --stage "$STAGE" --yes)
 echo "Destroyed preview stage ${STAGE}."
