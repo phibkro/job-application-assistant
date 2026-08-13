@@ -11,6 +11,10 @@ done
 
 bun install --frozen-lockfile
 
+if [ "${CI:-0}" = "1" ]; then
+  bun install --cwd infra --frozen-lockfile --force
+fi
+
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   ./scripts/install-hooks.sh
 fi
