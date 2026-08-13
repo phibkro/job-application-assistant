@@ -6,8 +6,9 @@ Stabilize the TypeScript/Effect service after the RFC 0015 cutover. The local
 Saved journey is complete through submission confirmation and application
 history. The explainable shortlist now ranks fresh vacancies from explicit
 profile preferences and renders the same evidence on feed and detail pages.
-PR-scoped Cloudflare preview automation is implemented but cannot be exercised
-until this checkout has a Git remote and can create a pull request.
+PR-scoped Cloudflare preview automation is proven end to end: a same-repository
+PR provisioned an isolated seeded Worker/D1/Durable Object stage, and closing
+the PR removed the deterministic resources from a fresh runner.
 
 The approved product direction is the Job Application Assistant mission and MVP boundary in [`docs/internal/product/vision.md`](../docs/internal/product/vision.md). The corpus is an enabling subsystem; human review and explicit approval remain required for consequential application actions.
 
@@ -26,7 +27,7 @@ The approved product direction is the Job Application Assistant mission and MVP 
 - `scripts/migrate-d1.sh` and `d1_migrations` upgrade existing D1 databases. `scripts/preview.sh` starts from a clean local state so schema drift cannot poison the demo.
 - A local browser smoke proved real NAV ingestion, checkpointed one-page runs, browse pagination, search, detail hydration, save, draft, assisted preparation, approval, custom-label filtering, submission confirmation, and history. This is local evidence only.
 - Local Playwright evidence covers profile preference editing, deterministic ranking and explanations, feed/detail parity, save, dismissal, and Axe checks against the seeded preview.
-- `.github/workflows/pr-preview.yml` provisions same-repository PR stages as `pr-N`, applies `dev/preview-seed.sql`, and destroys the stage on close. The scripts reject shared-stage teardown and fork PRs receive no Cloudflare authority. Provider lifecycle evidence is blocked because this repository has no configured Git remote.
+- `.github/workflows/pr-preview.yml` provisions same-repository PR stages as `pr-N`, applies `dev/preview-seed.sql`, and destroys deterministic Worker/D1 resources on close from a fresh runner. Fork PRs receive no Cloudflare authority. GitHub run `31660070001` attempt 4 proved provisioning and seeded API health; close run `31660706629` proved Worker/D1 deletion and post-delete namespace absence.
 - Project license is proprietary (see RFC 0005/0008 amendments).
 
 ## Current command surface
@@ -47,11 +48,9 @@ just soak               # bounded staging soak; use seven days for acceptance
 
 ## Next action
 
-Configure the canonical Git remote, push `feature/explainable-shortlist-previews`
-at `b5c23c9`, create a PR, and capture the provisioned preview URL and resource
-inventory. Close the PR and verify its Worker, D1 database, Durable Object
-namespace, assets, and Alchemy stage are absent. Production qualification
-remains separate and open.
+Complete TypeScript production qualification: realistic-corpus query-plan
+evidence, a clean restore drill, and the black-box staging smoke path. Keep
+production schedules disabled until those gates pass.
 
 ## Open decisions
 
