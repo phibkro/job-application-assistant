@@ -92,7 +92,7 @@ assert "types: [opened, reopened, synchronize, closed]" in preview_workflow
 assert "cancel-in-progress: false" in preview_workflow
 assert "github.event.pull_request.head.repo.full_name == github.repository" in preview_workflow
 assert '--command just _deploy-pr-preview "${{ github.event.pull_request.number }}"' in preview_workflow
-assert preview_workflow.count("--keep PATH") == 2
+assert "--keep PATH" not in preview_workflow
 assert '--command just _destroy-pr-preview "${{ github.event.pull_request.number }}"' in preview_workflow
 assert '_deploy-pr-preview number: _verify' in justfile
 assert './scripts/deploy-preview.sh "{{number}}"' in justfile

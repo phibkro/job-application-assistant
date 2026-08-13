@@ -31,7 +31,6 @@ jobs:
           nix develop --ignore-environment
           --keep HOME
           --keep CI
-          --keep PATH
           --keep CLOUDFLARE_API_TOKEN
           --keep CLOUDFLARE_ACCOUNT_ID
           --command just _deploy-pr-preview "${{ github.event.pull_request.number }}"
@@ -56,7 +55,6 @@ jobs:
           nix develop --ignore-environment
           --keep HOME
           --keep CI
-          --keep PATH
           --keep CLOUDFLARE_API_TOKEN
           --keep CLOUDFLARE_ACCOUNT_ID
           --command just _destroy-pr-preview "${{ github.event.pull_request.number }}"

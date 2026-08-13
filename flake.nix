@@ -37,6 +37,7 @@
               jq
               python3
               shellcheck
+              nixVersions.latest
               sqlite
             ];
 
