@@ -28,7 +28,7 @@
     "catalog:check": "bun run scripts/ts/catalog.ts"
   },
   "dependencies": {
-    "effect": "4.0.0-beta.104"
+    "effect": "4.0.0-rc.108"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
