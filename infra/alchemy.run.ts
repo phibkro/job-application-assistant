@@ -151,7 +151,13 @@ const CRONS = SCHEDULES_ALLOWED && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];
 
 export default Alchemy.Stack(
   "JobIndex",
-  { providers: Cloudflare.providers(), state: Cloudflare.state() },
+  {
+    providers: Cloudflare.providers(),
+    // PR stages are disposable and named deterministically, so an ephemeral
+    // runner can converge them from local state without bootstrapping the
+    // shared Cloudflare state-store Worker. Shared stages retain remote state.
+    state: PR_STAGE ? Alchemy.localState() : Cloudflare.state(),
+  },
   Effect.gen(function* () {
     // Shared environments retain the legacy resource for safe cutover. PR
     // stages are disposable and must contain only the TypeScript stack.

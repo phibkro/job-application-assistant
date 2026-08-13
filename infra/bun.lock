@@ -99,7 +99,7 @@
 
     "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0-beta.104", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.21.0" }, "peerDependencies": { "effect": "^4.0.0-beta.104" } }, "sha512-wZQWlreuCfR+Ip6E93h2Wo56lFdBTflzSErFKxvrAW06/ORa7yZMD4oq4Ow5aU5+AlQgomQSEeBKM7uao4ZewQ=="],
 
-    "@effect/vitest": ["@effect/vitest@4.0.0-beta.104", "", { "peerDependencies": { "effect": "^4.0.0-beta.104", "vitest": "^4.1.0" } }, "sha512-09AvNl3tJNR7hOEnxE8TqSlBTeqfrWu/s4mIjlv1q6c/r6izkH/qhUrByP87ebbEtCMPJDHHXNcKFs3kEbugbQ=="],
+    "@effect/vitest": ["@effect/vitest@4.0.0-rc.108", "", { "peerDependencies": { "effect": "^4.0.0-rc.108", "vitest": ">=4.1.0 <5.0.0" } }, "sha512-XD2GP1JATN28wnIeFGsBqYMuQDCHIodKKgFulGyG91GvuHqgf2gz+WxR2LPdyNoKMtr7lsbRzVj07niSYtIKzA=="],
 
     "@emnapi/core": ["@emnapi/core@1.10.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw=="],
 
@@ -461,7 +461,7 @@
 
     "multipasta": ["multipasta@0.2.8", "", {}, "sha512-ZPWuMKyv0cSO29f7hozp+k6+crZbQijV8ipMvxNxRf2SwtYGTX1ZX89Kd20VV4H9Znonx+EQn+iy1wGQsJ+b+Q=="],
 
-    "mysql2": ["mysql2@3.23.2", "", { "dependencies": { "aws-ssl-profiles": "^1.1.2", "denque": "^2.1.0", "generate-function": "^2.3.1", "iconv-lite": "^0.7.2", "long": "^5.3.2", "lru.min": "^1.1.4", "named-placeholders": "^1.1.6", "sql-escaper": "^1.5.1" }, "peerDependencies": { "@types/node": ">= 8" } }, "sha512-fxh3HpQ8vJtu/Mmnd4Xsur19jGjHGzRLMxptiDtOkbX7EVBgnafGSGDx1WGGVmJLClVh2LeeBMMo24IFv8wCyQ=="],
+    "mysql2": ["mysql2@3.23.3", "", { "dependencies": { "aws-ssl-profiles": "^1.1.2", "generate-function": "^2.3.1", "iconv-lite": "^0.7.3", "long": "^5.3.2", "lru.min": "^1.1.4", "named-placeholders": "^1.1.6", "sql-escaper": "^1.5.1" }, "peerDependencies": { "@types/node": ">= 8" } }, "sha512-ehp9HEKr4wVJaBOUVxNFa+CNrsCCCZ6363/jbGhb7WpEmSRNIXjHBjFs5K2s2cXn7j/RhDieejsQJ6nfUwD6vQ=="],
 
     "named-placeholders": ["named-placeholders@1.1.6", "", { "dependencies": { "lru.min": "^1.1.0" } }, "sha512-Tz09sEL2EEuv5fFowm419c1+a/jSMiBjI9gHxVLrVdbUkkNUUfjsVYs9pVZu5oCon/kmRh9TfLEObFtkVxmY0w=="],
 
@@ -483,7 +483,7 @@
 
     "pathe": ["pathe@2.0.3", "", {}, "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w=="],
 
-    "pg": ["pg@8.22.0", "", { "dependencies": { "pg-connection-string": "^2.14.0", "pg-pool": "^3.14.0", "pg-protocol": "^1.15.0", "pg-types": "2.2.0", "pgpass": "1.0.5" }, "optionalDependencies": { "pg-cloudflare": "^1.4.0" }, "peerDependencies": { "pg-native": ">=3.0.1" }, "optionalPeers": ["pg-native"] }, "sha512-8wih1vVIBMxoUM2oB4soJsD9tDnDpLv4OXBJ+EJzFsvycD+lfyIreC2gGHq78f8jbLLt+bvlPTFdFZfJkOuzAA=="],
+    "pg": ["pg@8.23.0", "", { "dependencies": { "pg-connection-string": "^2.14.0", "pg-pool": "^3.14.0", "pg-protocol": "^1.16.0", "pg-types": "2.2.0", "pgpass": "1.0.5" }, "optionalDependencies": { "pg-cloudflare": "^1.4.0" }, "peerDependencies": { "pg-native": ">=3.0.1" }, "optionalPeers": ["pg-native"] }, "sha512-Ip2EQCngowJLGOfCwkFhPXU7/ljlhn6Rxlmy4XYfL2Y+vyRM59+8uR2xqRWKdYmbXmxCFOAmKxBuSUCdF34qLg=="],
 
     "pg-cloudflare": ["pg-cloudflare@1.4.0", "", {}, "sha512-Vo7z/6rrQYxpNRylp4Tlob2elzbh+N/MOQbxFVWCxS7oEx6jF53GTJFxK2WWpKuBRkmiin4Mt+xofFDjx09R0A=="],
 
@@ -493,7 +493,7 @@
 
     "pg-pool": ["pg-pool@3.14.0", "", { "peerDependencies": { "pg": ">=8.0" } }, "sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw=="],
 
-    "pg-protocol": ["pg-protocol@1.15.0", "", {}, "sha512-cq9sECI5s0+uPUXjbz8ioyPJni6RzsRib0US67i5IoTZKw8fNeYlVE7u8F4dG7vEJJtc5wdD1K189lCCUwqWTQ=="],
+    "pg-protocol": ["pg-protocol@1.16.0", "", {}, "sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg=="],
 
     "pg-types": ["pg-types@2.2.0", "", { "dependencies": { "pg-int8": "1.0.1", "postgres-array": "~2.0.0", "postgres-bytea": "~1.0.0", "postgres-date": "~1.0.4", "postgres-interval": "^1.1.0" } }, "sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA=="],
 
