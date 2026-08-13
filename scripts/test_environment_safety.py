@@ -24,8 +24,8 @@ infra = (ROOT / "infra/alchemy.run.ts").read_text()
 # RFC 0015 starts the TypeScript service on a new database. Keep the legacy
 # `Db` resource declared so Alchemy cannot delete it, and bind the Worker to a
 # separately identified resource whose physical name cannot adopt the Rust D1.
-assert 'Cloudflare.D1Database("Db"' in infra
-assert 'Cloudflare.D1Database("TypeScriptDb"' in infra
+assert 'Cloudflare.D1.Database("Db"' in infra
+assert 'Cloudflare.D1.Database("TypeScriptDb"' in infra
 assert "job-index-${STAGE}-typescript-db" in infra
 
 # Production must not expose the demo mutations or stale public-token
@@ -84,7 +84,7 @@ assert "dev/preview-seed.sql" in preview_deploy
 assert "NAV_API_TOKEN" not in preview_deploy
 assert 'STAGE="pr-$1"' in preview_deploy
 assert "job-index-${STAGE}-typescript-db" in infra
-assert 'bun alchemy destroy --stage "$STAGE" --yes' in preview_destroy
+assert 'bun run alchemy destroy --stage "$STAGE" --yes' in preview_destroy
 for forbidden_stage in ("preview", "staging", "production"):
     assert f'STAGE="{forbidden_stage}"' not in preview_destroy
 assert "types: [opened, reopened, synchronize, closed]" in preview_workflow

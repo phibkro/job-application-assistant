@@ -134,7 +134,7 @@ export const findHistoryForSaved = (
         AND aa.savedJobId = a.savedJobId
         AND aa.applicationId = a.id
        WHERE a.profileId = ? AND a.savedJobId = ?
-       ORDER BY a.createdAt DESC, a.id DESC`,
+       ORDER BY a.createdAt DESC, isCurrent DESC, a.id DESC`,
       [profileId, savedJobId],
     );
   });

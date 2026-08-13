@@ -26,8 +26,8 @@ import * as Redacted from "effect/Redacted";
  *
  * Stages map to the service's environments:
  *
- *   bun alchemy deploy --stage staging
- *   bun alchemy deploy --stage production
+ *   bun run alchemy deploy --stage staging
+ *   bun run alchemy deploy --stage production
  */
 
 const STAGE = process.env.ALCHEMY_STAGE ?? "staging";
@@ -53,7 +53,7 @@ const PR_STAGE = /^pr-[1-9][0-9]*$/.test(STAGE);
  * changing it later is one edit, and it is stage-scoped so the Rust
  * deployments keep their own hostnames.
  */
-const PREVIEW_DOMAINS = ["job-index.phibkro.org"];
+const PREVIEW_DOMAIN = "job-index.phibkro.org";
 
 /**
  * Where verification and sign-in mail comes from, and — for now — the only
@@ -156,7 +156,7 @@ export default Alchemy.Stack(
     // Shared environments retain the legacy resource for safe cutover. PR
     // stages are disposable and must contain only the TypeScript stack.
     if (!PR_STAGE) {
-      yield* Cloudflare.D1Database("Db", {
+      yield* Cloudflare.D1.Database("Db", {
         name: `job-index-${STAGE}-db`,
         primaryLocationHint: "weur",
       });
@@ -170,7 +170,7 @@ export default Alchemy.Stack(
     //
     // No `migrationsDir` here: an incremental ALTER migration would run during
     // resource provisioning, before a new database has its generated baseline.
-    const database = yield* Cloudflare.D1Database("TypeScriptDb", {
+    const database = yield* Cloudflare.D1.Database("TypeScriptDb", {
       name: `job-index-${STAGE}-typescript-db`,
       // Norwegian vacancies read from Norway.
       primaryLocationHint: "weur",
@@ -178,7 +178,7 @@ export default Alchemy.Stack(
 
     const email = PR_STAGE
       ? undefined
-      : yield* Cloudflare.SendEmail("Mail", {
+      : yield* Cloudflare.Email.SendEmail("Mail", {
           destinationAddress: MAIL_VERIFIED_DESTINATION,
           allowedSenderAddresses: [MAIL_FROM],
         });
@@ -191,7 +191,7 @@ export default Alchemy.Stack(
     // its own state to compute the Cloudflare migration a first-time DO
     // class requires (`new_sqlite_classes`); there is nothing to hand-write
     // here.
-    const sourceLease = Cloudflare.DurableObjectNamespace("SourceLease", {
+    const sourceLease = Cloudflare.Workers.DurableObject("SourceLease", {
       className: "SourceLeaseObject",
     });
 
@@ -215,8 +215,8 @@ export default Alchemy.Stack(
       compatibility: { date: "2026-05-25" },
       // The workers.dev URL stays on alongside the custom domain: it is what
       // the smoke checks hit, and it keeps working if DNS is mid-change.
-      url: true,
-      domain: PR_STAGE || STAGE !== "preview" ? undefined : PREVIEW_DOMAINS,
+      workersDev: true,
+      domain: PR_STAGE || STAGE !== "preview" ? undefined : PREVIEW_DOMAIN,
       env: {
         DB: database,
         ...(email ? { EMAIL: email } : {}),
