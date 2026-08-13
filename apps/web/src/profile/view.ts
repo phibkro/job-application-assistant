@@ -106,6 +106,49 @@ const profileForm = (
                 },
                 h,
               ),
+              h.fieldset(
+                [h.Class("space-y-4 border-t border-gray-200 pt-4")],
+                [
+                  h.legend(
+                    [h.Class("text-sm font-semibold text-gray-900")],
+                    ["Shortlist preferences"],
+                  ),
+                  h.p(
+                    [h.Class("text-sm text-gray-500")],
+                    ["These preferences rank and explain your fresh feed."],
+                  ),
+                  textareaField(
+                    {
+                      id: "profile-desired-roles",
+                      label: "Desired roles, one per line",
+                      value: form.desiredRolesText,
+                      rows: 3,
+                      onInput: (value) => Message.DesiredRolesTextChanged({ value }),
+                    },
+                    h,
+                  ),
+                  textareaField(
+                    {
+                      id: "profile-desired-locations",
+                      label: "Desired locations, one per line",
+                      value: form.desiredLocationsText,
+                      rows: 3,
+                      onInput: (value) => Message.DesiredLocationsTextChanged({ value }),
+                    },
+                    h,
+                  ),
+                  textareaField(
+                    {
+                      id: "profile-excluded-terms",
+                      label: "Excluded terms, one per line",
+                      value: form.excludedTermsText,
+                      rows: 3,
+                      onInput: (value) => Message.ExcludedTermsTextChanged({ value }),
+                    },
+                    h,
+                  ),
+                ],
+              ),
             ],
           ),
         ],

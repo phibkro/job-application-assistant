@@ -22,6 +22,11 @@ const meResponse: MeResponse = {
     languages: "English",
     skills: ["TypeScript"],
     education: ["BSc"],
+    preferences: {
+      desiredRoles: ["Frontend"],
+      desiredLocations: ["Bergen"],
+      excludedTerms: [],
+    },
     experience: [
       { title: "Engineer", employer: "Acme", period: "2020-2023", highlights: ["Shipped X"] },
     ],
@@ -45,6 +50,8 @@ describe("FetchSucceeded / FetchFailed", () => {
     const form = Option.getOrThrow(model.profileForm);
     expect(form.headline).toBe("Engineer");
     expect(form.skillsText).toBe("TypeScript");
+    expect(form.desiredRolesText).toBe("Frontend");
+    expect(form.desiredLocationsText).toBe("Bergen");
     expect(form.experience).toHaveLength(1);
     expect(form.experience[0]?.title).toBe("Engineer");
   });
@@ -137,6 +144,15 @@ describe("SaveClicked", () => {
     expect(model.profileSaving).toEqual({ _tag: "Pending" });
     expect(commands.map((c) => c.name)).toEqual(["SaveProfile"]);
     expect(commands[0]?.args).toMatchObject({ capabilities: ["draft"] });
+    expect(commands[0]?.args).toMatchObject({
+      profile: {
+        preferences: {
+          desiredRoles: ["Frontend"],
+          desiredLocations: ["Bergen"],
+          excludedTerms: [],
+        },
+      },
+    });
   });
 
   it("SaveSucceeded refreshes the cache and clears Pending", () => {

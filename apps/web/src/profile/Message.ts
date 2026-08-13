@@ -19,6 +19,9 @@ export const LocationChanged = m("LocationChanged", { value: S.String });
 export const LanguagesChanged = m("LanguagesChanged", { value: S.String });
 export const SkillsTextChanged = m("SkillsTextChanged", { value: S.String });
 export const EducationTextChanged = m("EducationTextChanged", { value: S.String });
+export const DesiredRolesTextChanged = m("DesiredRolesTextChanged", { value: S.String });
+export const DesiredLocationsTextChanged = m("DesiredLocationsTextChanged", { value: S.String });
+export const ExcludedTermsTextChanged = m("ExcludedTermsTextChanged", { value: S.String });
 export const ExperienceAdded = m("ExperienceAdded");
 /** Wraps one `ExperienceEntry` instance's own Message, addressed by its
  *  stable `id` — the same id used as that entry's `slotId` — rather than by
@@ -42,6 +45,9 @@ export const Message = S.Union([
   LanguagesChanged,
   SkillsTextChanged,
   EducationTextChanged,
+  DesiredRolesTextChanged,
+  DesiredLocationsTextChanged,
+  ExcludedTermsTextChanged,
   ExperienceAdded,
   GotExperienceMessage,
   SaveClicked,

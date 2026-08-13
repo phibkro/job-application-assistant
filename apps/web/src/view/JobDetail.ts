@@ -9,7 +9,15 @@ import * as Applications from "../Applications.ts";
 import * as Route from "../Route.ts";
 import { RequestIdle } from "../Model.ts";
 import type { ApplyStage, Model, RequestStatus } from "../Model.ts";
-import { button, card, linkButton, pageClass, renderProblem, sectionHeading } from "./Shared.ts";
+import {
+  button,
+  card,
+  linkButton,
+  matchAssessmentView,
+  pageClass,
+  renderProblem,
+  sectionHeading,
+} from "./Shared.ts";
 
 const statusLabel = (job: CanonicalJob): string =>
   job.status._tag === "Active" ? "Active" : `Closed ${job.status.closedAt}`;
@@ -378,16 +386,28 @@ const applyFlow = (model: Model, job: CanonicalJob, h: HtmlBuilder<Message>): Ht
   );
 };
 
-export const jobDetailView = (model: Model, h: HtmlBuilder<Message>): Html =>
-  h.div(
-    [h.Class(pageClass)],
-    [
-      AsyncData.matchDataSplitEmpty(model.jobDetail, {
-        onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["No job selected."]),
-        onLoading: () =>
-          h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading job…"]),
-        onFailure: (problem) => renderProblem(problem, h),
-        onData: (job) => h.div([h.Class("space-y-6")], [jobBody(job, h), applyFlow(model, job, h)]),
-      }),
-    ],
-  );
+export const jobDetailView = (model: Model, h: HtmlBuilder<Message>): Html => {
+  const content =
+    model.session._tag === "Authenticated"
+      ? AsyncData.matchDataSplitEmpty(model.matchDetail, {
+          onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["No job selected."]),
+          onLoading: () =>
+            h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading match detail…"]),
+          onFailure: (problem) => renderProblem(problem, h),
+          onData: ({ job, assessment }) =>
+            h.div(
+              [h.Class("space-y-6")],
+              [jobBody(job, h), matchAssessmentView(assessment, h), applyFlow(model, job, h)],
+            ),
+        })
+      : AsyncData.matchDataSplitEmpty(model.publicJobDetail, {
+          onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["No job selected."]),
+          onLoading: () =>
+            h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading job…"]),
+          onFailure: (problem) => renderProblem(problem, h),
+          onData: (job) =>
+            h.div([h.Class("space-y-6")], [jobBody(job, h), applyFlow(model, job, h)]),
+        });
+
+  return h.div([h.Class(pageClass)], [content]);
+};

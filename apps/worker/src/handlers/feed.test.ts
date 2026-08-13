@@ -4,7 +4,8 @@ import * as Layer from "effect/Layer";
 import type { Credential } from "@job-index/domain/Access";
 import type { CanonicalJob } from "@job-index/domain/Job";
 import type { CanonicalJobId, PrincipalId, ProfileId, Sequence } from "@job-index/domain/Ids";
-import { Accounts } from "../services/Accounts.ts";
+import type { Profile } from "@job-index/domain/Profile";
+import { Accounts, Profiles } from "../services/Accounts.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { Judgements } from "../services/Judgements.ts";
 import { buildHandler } from "./testSupport.ts";
@@ -21,6 +22,15 @@ const authedAs = (profile: ProfileId) => {
 };
 
 const authHeaders = { Authorization: "Bearer good-token" };
+const profile: Profile = {
+  headline: "Baker",
+  summary: "",
+  location: "Oslo",
+  languages: "",
+  skills: [],
+  experience: [],
+  education: [],
+};
 
 describe("feed (authenticated)", () => {
   it("fresh reads Corpus.fresh scoped to CurrentPrincipal.profileId", async () => {
@@ -45,8 +55,8 @@ describe("feed (authenticated)", () => {
         get: () => Effect.die("unused"),
         changedSince: () => Effect.die("unused"),
         search: () => Effect.die("unused"),
-        fresh: (profile, limit) => {
-          seenProfile = profile;
+        fresh: (profileId, limit) => {
+          seenProfile = profileId;
           return Effect.succeed([job].slice(0, limit));
         },
         markOffered: () => Effect.die("unused"),
@@ -54,6 +64,13 @@ describe("feed (authenticated)", () => {
         occurrenceFor: () => Effect.die("unused"),
         hydrateDetail: () => Effect.die("unused"),
         closeEarly: () => Effect.die("unused"),
+      }),
+      profiles: Layer.succeed(Profiles, {
+        get: () => Effect.succeed(profile),
+        set: () => Effect.die("unused"),
+        answers: () => Effect.die("unused"),
+        answer: () => Effect.die("unused"),
+        unanswered: () => Effect.die("unused"),
       }),
     });
     const res = await handler(
@@ -69,8 +86,8 @@ describe("feed (authenticated)", () => {
     const { handler } = buildHandler({
       accounts: authedAs(alice),
       judgements: Layer.succeed(Judgements, {
-        record: (profile, job, verdict, reason) => {
-          calls.push({ profile, job, verdict, reason });
+        record: (profileId, job, verdict, reason) => {
+          calls.push({ profile: profileId, job, verdict, reason });
           return Effect.void;
         },
       }),

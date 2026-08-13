@@ -22,8 +22,19 @@ export const Experience = Schema.Struct({
 export type Experience = typeof Experience.Type;
 
 /**
- * The CV as a value, unattached to any account. Used for input and rendering.
+ * The matching controls a person may add to their CV.
+ *
+ * This field is optional on the wire so profiles written before preferences
+ * existed remain readable. `preferencesOf` is the one place that gives an
+ * older profile its empty preference lists.
  */
+export const ProfilePreferences = Schema.Struct({
+  desiredRoles: Schema.Array(Schema.String),
+  desiredLocations: Schema.Array(Schema.String),
+  excludedTerms: Schema.Array(Schema.String),
+});
+export type ProfilePreferences = typeof ProfilePreferences.Type;
+
 export const Profile = Schema.Struct({
   headline: Schema.String,
   summary: Schema.String,
@@ -32,8 +43,13 @@ export const Profile = Schema.Struct({
   skills: Schema.Array(Schema.String),
   experience: Schema.Array(Experience),
   education: Schema.Array(Schema.String),
+  preferences: Schema.optional(ProfilePreferences),
 });
 export type Profile = typeof Profile.Type;
+
+/** Gives profiles from before the preferences field existed a stable shape. */
+export const preferencesOf = (profile: Pick<Profile, "preferences">): ProfilePreferences =>
+  profile.preferences ?? { desiredRoles: [], desiredLocations: [], excludedTerms: [] };
 
 /**
  * The stored profile: a CV attached to an account, plus its erasure state.

@@ -2,6 +2,11 @@ import * as S from "effect/Schema";
 import { AsyncData } from "foldkit";
 import { ts } from "foldkit/schema";
 import { CanonicalJob } from "@job-index/domain/Job";
+import {
+  JobPage as JobPageSchema,
+  MatchedJob as MatchedJobSchema,
+  MatchPage as MatchPageSchema,
+} from "../../worker/src/Api.ts";
 import * as ProfileSubmodel from "./profile/Model.ts";
 import * as SavedSubmodel from "./saved/Model.ts";
 // `Problem` and the request tri-state live below every cluster (see
@@ -33,17 +38,10 @@ export {
   Unauthorized,
 };
 
-/**
- * A page of jobs, as `corpus.listJobs` and `feed.fresh` both return it.
- *
- * `Api.ts` builds this shape (`JobPage`) inline and does not export it, so a
- * Model field of this type has nothing to import — this is the one
- * unavoidable restatement in this module, and it restates only the
- * pagination envelope, not `CanonicalJob` itself.
- */
-const PageMeta = S.Struct({ limit: S.Number, nextCursor: S.NullOr(S.String) });
-export const JobPage = S.Struct({ data: S.Array(CanonicalJob), meta: PageMeta });
-export type JobPage = typeof JobPage.Type;
+export { JobPageSchema, MatchedJobSchema, MatchPageSchema };
+export type JobPage = typeof JobPageSchema.Type;
+export type MatchedJob = typeof MatchedJobSchema.Type;
+export type MatchPage = typeof MatchPageSchema.Type;
 
 // PAGE — which screen is showing. URL-backed: `Route.ts` parses the
 // address bar into a `Route` and `update.ts`'s `UrlChanged` handler is the
@@ -77,9 +75,10 @@ export type SessionState = typeof SessionState.Type;
 export const BrowseQuery = S.Struct({ term: S.String, location: S.String, status: S.String });
 export type BrowseQuery = typeof BrowseQuery.Type;
 
-export const BrowseAsyncData = AsyncData.Schema(JobPage, Problem);
-export const JobDetailAsyncData = AsyncData.Schema(CanonicalJob, Problem);
-export const FeedAsyncData = AsyncData.Schema(JobPage, Problem);
+export const BrowseAsyncData = AsyncData.Schema(JobPageSchema, Problem);
+export const PublicJobDetailAsyncData = AsyncData.Schema(CanonicalJob, Problem);
+export const MatchDetailAsyncData = AsyncData.Schema(MatchedJobSchema, Problem);
+export const FeedAsyncData = AsyncData.Schema(MatchPageSchema, Problem);
 
 /**
  * Where one job's application stands. Each stage carries forward what a
@@ -140,7 +139,8 @@ export const Model = S.Struct({
   browseQuery: BrowseQuery,
   browseResults: BrowseAsyncData.schema,
 
-  jobDetail: JobDetailAsyncData.schema,
+  publicJobDetail: PublicJobDetailAsyncData.schema,
+  matchDetail: MatchDetailAsyncData.schema,
 
   feedResults: FeedAsyncData.schema,
 
@@ -160,7 +160,8 @@ export const initialModel: Model = {
   browseQuery: { term: "", location: "", status: "" },
   browseResults: BrowseAsyncData.Idle(),
 
-  jobDetail: JobDetailAsyncData.Idle(),
+  publicJobDetail: PublicJobDetailAsyncData.Idle(),
+  matchDetail: MatchDetailAsyncData.Idle(),
 
   feedResults: FeedAsyncData.Idle(),
 

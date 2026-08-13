@@ -65,6 +65,23 @@ const job = S.decodeUnknownSync(CanonicalJob)({
 });
 
 const page = { data: [job], meta: { limit: 20, nextCursor: null as string | null } };
+const assessment = {
+  fit: "strong" as const,
+  score: 3,
+  reasons: [
+    {
+      kind: "role" as const,
+      profileValue: "Engineer",
+      jobField: "title" as const,
+      jobValue: "Software Engineer",
+    },
+  ],
+  concerns: [],
+};
+const matchPage = {
+  data: [{ job, assessment }],
+  meta: { limit: 20, nextCursor: null as null },
+};
 
 describe("UrlChanged", () => {
   it("triggers exactly one FetchJobs Command the first time Browse loads", () => {
@@ -105,24 +122,36 @@ describe("UrlChanged", () => {
       UrlChanged({ route: RouteJobDetail({ jobId: "job-2" }) }),
     );
     expect(model.page).toEqual({ _tag: "JobDetail", jobId: "job-2" });
-    expect(model.jobDetail._tag).toBe("Loading");
-    expect(commands.map((c) => c.name)).toEqual(["FetchJob"]);
+    expect(model.publicJobDetail._tag).toBe("Loading");
+    expect(commands.map((c) => c.name)).toEqual(["FetchPublicJob"]);
     expect(commands[0]?.args).toMatchObject({ jobId: "job-2" });
+  });
+
+  it("uses the authenticated match endpoint for signed-in detail", () => {
+    const [model, commands] = update(
+      {
+        ...initialModel,
+        session: { _tag: "Authenticated", token: "demo-token" },
+      },
+      UrlChanged({ route: RouteJobDetail({ jobId: "job-2" }) }),
+    );
+    expect(model.matchDetail._tag).toBe("Loading");
+    expect(commands.map((command) => command.name)).toEqual(["FetchMatchDetail"]);
   });
 
   it("always refetches the job on JobDetail navigation, keyed by the new id", () => {
     const atJobOne: Model = {
       ...initialModel,
       page: { _tag: "JobDetail", jobId: "job-1" },
-      jobDetail: { _tag: "Success", data: job },
+      publicJobDetail: { _tag: "Success", data: job },
     };
     const [model, commands] = update(
       atJobOne,
       UrlChanged({ route: RouteJobDetail({ jobId: "job-2" }) }),
     );
     expect(model.page).toEqual({ _tag: "JobDetail", jobId: "job-2" });
-    expect(model.jobDetail._tag).toBe("Loading");
-    expect(commands.map((c) => c.name)).toEqual(["FetchJob"]);
+    expect(model.publicJobDetail._tag).toBe("Loading");
+    expect(commands.map((c) => c.name)).toEqual(["FetchPublicJob"]);
   });
 
   it("routes into Profile and asks the Submodel to load, going through its own boundary", () => {
@@ -495,20 +524,29 @@ describe("apply loop", () => {
 
 describe("feed", () => {
   it("dismissing a job removes it from the visible page without refetching", () => {
-    const loaded: Model = { ...initialModel, feedResults: { _tag: "Success", data: page } };
+    const loaded: Model = {
+      ...initialModel,
+      feedResults: { _tag: "Success", data: matchPage },
+    };
     const [model, commands] = update(loaded, FeedDismissSucceeded({ jobId: "job-1" }));
-    expect(model.feedResults).toEqual({ _tag: "Success", data: { ...page, data: [] } });
+    expect(model.feedResults).toEqual({
+      _tag: "Success",
+      data: { ...matchPage, data: [] },
+    });
     expect(commands).toEqual([]);
   });
 
   it("does not refetch the feed once it has loaded", () => {
-    const loaded: Model = { ...initialModel, feedResults: { _tag: "Success", data: page } };
+    const loaded: Model = {
+      ...initialModel,
+      feedResults: { _tag: "Success", data: matchPage },
+    };
     const [, commands] = update(loaded, UrlChanged({ route: RouteFeed() }));
     expect(commands).toEqual([]);
   });
 
   it("FeedSucceeded on first load populates the feed", () => {
-    const [model] = update(initialModel, FeedSucceeded({ page }));
-    expect(model.feedResults).toEqual({ _tag: "Success", data: page });
+    const [model] = update(initialModel, FeedSucceeded({ page: matchPage }));
+    expect(model.feedResults).toEqual({ _tag: "Success", data: matchPage });
   });
 });

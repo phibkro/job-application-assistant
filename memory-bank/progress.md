@@ -17,6 +17,9 @@
 - TypeScript D1 isolation: staging/production retain the legacy database resource unbound and use a separately identified `TypeScriptDb`, preventing the RFC 0015 cutover from adopting the Rust schema.
 - Staging and production deployments build the web and Worker artifacts immediately before Alchemy publishes them. A deploy cannot reuse an artifact from an earlier preview or checkout.
 - Local full-stack evidence: real NAV ingestion → checkpoint → browse pagination → search → detail hydration, plus save → draft → assisted preparation → approval → label filter → submission confirmation → Applied preset → history.
+- Explainable personal shortlist: explicit role/location/exclusion preferences, deterministic assessment and stable ranking, evidence/concerns on feed and detail, and save/dismiss continuity.
+- Seeded browser journey: Playwright exercises profile → ranked feed → detail parity → save/dismiss and runs Axe on the changed screens.
+- PR preview lifecycle source: same-repository PRs use isolated `pr-N` Worker/D1/Durable Object stages with deterministic seed data; close events run guarded Alchemy teardown.
 
 ## Known gaps and evidence status
 
@@ -27,6 +30,7 @@ These gaps are current boundaries or evidence limits, not claims that source cod
 - **Production qualification.** No current TypeScript evidence proves realistic-corpus query-plan capacity, a clean restore drill, or the black-box staging smoke path. Production qualification remains open.
 - **Staging evidence.** Revision `c00d67d` passed the full deployment gate and HTTP smoke. The staged corpus API serves NAV data, and scheduled ingestion has current checkpoint and run-report evidence.
 - **OpenAPI contract.** `openapi/job-index-v1.json` is not a current generated artifact; nothing currently generates a replacement from `apps/worker/src/Api.ts`.
+- **PR preview evidence.** Source, policy checks, local seeded E2E, and the full repository gate pass at `b5c23c9`. Provider provisioning and teardown are not yet proven because this checkout has no configured Git remote, so a PR workflow cannot be triggered.
 
 ## Current stabilization focus
 

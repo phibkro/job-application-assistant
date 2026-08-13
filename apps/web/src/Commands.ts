@@ -84,15 +84,30 @@ export const FetchJobs = Command.define("FetchJobs", {
     ),
 });
 
-export const FetchJob = Command.define("FetchJob", {
+export const FetchPublicJob = Command.define("FetchPublicJob", {
   args: { jobId: S.String },
-  messages: [Msg.JobFetchSucceeded, Msg.JobFetchFailed],
+  messages: [Msg.PublicJobFetchSucceeded, Msg.JobFetchFailed],
+  execute: ({ jobId }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(Option.none());
+        const job = yield* client.corpus.getJob({ params: { id: jobId } });
+        return Msg.PublicJobFetchSucceeded({ job });
+      }).pipe(
+        Effect.catch((error) => Effect.succeed(Msg.JobFetchFailed({ problem: toProblem(error) }))),
+      ),
+    ),
+});
+
+export const FetchMatchDetail = Command.define("FetchMatchDetail", {
+  args: { jobId: S.String },
+  messages: [Msg.MatchDetailFetchSucceeded, Msg.JobFetchFailed],
   execute: ({ jobId }) =>
     withHttp(
       Effect.gen(function* () {
         const client = yield* makeClient(currentToken());
-        const job = yield* client.corpus.getJob({ params: { id: jobId } });
-        return Msg.JobFetchSucceeded({ job });
+        const matchedJob = yield* client.feed.getMatch({ params: { id: jobId } });
+        return Msg.MatchDetailFetchSucceeded({ matchedJob });
       }).pipe(
         Effect.catch((error) => Effect.succeed(Msg.JobFetchFailed({ problem: toProblem(error) }))),
       ),

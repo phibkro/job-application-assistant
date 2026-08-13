@@ -28,6 +28,9 @@ export const ProfileForm = S.Struct({
   skillsText: S.String,
   /** Newline-separated in the form, split into `Profile.education` on save. */
   educationText: S.String,
+  desiredRolesText: S.String,
+  desiredLocationsText: S.String,
+  excludedTermsText: S.String,
   experience: S.Array(ExperienceEntry.Model),
 });
 export type ProfileForm = typeof ProfileForm.Type;
