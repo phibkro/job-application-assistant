@@ -22,14 +22,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@v3
-      - run: ./bootstrap setup
-      - run: ./bootstrap verify
-      - name: Deploy isolated seeded preview
+      - name: Verify and deploy isolated seeded preview
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CI: "1"
-        run: nix develop -c ./scripts/deploy-preview.sh "${{ github.event.pull_request.number }}"
+        run: >-
+          nix develop --ignore-environment
+          --keep HOME
+          --keep CI
+          --keep PATH
+          --keep CLOUDFLARE_API_TOKEN
+          --keep CLOUDFLARE_ACCOUNT_ID
+          --command just _deploy-pr-preview "${{ github.event.pull_request.number }}"
 
   destroy:
     if: >-
@@ -42,10 +47,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@v3
-      - run: ./bootstrap setup
       - name: Destroy isolated preview
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CI: "1"
-        run: nix develop -c ./scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"
+        run: >-
+          nix develop --ignore-environment
+          --keep HOME
+          --keep CI
+          --keep PATH
+          --keep CLOUDFLARE_API_TOKEN
+          --keep CLOUDFLARE_ACCOUNT_ID
+          --command just _destroy-pr-preview "${{ github.event.pull_request.number }}"

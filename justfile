@@ -43,6 +43,10 @@ preview:
 deploy-preview:
   ./scripts/dispatch.sh _deploy-preview
 
+# Provision or update one isolated, seeded pull-request preview.
+deploy-pr-preview number:
+  ./scripts/dispatch.sh _deploy-pr-preview {{number}}
+
 # Deploy staging after verification and run a non-destructive HTTP smoke.
 deploy:
   ./scripts/dispatch.sh _deploy-staging
@@ -56,6 +60,10 @@ deploy-production:
 
 clean:
   ./scripts/dispatch.sh _clean
+
+# Destroy one isolated pull-request preview. Shared stages are rejected by the script.
+destroy-pr-preview number:
+  ./scripts/dispatch.sh _destroy-pr-preview {{number}}
 
 # Internal recipes. Invoke through a public command or ./bootstrap _<name>.
 _setup:
@@ -81,6 +89,12 @@ _preview: _setup
 
 _deploy-preview: _setup
   ./scripts/deploy-preview.sh
+
+_deploy-pr-preview number: _verify
+  ./scripts/deploy-preview.sh "{{number}}"
+
+_destroy-pr-preview number: _setup
+  ./scripts/destroy-preview.sh "{{number}}"
 
 _soak base_url duration interval: _setup
   python3 scripts/soak.py "{{base_url}}" --duration "{{duration}}" --interval "{{interval}}"

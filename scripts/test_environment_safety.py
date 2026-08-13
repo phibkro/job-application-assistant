@@ -80,6 +80,7 @@ for script in ("scripts/deploy.sh", "scripts/deploy-preview.sh"):
 preview_deploy = (ROOT / "scripts/deploy-preview.sh").read_text()
 preview_destroy = (ROOT / "scripts/destroy-preview.sh").read_text()
 preview_workflow = (ROOT / ".github/workflows/pr-preview.yml").read_text()
+justfile = (ROOT / "justfile").read_text()
 assert "dev/preview-seed.sql" in preview_deploy
 assert "NAV_API_TOKEN" not in preview_deploy
 assert 'STAGE="pr-$1"' in preview_deploy
@@ -90,11 +91,15 @@ for forbidden_stage in ("preview", "staging", "production"):
 assert "types: [opened, reopened, synchronize, closed]" in preview_workflow
 assert "cancel-in-progress: false" in preview_workflow
 assert "github.event.pull_request.head.repo.full_name == github.repository" in preview_workflow
-assert './scripts/deploy-preview.sh "${{ github.event.pull_request.number }}"' in preview_workflow
-assert './scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"' in preview_workflow
+assert '--command just _deploy-pr-preview "${{ github.event.pull_request.number }}"' in preview_workflow
+assert preview_workflow.count("--keep PATH") == 2
+assert '--command just _destroy-pr-preview "${{ github.event.pull_request.number }}"' in preview_workflow
+assert '_deploy-pr-preview number: _verify' in justfile
+assert './scripts/deploy-preview.sh "{{number}}"' in justfile
+assert '_destroy-pr-preview number: _setup' in justfile
+assert './scripts/destroy-preview.sh "{{number}}"' in justfile
 
 
-justfile = (ROOT / "justfile").read_text()
 for recipe in ["deploy-staging:", "deploy-production:", "admin-key:"]:
     assert recipe in justfile, recipe
 
