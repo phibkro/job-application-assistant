@@ -186,7 +186,8 @@ read_resource_attribute() {
   local attribute="$2"
   (
     cd infra
-    bun run alchemy state get --stack JobIndex --stage "${environment}" --fqn "${resource}"
+    ALCHEMY_STAGE="${environment}" bun run alchemy state get \
+      --stack JobIndex --stage "${environment}" --fqn "${resource}"
   ) | python3 -c '
 import json
 import sys
