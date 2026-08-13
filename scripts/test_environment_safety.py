@@ -85,7 +85,10 @@ assert "dev/preview-seed.sql" in preview_deploy
 assert "NAV_API_TOKEN" not in preview_deploy
 assert 'STAGE="pr-$1"' in preview_deploy
 assert "job-index-${STAGE}-typescript-db" in infra
-assert 'bun alchemy destroy --stage "$STAGE" --yes' in preview_destroy
+assert "/workers/scripts/${WORKER}" in preview_destroy
+assert "/d1/database?name=${DATABASE}" in preview_destroy
+assert "/workers/durable_objects/namespaces?per_page=100" in preview_destroy
+assert 'bun alchemy destroy --stage "$STAGE" --yes' not in preview_destroy
 for forbidden_stage in ("preview", "staging", "production"):
     assert f'STAGE="{forbidden_stage}"' not in preview_destroy
 assert "types: [opened, reopened, synchronize, closed]" in preview_workflow
