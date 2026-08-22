@@ -8,13 +8,19 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 bash_bin="$(command -v bash)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
-mkdir -p "${tmp}/bin"
+fixture="${tmp}/repository"
+mkdir -p "${tmp}/bin" "${fixture}/scripts"
+cp "${root}/scripts/deploy.sh" "${fixture}/scripts/deploy.sh"
 
 cat > "${tmp}/bin/wrangler" <<'WRANGLER'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >> "${WRANGLER_CALL_LOG:?}"
-exit 99
+case "${1:-}" in
+  whoami) exit "${WRANGLER_WHOAMI_STATUS:-99}" ;;
+  login) exit "${WRANGLER_LOGIN_STATUS:-1}" ;;
+  *) exit 99 ;;
+esac
 WRANGLER
 chmod +x "${tmp}/bin/wrangler"
 
@@ -44,6 +50,8 @@ assert_preflight_failure() {
   local expected="$1"
   shift
   : > "${tmp}/wrangler-calls"
+  : > "${tmp}/curl-calls"
+  rm -rf "${fixture}/.deploy" "${fixture}/.artifacts"
   set +e
   output="$(
     env -i \
@@ -53,7 +61,7 @@ assert_preflight_failure() {
       CURL_CALL_LOG="${tmp}/curl-calls" \
       JOB_INDEX_DEV_VARS_FILE="${tmp}/missing.dev.vars" \
       "$@" \
-      "${bash_bin}" "${root}/scripts/deploy.sh" production 2>&1
+      "${bash_bin}" "${fixture}/scripts/deploy.sh" production 2>&1
   )"
   status=$?
   set -e
@@ -67,11 +75,29 @@ assert_preflight_failure() {
     printf '%s\n' "${output}" >&2
     exit 1
   }
-  [ ! -s "${tmp}/wrangler-calls" ] || {
-    echo "Wrangler was invoked before production preflight completed" >&2
-    cat "${tmp}/wrangler-calls" >&2
+  [ ! -e "${fixture}/.deploy" ] || {
+    echo "production preflight created .deploy before rejection" >&2
     exit 1
   }
+  [ ! -e "${fixture}/.artifacts/deploy/production" ] || {
+    echo "production preflight created .artifacts/deploy/production before rejection" >&2
+    exit 1
+  }
+  if [ "${expected}" = "Cloudflare authentication is required; opening Wrangler login..." ]; then
+    diff -u - "${tmp}/wrangler-calls" <<'CALLS' || {
+whoami
+login
+CALLS
+      echo "Wrangler authentication calls did not match the rejected preflight" >&2
+      exit 1
+    }
+  else
+    [ ! -s "${tmp}/wrangler-calls" ] || {
+      echo "Wrangler was invoked before production preflight completed" >&2
+      cat "${tmp}/wrangler-calls" >&2
+      exit 1
+    }
+  fi
 }
 
 assert_preflight_failure \
@@ -94,8 +120,12 @@ assert_preflight_failure \
   "NAV rejected the configured private token during feed validation (HTTP 401)." \
   env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef CURL_STATUS=401
 
+assert_preflight_failure \
+  "Cloudflare authentication is required; opening Wrangler login..." \
+  env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef CURL_STATUS=200
+
 # The source-URL preflight assertions are gone with the AGPL obligation that
 # required them. The credential gates above stay: those protect production,
 # not a licence term.
 
-echo "Production deployment preflight tests passed without invoking Wrangler."
+echo "Production deployment preflight tests passed without deployment side effects."
