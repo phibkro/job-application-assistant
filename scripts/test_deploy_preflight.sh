@@ -9,6 +9,9 @@ bash_bin="$(command -v bash)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 mkdir -p "${tmp}/bin"
+fixture_root="${tmp}/repository"
+mkdir -p "${fixture_root}/scripts"
+cp "${root}/scripts/deploy.sh" "${fixture_root}/scripts/deploy.sh"
 
 cat > "${tmp}/bin/wrangler" <<'WRANGLER'
 #!/usr/bin/env bash
@@ -40,6 +43,17 @@ PYJWT
 
 private_token="$(make_jwt)"
 
+assert_deployment_paths_absent() {
+  [ ! -e "${fixture_root}/.deploy" ] || {
+    echo ".deploy was created by a rejected production preflight" >&2
+    exit 1
+  }
+  [ ! -e "${fixture_root}/.artifacts/deploy/production" ] || {
+    echo ".artifacts/deploy/production was created by a rejected production preflight" >&2
+    exit 1
+  }
+}
+
 assert_preflight_failure() {
   local expected="$1"
   shift
@@ -53,7 +67,7 @@ assert_preflight_failure() {
       CURL_CALL_LOG="${tmp}/curl-calls" \
       JOB_INDEX_DEV_VARS_FILE="${tmp}/missing.dev.vars" \
       "$@" \
-      "${bash_bin}" "${root}/scripts/deploy.sh" production 2>&1
+      "${bash_bin}" "${fixture_root}/scripts/deploy.sh" production 2>&1
   )"
   status=$?
   set -e
@@ -72,6 +86,7 @@ assert_preflight_failure() {
     cat "${tmp}/wrangler-calls" >&2
     exit 1
   }
+  assert_deployment_paths_absent
 }
 
 assert_preflight_failure \
@@ -94,8 +109,34 @@ assert_preflight_failure \
   "NAV rejected the configured private token during feed validation (HTTP 401)." \
   env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef CURL_STATUS=401
 
+set +e
+output="$(
+  env -i \
+    HOME="${tmp}" \
+    PATH="${tmp}/bin:${PATH}" \
+    WRANGLER_CALL_LOG="${tmp}/wrangler-calls" \
+    CURL_CALL_LOG="${tmp}/curl-calls" \
+    JOB_INDEX_DEV_VARS_FILE="${tmp}/missing.dev.vars" \
+    NAV_PRIVATE_API_TOKEN="${private_token}" \
+    ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef \
+    "${bash_bin}" "${fixture_root}/scripts/deploy.sh" production 2>&1
+)"
+status=$?
+set -e
+[ "${status}" -eq 99 ] || {
+  echo "Wrangler authentication preflight exited ${status}, expected 99" >&2
+  printf '%s\n' "${output}" >&2
+  exit 1
+}
+printf '%s\n' "${output}" | grep -F "Cloudflare authentication is required" >/dev/null || {
+  echo "production preflight did not report the Wrangler authentication requirement" >&2
+  printf '%s\n' "${output}" >&2
+  exit 1
+}
+assert_deployment_paths_absent
+
 # The source-URL preflight assertions are gone with the AGPL obligation that
 # required them. The credential gates above stay: those protect production,
 # not a licence term.
 
-echo "Production deployment preflight tests passed without invoking Wrangler."
+echo "Production deployment preflight tests passed without deployment side effects."
