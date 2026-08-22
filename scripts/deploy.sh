@@ -27,7 +27,6 @@ cleanup_database_config() {
   fi
 }
 trap cleanup_database_config EXIT
-mkdir -p "${state_dir}" "${log_dir}"
 
 dev_vars_file="${JOB_INDEX_DEV_VARS_FILE:-.dev.vars}"
 nav_validation_url="${NAV_KEY_VALIDATION_URL:-https://pam-stilling-feed.nav.no/api/v1/feed?last=true}"
@@ -101,6 +100,8 @@ PYTOKEN
   # untouched — some deployments may want to link an internal repository — but
   # nothing requires it.
 fi
+
+mkdir -p "${state_dir}" "${log_dir}"
 
 # A token can be revoked before its JWT expiry (NAV invalidates earlier tokens
 # when a consumer receives a replacement). Validate the credential at deploy
