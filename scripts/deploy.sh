@@ -27,7 +27,6 @@ cleanup_database_config() {
   fi
 }
 trap cleanup_database_config EXIT
-mkdir -p "${state_dir}" "${log_dir}"
 
 dev_vars_file="${JOB_INDEX_DEV_VARS_FILE:-.dev.vars}"
 nav_validation_url="${NAV_KEY_VALIDATION_URL:-https://pam-stilling-feed.nav.no/api/v1/feed?last=true}"
@@ -134,6 +133,8 @@ if ! wrangler whoami >/dev/null 2>&1; then
   echo "Cloudflare authentication is required; opening Wrangler login..."
   wrangler login
 fi
+
+mkdir -p "${state_dir}" "${log_dir}"
 
 strip_ansi() {
   python3 -c 'import re,sys; print(re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", sys.stdin.read()), end="")'
