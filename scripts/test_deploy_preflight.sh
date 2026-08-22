@@ -8,12 +8,20 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 bash_bin="$(command -v bash)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
-mkdir -p "${tmp}/bin"
+fixture="${tmp}/repository"
+mkdir -p "${tmp}/bin" "${fixture}/scripts" "${fixture}/infra"
+cp "${root}/scripts/deploy.sh" "${fixture}/scripts/deploy.sh"
 
 cat > "${tmp}/bin/wrangler" <<'WRANGLER'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >> "${WRANGLER_CALL_LOG:?}"
+case "${WRANGLER_MODE:-authenticated}:$1" in
+  authenticated:whoami) exit 0 ;;
+  rejected:whoami) exit 1 ;;
+  rejected:login) exit 1 ;;
+esac
+echo "unexpected Wrangler call: $*" >&2
 exit 99
 WRANGLER
 chmod +x "${tmp}/bin/wrangler"
@@ -25,6 +33,14 @@ printf '%s\n' "$*" >> "${CURL_CALL_LOG:?}"
 printf '%s' "${CURL_STATUS:-200}"
 CURL
 chmod +x "${tmp}/bin/curl"
+
+cat > "${tmp}/bin/bun" <<'BUN'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "bounded dependency failure" >&2
+exit 42
+BUN
+chmod +x "${tmp}/bin/bun"
 
 make_jwt() {
   python3 - <<'PYJWT'
@@ -40,10 +56,23 @@ PYJWT
 
 private_token="$(make_jwt)"
 
+assert_deploy_paths_absent() {
+  [ ! -e "${fixture}/.deploy" ] || {
+    echo "rejected preflight created .deploy" >&2
+    exit 1
+  }
+  [ ! -e "${fixture}/.artifacts/deploy/production" ] || {
+    echo "rejected preflight created .artifacts/deploy/production" >&2
+    exit 1
+  }
+}
+
 assert_preflight_failure() {
   local expected="$1"
   shift
   : > "${tmp}/wrangler-calls"
+  : > "${tmp}/curl-calls"
+  assert_deploy_paths_absent
   set +e
   output="$(
     env -i \
@@ -53,7 +82,7 @@ assert_preflight_failure() {
       CURL_CALL_LOG="${tmp}/curl-calls" \
       JOB_INDEX_DEV_VARS_FILE="${tmp}/missing.dev.vars" \
       "$@" \
-      "${bash_bin}" "${root}/scripts/deploy.sh" production 2>&1
+      "${bash_bin}" "${fixture}/scripts/deploy.sh" production 2>&1
   )"
   status=$?
   set -e
@@ -67,11 +96,7 @@ assert_preflight_failure() {
     printf '%s\n' "${output}" >&2
     exit 1
   }
-  [ ! -s "${tmp}/wrangler-calls" ] || {
-    echo "Wrangler was invoked before production preflight completed" >&2
-    cat "${tmp}/wrangler-calls" >&2
-    exit 1
-  }
+  assert_deploy_paths_absent
 }
 
 assert_preflight_failure \
@@ -94,8 +119,57 @@ assert_preflight_failure \
   "NAV rejected the configured private token during feed validation (HTTP 401)." \
   env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef CURL_STATUS=401
 
+assert_preflight_failure \
+  "Cloudflare authentication is required; opening Wrangler login..." \
+  env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef WRANGLER_MODE=rejected
+[ "$(cat "${tmp}/wrangler-calls")" = $'whoami\nlogin' ] || {
+  echo "rejected Wrangler authentication did not call whoami then login" >&2
+  cat "${tmp}/wrangler-calls" >&2
+  exit 1
+}
+
+: > "${tmp}/wrangler-calls"
+set +e
+output="$(
+  env -i \
+    HOME="${tmp}" \
+    PATH="${tmp}/bin:${PATH}" \
+    WRANGLER_CALL_LOG="${tmp}/wrangler-calls" \
+    CURL_CALL_LOG="${tmp}/curl-calls" \
+    JOB_INDEX_DEV_VARS_FILE="${tmp}/missing.dev.vars" \
+    NAV_PRIVATE_API_TOKEN="${private_token}" \
+    ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef \
+    WRANGLER_MODE=authenticated \
+    "${bash_bin}" "${fixture}/scripts/deploy.sh" production 2>&1
+)"
+status=$?
+set -e
+[ "${status}" -eq 42 ] || {
+  echo "authenticated deployment exited ${status}, expected bounded dependency failure 42" >&2
+  printf '%s\n' "${output}" >&2
+  exit 1
+}
+[ "$(cat "${tmp}/wrangler-calls")" = "whoami" ] || {
+  echo "authenticated deployment did not call only whoami" >&2
+  cat "${tmp}/wrangler-calls" >&2
+  exit 1
+}
+[ -d "${fixture}/.deploy" ] || {
+  echo "authenticated deployment did not create .deploy" >&2
+  exit 1
+}
+[ -d "${fixture}/.artifacts/deploy/production" ] || {
+  echo "authenticated deployment did not create .artifacts/deploy/production" >&2
+  exit 1
+}
+printf '%s\n' "${output}" | grep -F "bounded dependency failure" >/dev/null || {
+  echo "authenticated deployment did not reach bounded dependency failure" >&2
+  printf '%s\n' "${output}" >&2
+  exit 1
+}
+
 # The source-URL preflight assertions are gone with the AGPL obligation that
 # required them. The credential gates above stay: those protect production,
 # not a licence term.
 
-echo "Production deployment preflight tests passed without invoking Wrangler."
+echo "Production deployment preflight side-effect tests passed."
