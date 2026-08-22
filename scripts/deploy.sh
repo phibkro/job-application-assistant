@@ -27,7 +27,6 @@ cleanup_database_config() {
   fi
 }
 trap cleanup_database_config EXIT
-mkdir -p "${state_dir}" "${log_dir}"
 
 dev_vars_file="${JOB_INDEX_DEV_VARS_FILE:-.dev.vars}"
 nav_validation_url="${NAV_KEY_VALIDATION_URL:-https://pam-stilling-feed.nav.no/api/v1/feed?last=true}"
@@ -128,6 +127,8 @@ if [ -n "${private_nav_token}" ]; then
       ;;
   esac
 fi
+
+mkdir -p "${state_dir}" "${log_dir}"
 
 # A browser login is opened only when no API token or OAuth session exists.
 if ! wrangler whoami >/dev/null 2>&1; then
