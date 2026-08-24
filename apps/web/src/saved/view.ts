@@ -139,13 +139,13 @@ const filtersView = (
     [h.AriaLabelledBy("saved-filters-heading"), h.Class("space-y-4")],
     [
       h.h3(
-        [h.Id("saved-filters-heading"), h.Class("text-base font-semibold text-gray-900")],
+        [h.Id("saved-filters-heading"), h.Class("text-base font-semibold text-on-surface")],
         ["Filter Saved"],
       ),
       h.fieldset(
         [h.Class("space-y-2")],
         [
-          h.legend([h.Class("text-sm font-medium text-gray-700")], ["Saved view"]),
+          h.legend([h.Class("text-sm font-medium text-on-surface")], ["Saved view"]),
           h.ul(
             [h.Class("flex flex-wrap gap-2")],
             presets.map((candidate) =>
@@ -171,7 +171,7 @@ const filtersView = (
         ],
       ),
       h.p(
-        [h.Id("saved-filter-explanation"), h.Class("text-sm text-gray-600")],
+        [h.Id("saved-filter-explanation"), h.Class("text-sm text-on-surface-variant")],
         [`${preset?.description ?? ""} ${labelClause}`],
       ),
       h.div(
@@ -236,7 +236,7 @@ const labelDefinition = (
 
   return h.keyed("li")(
     label.id,
-    [h.Class("rounded-md border border-gray-200 p-3")],
+    [h.Class("rounded-m3-medium border border-outline-variant p-3")],
     [
       isRenaming
         ? h.form(
@@ -284,7 +284,7 @@ const labelDefinition = (
               [h.Class("space-y-3")],
               [
                 h.p(
-                  [h.Class("text-sm font-semibold text-gray-900")],
+                  [h.Class("text-sm font-semibold text-on-surface")],
                   [`Delete "${label.name}" and remove it from every saved vacancy?`],
                 ),
                 h.div(
@@ -312,7 +312,7 @@ const labelDefinition = (
                 ),
                 manager.request._tag === "Pending"
                   ? h.p(
-                      [h.Role("status"), h.Class("text-sm text-gray-500")],
+                      [h.Role("status"), h.Class("text-sm text-on-surface-variant")],
                       ["Deleting label and removing assignments…"],
                     )
                   : h.empty,
@@ -324,7 +324,7 @@ const labelDefinition = (
           : h.div(
               [h.Class("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between")],
               [
-                h.span([h.Class("font-medium text-gray-900")], [label.name]),
+                h.span([h.Class("font-medium text-on-surface")], [label.name]),
                 h.div(
                   [h.Class("flex flex-wrap gap-2")],
                   [
@@ -375,11 +375,11 @@ const labelManager = (
     ],
     [
       h.h3(
-        [h.Id("saved-labels-heading"), h.Class("text-base font-semibold text-gray-900")],
+        [h.Id("saved-labels-heading"), h.Class("text-base font-semibold text-on-surface")],
         ["Custom labels"],
       ),
       h.p(
-        [h.Class("text-sm text-gray-600")],
+        [h.Class("text-sm text-on-surface-variant")],
         [
           "Names are unique within your account after case and repeated spaces are normalized. Deleting a label also removes all of its saved-vacancy assignments.",
         ],
@@ -417,7 +417,7 @@ const labelManager = (
         ],
       ),
       model.labels._tag === "Loading"
-        ? h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading labels…"])
+        ? h.p([h.Role("status"), h.Class("text-sm text-on-surface-variant")], ["Loading labels…"])
         : h.empty,
       Option.match(AsyncData.getError(model.labels), {
         onNone: () => h.empty,
@@ -428,7 +428,7 @@ const labelManager = (
         ? h.empty
         : labels.length === 0
           ? h.p(
-              [h.Class("text-sm text-gray-500")],
+              [h.Class("text-sm text-on-surface-variant")],
               ["Create a label to group saved vacancies around your own next steps."],
             )
           : h.ul(
@@ -443,12 +443,12 @@ const systemLabels = (item: SavedItem, h: HtmlBuilder<Message.Message>): Html =>
   h.section(
     [h.Class("space-y-2")],
     [
-      h.h4([h.Class("text-sm font-semibold text-gray-900")], ["System labels"]),
+      h.h4([h.Class("text-sm font-semibold text-on-surface")], ["System labels"]),
       h.ul(
         [h.Class("space-y-1")],
         item.systemLabels.map((label) =>
           h.li(
-            [h.Class("break-words text-sm text-gray-700")],
+            [h.Class("break-words text-sm text-on-surface")],
             [
               h.span([h.Class("font-semibold capitalize")], [label.name]),
               ` — evidence ${label.evidence.authority}: ${label.evidence.reference}`,
@@ -470,14 +470,17 @@ const customLabels = (
   h.fieldset(
     [...(request._tag === "Pending" ? [h.AriaBusy(true)] : []), h.Class("space-y-2")],
     [
-      h.legend([h.Class("text-sm font-semibold text-gray-900")], ["Custom labels"]),
+      h.legend([h.Class("text-sm font-semibold text-on-surface")], ["Custom labels"]),
       !labelsAvailable
         ? h.p(
-            [h.Class("text-sm text-gray-500")],
+            [h.Class("text-sm text-on-surface-variant")],
             ["Custom-label assignments are available after labels finish loading."],
           )
         : labels.length === 0
-          ? h.p([h.Class("text-sm text-gray-500")], ["Create a custom label above to assign one."])
+          ? h.p(
+              [h.Class("text-sm text-on-surface-variant")],
+              ["Create a custom label above to assign one."],
+            )
           : h.div(
               [h.Class("flex flex-wrap gap-x-4 gap-y-1")],
               labels.map((label) =>
@@ -499,7 +502,7 @@ const customLabels = (
               ),
             ),
       request._tag === "Pending"
-        ? h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Saving labels…"])
+        ? h.p([h.Role("status"), h.Class("text-sm text-on-surface-variant")], ["Saving labels…"])
         : h.empty,
       request._tag === "Failed" ? renderProblem(request.problem, h) : h.empty,
     ],
@@ -514,23 +517,26 @@ const applicationHistoryList = (
     [h.Id(regionId), h.Class("space-y-2")],
     [
       entries.length === 0
-        ? h.p([h.Class("text-sm text-gray-500")], ["No application attempts are recorded."])
+        ? h.p(
+            [h.Class("text-sm text-on-surface-variant")],
+            ["No application attempts are recorded."],
+          )
         : h.ol(
             [h.Class("space-y-2")],
             entries.map((entry) =>
               h.keyed("li")(
                 entry.applicationId,
-                [h.Class("rounded-md border border-gray-200 p-3")],
+                [h.Class("rounded-m3-medium border border-outline-variant p-3")],
                 [
                   h.div(
                     [h.Class("flex flex-wrap items-start justify-between gap-2")],
                     [
-                      h.p([h.Class("font-semibold text-gray-900")], [statusText(entry.status)]),
+                      h.p([h.Class("font-semibold text-on-surface")], [statusText(entry.status)]),
                       entry.isCurrent
                         ? h.span(
                             [
                               h.Class(
-                                "rounded-md bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700",
+                                "rounded-m3-small bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container",
                               ),
                             ],
                             ["Current attempt"],
@@ -538,7 +544,7 @@ const applicationHistoryList = (
                         : h.span(
                             [
                               h.Class(
-                                "rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600",
+                                "rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface-variant",
                               ),
                             ],
                             ["Prior attempt"],
@@ -548,26 +554,26 @@ const applicationHistoryList = (
                   h.dl(
                     [h.Class("mt-2 grid grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-2")],
                     [
-                      h.dt([h.Class("text-gray-500")], ["Method"]),
+                      h.dt([h.Class("text-on-surface-variant")], ["Method"]),
                       h.dd(
-                        [h.Class("break-words text-gray-700")],
+                        [h.Class("break-words text-on-surface")],
                         [entry.method === "automated" ? "Automated" : "Assisted"],
                       ),
-                      h.dt([h.Class("text-gray-500")], ["Created"]),
+                      h.dt([h.Class("text-on-surface-variant")], ["Created"]),
                       h.dd(
-                        [h.Class("break-words text-gray-700")],
+                        [h.Class("break-words text-on-surface")],
                         [h.time([h.Datetime(entry.createdAt)], [entry.createdAt])],
                       ),
-                      h.dt([h.Class("text-gray-500")], ["Updated"]),
+                      h.dt([h.Class("text-on-surface-variant")], ["Updated"]),
                       h.dd(
-                        [h.Class("break-words text-gray-700")],
+                        [h.Class("break-words text-on-surface")],
                         [h.time([h.Datetime(entry.updatedAt)], [entry.updatedAt])],
                       ),
                     ],
                   ),
                   entry.notes.trim() === ""
                     ? h.empty
-                    : h.p([h.Class("mt-2 text-sm text-gray-700")], [`Notes: ${entry.notes}`]),
+                    : h.p([h.Class("mt-2 text-sm text-on-surface")], [`Notes: ${entry.notes}`]),
                   h.div(
                     [h.Class("mt-2")],
                     [
@@ -602,11 +608,11 @@ const applicationHistory = (
     [h.AriaLabelledBy(`${regionId}-heading`), h.Class("space-y-2")],
     [
       h.h5(
-        [h.Id(`${regionId}-heading`), h.Class("text-sm font-semibold text-gray-900")],
+        [h.Id(`${regionId}-heading`), h.Class("text-sm font-semibold text-on-surface")],
         ["Application history"],
       ),
       h.p(
-        [h.Class("text-sm text-gray-600")],
+        [h.Class("text-sm text-on-surface-variant")],
         [
           `${item.priorAttemptCount} prior ${
             item.priorAttemptCount === 1 ? "attempt" : "attempts"
@@ -644,7 +650,11 @@ const applicationHistory = (
                     h,
                   ),
                   h.p(
-                    [h.Role("status"), h.AriaLive("polite"), h.Class("text-sm text-gray-500")],
+                    [
+                      h.Role("status"),
+                      h.AriaLive("polite"),
+                      h.Class("text-sm text-on-surface-variant"),
+                    ],
                     ["Loading application history…"],
                   ),
                 ],
@@ -654,7 +664,11 @@ const applicationHistory = (
                 [h.Class("space-y-2")],
                 [
                   h.p(
-                    [h.Role("status"), h.AriaLive("polite"), h.Class("text-sm text-gray-500")],
+                    [
+                      h.Role("status"),
+                      h.AriaLive("polite"),
+                      h.Class("text-sm text-on-surface-variant"),
+                    ],
                     ["Refreshing application history…"],
                   ),
                   applicationHistoryList(response.data, regionId, h),
@@ -687,7 +701,7 @@ const applicationHistory = (
               ),
             onSuccess: (response) => applicationHistoryList(response.data, regionId, h),
           })
-        : h.p([h.Class("text-sm text-gray-500")], ["No application attempts yet."]),
+        : h.p([h.Class("text-sm text-on-surface-variant")], ["No application attempts yet."]),
     ],
   );
 };
@@ -706,15 +720,15 @@ const application = (
   return h.section(
     [
       ...(request._tag === "Pending" ? [h.AriaBusy(true)] : []),
-      h.Class("space-y-3 border-t border-gray-100 pt-4"),
+      h.Class("space-y-3 border-t border-outline-variant pt-4"),
     ],
     [
-      h.h4([h.Class("text-sm font-semibold text-gray-900")], ["Application"]),
+      h.h4([h.Class("text-sm font-semibold text-on-surface")], ["Application"]),
       current === null
         ? h.div(
             [h.Class("space-y-2")],
             [
-              h.p([h.Class("text-sm text-gray-700")], ["No current application attempt."]),
+              h.p([h.Class("text-sm text-on-surface")], ["No current application attempt."]),
               linkButton(
                 {
                   label: "Open job to prepare",
@@ -729,11 +743,11 @@ const application = (
             [h.Class("space-y-3")],
             [
               h.p(
-                [h.Class("text-sm font-semibold text-gray-900")],
+                [h.Class("text-sm font-semibold text-on-surface")],
                 [`Current status: ${statusText(current.status)}`],
               ),
               h.p(
-                [h.Class("text-sm text-gray-600")],
+                [h.Class("text-sm text-on-surface-variant")],
                 [
                   `${current.method === "automated" ? "Automated" : "Assisted"} preparation · Updated `,
                   h.time([h.Datetime(current.updatedAt)], [current.updatedAt]),
@@ -750,7 +764,7 @@ const application = (
               ),
               current.status === "ready"
                 ? h.p(
-                    [h.Class("text-sm text-gray-600")],
+                    [h.Class("text-sm text-on-surface-variant")],
                     [
                       "Submit on the external site first. Choose “I submitted externally — confirm” only after you personally complete that submission. This human-confirmation event is what changes the status to Submitted.",
                     ],
@@ -779,7 +793,11 @@ const application = (
                   ),
               request._tag === "Pending"
                 ? h.p(
-                    [h.Role("status"), h.AriaLive("polite"), h.Class("text-sm text-gray-500")],
+                    [
+                      h.Role("status"),
+                      h.AriaLive("polite"),
+                      h.Class("text-sm text-on-surface-variant"),
+                    ],
                     ["Recording application update…"],
                   )
                 : h.empty,
@@ -816,13 +834,13 @@ const savedCard = (
               h.div(
                 [h.Class("space-y-1")],
                 [
-                  h.h3([h.Class("text-lg font-semibold text-gray-900")], [item.snapshot.title]),
+                  h.h3([h.Class("text-lg font-semibold text-on-surface")], [item.snapshot.title]),
                   h.p(
-                    [h.Class("text-sm text-gray-600")],
+                    [h.Class("text-sm text-on-surface-variant")],
                     [`${item.snapshot.employerName} — ${item.snapshot.location}`],
                   ),
                   h.p(
-                    [h.Class("text-sm text-gray-500")],
+                    [h.Class("text-sm text-on-surface-variant")],
                     [
                       "Saved ",
                       h.time([h.Datetime(item.savedAt)], [item.savedAt]),
@@ -833,7 +851,7 @@ const savedCard = (
                   ),
                   item.note.trim() === ""
                     ? h.empty
-                    : h.p([h.Class("text-sm text-gray-700")], [`Note: ${item.note}`]),
+                    : h.p([h.Class("text-sm text-on-surface")], [`Note: ${item.note}`]),
                 ],
               ),
               h.div(
@@ -890,9 +908,9 @@ const pageData = (
       page.data.length === 0
         ? card(
             [
-              h.p([h.Class("font-semibold text-gray-900")], ["No saved vacancies match."]),
+              h.p([h.Class("font-semibold text-on-surface")], ["No saved vacancies match."]),
               h.p(
-                [h.Class("mt-1 text-sm text-gray-600")],
+                [h.Class("mt-1 text-sm text-on-surface-variant")],
                 ["Change the filters, or browse vacancies and shortlist one for this workspace."],
               ),
               h.div(
@@ -940,14 +958,15 @@ const savedResults = (
   h: HtmlBuilder<Message.Message>,
 ): Html =>
   AsyncData.match(model.saved, {
-    onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["Saved has not loaded yet."]),
-    onLoading: () => h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading Saved…"]),
+    onIdle: () => h.p([h.Class("text-sm text-on-surface-variant")], ["Saved has not loaded yet."]),
+    onLoading: () =>
+      h.p([h.Role("status"), h.Class("text-sm text-on-surface-variant")], ["Loading Saved…"]),
     onRefreshing: (page) =>
       h.div(
         [h.Class("space-y-3")],
         [
           h.p(
-            [h.Role("status"), h.AriaLive("polite"), h.Class("text-sm text-gray-500")],
+            [h.Role("status"), h.AriaLive("polite"), h.Class("text-sm text-on-surface-variant")],
             ["Refreshing Saved…"],
           ),
           pageData(model, page, labels, h),
@@ -978,7 +997,7 @@ export const view = defineView<Model, Message.Message, ViewInputs>(
               [
                 sectionHeading("Saved", h),
                 h.p(
-                  [h.Class("text-sm text-gray-600")],
+                  [h.Class("text-sm text-on-surface-variant")],
                   [
                     "Durable bookmarks, application attempts, and the next action each vacancy needs.",
                   ],
@@ -1009,9 +1028,9 @@ export const view = defineView<Model, Message.Message, ViewInputs>(
             )
           : card(
               [
-                h.p([h.Class("font-semibold text-gray-900")], ["Sign in to open Saved."]),
+                h.p([h.Class("font-semibold text-on-surface")], ["Sign in to open Saved."]),
                 h.p(
-                  [h.Class("mt-1 text-sm text-gray-600")],
+                  [h.Class("mt-1 text-sm text-on-surface-variant")],
                   ["Enter a session token above to load your owner-scoped workspace."],
                 ),
               ],

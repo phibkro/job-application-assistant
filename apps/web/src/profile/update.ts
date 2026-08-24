@@ -8,6 +8,7 @@ import { settle } from "../Settle.ts";
 import * as ExperienceEntry from "./ExperienceEntry.ts";
 import * as Message from "./Message.ts";
 import type { Model, ProfileForm } from "./Model.ts";
+import { presetPreference, type ColorMode, type ThemePresetId } from "../theme.ts";
 import { RequestFailed, RequestIdle, RequestPending } from "../RequestStatus.ts";
 import * as ProfileFormCodec from "./ProfileFormCodec.ts";
 
@@ -143,5 +144,27 @@ export const update = (model: Model, message: Message.Message): UpdateReturn =>
         evo(model, { profileSaving: () => RequestFailed({ problem }) }),
         [],
       ],
+      // Appearance (WS-0013-r1): both are local-only transitions — update
+      // the preference, schedule the validated persist, touch nothing else.
+      // A preset keeps the current mode; picking a mode keeps the current
+      // palette selection (which may be off-preset).
+      ThemePresetChanged: ({ value }) => {
+        const themePreference = presetPreference(
+          value as ThemePresetId,
+          model.themePreference.mode,
+        );
+        return [
+          evo(model, { themePreference: () => themePreference }),
+          [Commands.PersistThemePreference({ preference: themePreference })],
+        ];
+      },
+      ColorModeChanged: ({ value }) => {
+        const themePreference = { ...model.themePreference, mode: value as ColorMode };
+        return [
+          evo(model, { themePreference: () => themePreference }),
+          [Commands.PersistThemePreference({ preference: themePreference })],
+        ];
+      },
+      ThemePersisted: () => [model, []],
     }),
   );

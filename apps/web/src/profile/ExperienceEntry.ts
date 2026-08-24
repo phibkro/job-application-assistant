@@ -113,10 +113,13 @@ export const view = defineView<Model, Message, ViewInputs>((model, { position },
       id,
       toView: (attributes) =>
         h.fieldset(
-          [...attributes.fieldset, h.Class("space-y-3 rounded-lg border border-gray-200 p-4")],
+          [
+            ...attributes.fieldset,
+            h.Class("space-y-3 rounded-m3-large border border-outline-variant p-4"),
+          ],
           [
             h.legend(
-              [...attributes.legend, h.Class("px-1 text-sm font-semibold text-gray-900")],
+              [...attributes.legend, h.Class("px-1 text-sm font-semibold text-on-surface")],
               [`Experience ${position}`],
             ),
             inputField(

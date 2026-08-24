@@ -32,9 +32,9 @@ const feedItem = (matched: MatchedJob, h: HtmlBuilder<Message>): Html => {
           h.div(
             [h.Class("min-w-0")],
             [
-              h.h3([h.Class("font-medium text-gray-900")], [job.title]),
+              h.h3([h.Class("font-medium text-on-surface")], [job.title]),
               h.p(
-                [h.Class("mt-1 text-sm text-gray-500")],
+                [h.Class("mt-1 text-sm text-on-surface-variant")],
                 [`${job.employerName} — ${job.location}`],
               ),
             ],
@@ -77,23 +77,27 @@ export const feedView = (model: Model, h: HtmlBuilder<Message>): Html =>
     [
       sectionHeading("Fresh feed", h),
       h.p(
-        [h.Class("text-sm text-gray-500")],
+        [h.Class("text-sm text-on-surface-variant")],
         ["A ranked shortlist with the profile evidence behind every fit."],
       ),
       button({ label: "Refresh", variant: "secondary", onClick: FeedRequested() }, h),
       AsyncData.matchDataSplitEmpty(model.feedResults, {
-        onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["Not loaded yet."]),
+        onIdle: () => h.p([h.Class("text-sm text-on-surface-variant")], ["Not loaded yet."]),
         onLoading: () =>
-          h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading matches…"]),
+          h.p([h.Role("status"), h.Class("text-sm text-on-surface-variant")], ["Loading matches…"]),
         onFailure: (problem) => renderProblem(problem, h),
         onData: (page) =>
           page.data.length === 0
             ? h.div(
-                [h.Class("space-y-2 rounded-lg border border-gray-200 bg-white p-4")],
                 [
-                  h.p([h.Class("font-medium text-gray-900")], ["Your shortlist is up to date."]),
+                  h.Class(
+                    "space-y-2 rounded-m3-large border border-outline-variant bg-surface-container-low p-4",
+                  ),
+                ],
+                [
+                  h.p([h.Class("font-medium text-on-surface")], ["Your shortlist is up to date."]),
                   h.p(
-                    [h.Class("text-sm text-gray-500")],
+                    [h.Class("text-sm text-on-surface-variant")],
                     ["Adjust your profile preferences or refresh after new vacancies arrive."],
                   ),
                 ],
@@ -101,7 +105,7 @@ export const feedView = (model: Model, h: HtmlBuilder<Message>): Html =>
             : card(
                 [
                   h.ul(
-                    [h.Class("divide-y divide-gray-100")],
+                    [h.Class("divide-y divide-outline-variant")],
                     page.data.map((matched) => feedItem(matched, h)),
                   ),
                 ],

@@ -21,6 +21,11 @@
 - Seeded browser journey: Playwright exercises profile → ranked feed → detail parity → save/dismiss and runs Axe on the changed screens.
 - PR preview lifecycle source: same-repository PRs use isolated `pr-N` Worker/D1/Durable Object stages with deterministic seed data; close events run guarded Alchemy teardown.
 - TypeScript local production qualification: `just qualification` seeds 50,000 current-schema vacancies and representative owner-scoped workspace history, asserts current feed/detail/label/history indexes, records timings, and proves backup/restore fingerprints, integrity, foreign keys, and repeated plans.
+- WS-0013 design-system port: semantic Material You tokens, theme preference
+  module with Profile appearance section, and the responsive
+  sidebar/bottom-bar shell in `apps/web`, ported from course-data-platform
+  with provenance headers (unstaged pending owner integration; evidence in
+  `.artifacts/ws-0013/`).
 
 ## Known gaps and evidence status
 

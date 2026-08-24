@@ -30,12 +30,19 @@ export const card = <M>(
   className?: string,
 ): Html =>
   h.div(
-    [h.Class(clsx("rounded-lg border border-gray-200 bg-white p-4 shadow-sm", className))],
+    [
+      h.Class(
+        clsx(
+          "rounded-m3-large border border-outline-variant bg-surface-container-low p-4 shadow-m3-1",
+          className,
+        ),
+      ),
+    ],
     children,
   );
 
 export const sectionHeading = <M>(text: string, h: HtmlBuilder<M>): Html =>
-  h.h2([h.Class("text-xl font-semibold text-gray-900")], [text]);
+  h.h2([h.Class("text-xl font-semibold text-on-surface")], [text]);
 
 // ---- BUTTON -------------------------------------------------------------
 // `@foldkit/ui`'s Button is headless (keyboard handling, ARIA, disabled
@@ -44,20 +51,21 @@ export const sectionHeading = <M>(text: string, h: HtmlBuilder<M>): Html =>
 export type ButtonVariant = "primary" | "secondary" | "success" | "warning" | "ghost";
 
 const buttonVariantClass: Record<ButtonVariant, string> = {
-  primary: "bg-indigo-600 text-white hover:bg-indigo-700",
-  secondary: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-  success: "bg-green-600 text-white hover:bg-green-700",
+  primary: "bg-primary text-on-primary hover:shadow-m3-2",
+  secondary:
+    "border border-outline bg-surface-container text-primary hover:bg-surface-container-high",
+  success: "bg-valid text-on-valid",
   // Rework and Decline are ordinary decisions, not failures, so they read as
   // muted/cautionary rather than as the red reserved for actual `Problem`s.
-  warning: "border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100",
-  ghost: "text-indigo-700 hover:bg-indigo-50",
+  warning: "bg-warning-container text-on-warning-container",
+  ghost: "text-primary hover:bg-secondary-container",
 };
 
 const buttonBaseClass = clsx(
   "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-2",
   "text-sm font-semibold shadow-sm transition",
   "disabled:cursor-not-allowed disabled:opacity-50",
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tertiary",
 );
 
 export const button = <M>(
@@ -73,6 +81,9 @@ export const button = <M>(
     ariaDescribedBy?: string;
     ariaControls?: string;
     ariaExpanded?: boolean;
+    /** Extra classes appended after the variant's own — the escape hatch the
+     *  Appearance preset cards use for their swatch layout. */
+    className?: string;
   }>,
   h: HtmlBuilder<M>,
 ): Html =>
@@ -95,7 +106,13 @@ export const button = <M>(
               : [h.AriaDescribedBy(config.ariaDescribedBy)]),
             ...(config.ariaControls === undefined ? [] : [h.AriaControls(config.ariaControls)]),
             ...(config.ariaExpanded === undefined ? [] : [h.AriaExpanded(config.ariaExpanded)]),
-            h.Class(clsx(buttonBaseClass, buttonVariantClass[config.variant ?? "primary"])),
+            h.Class(
+              clsx(
+                buttonBaseClass,
+                buttonVariantClass[config.variant ?? "primary"],
+                config.className,
+              ),
+            ),
           ],
           [config.label],
         ),
@@ -134,11 +151,11 @@ export const linkButton = <M>(
 // rather than by remembering to keep a `<label>` wrapped around an input.
 
 const controlClass =
-  "block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm " +
-  "focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 " +
-  "disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500";
+  "block w-full rounded-m3-small border border-outline-variant bg-surface-container-high px-3 py-2 text-sm " +
+  "text-on-surface focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary " +
+  "disabled:cursor-not-allowed disabled:bg-surface-container disabled:text-on-surface-variant";
 
-const fieldLabelClass = "block text-sm font-medium text-gray-700";
+const fieldLabelClass = "block text-sm font-medium text-on-surface-variant";
 
 /** A label that stays reachable to assistive tech without taking up layout
  *  space — for the handful of controls (search term, session token) whose
@@ -269,7 +286,7 @@ export const checkboxField = <M>(
           [
             h.Class(
               clsx(
-                "inline-flex items-center gap-2 rounded-md py-1.5 text-sm text-gray-700",
+                "inline-flex items-center gap-2 rounded-m3-small py-1.5 text-sm text-on-surface",
                 config.isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
               ),
             ),
@@ -281,10 +298,10 @@ export const checkboxField = <M>(
                 h.Class(
                   clsx(
                     "flex size-5 items-center justify-center rounded border shadow-sm",
-                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tertiary",
                     config.isChecked
-                      ? "border-indigo-600 bg-indigo-600"
-                      : "border-gray-300 bg-white",
+                      ? "border-primary bg-primary"
+                      : "border-outline bg-surface-container-highest",
                   ),
                 ),
               ],
@@ -294,7 +311,7 @@ export const checkboxField = <M>(
                     h.Class(
                       clsx(
                         "block size-2 rounded-sm",
-                        config.isChecked ? "bg-white" : "bg-transparent",
+                        config.isChecked ? "bg-on-primary" : "bg-transparent",
                       ),
                     ),
                   ],
@@ -321,30 +338,35 @@ export const matchAssessmentView = <M>(assessment: MatchAssessment, h: HtmlBuild
     [
       h.DataAttribute("match-assessment", ""),
       h.DataAttribute("fit", assessment.fit),
-      h.Class("space-y-3 rounded-md border border-gray-200 bg-gray-50 p-4"),
+      h.Class(
+        "space-y-3 rounded-m3-medium border border-outline-variant bg-surface-container-low p-4",
+      ),
     ],
     [
       h.div(
         [h.Class("flex flex-wrap items-baseline justify-between gap-2")],
         [
           h.h3(
-            [h.Class("text-sm font-semibold capitalize text-gray-900")],
+            [h.Class("text-sm font-semibold capitalize text-primary")],
             [`${assessment.fit} fit`],
           ),
-          h.p([h.Class("text-sm font-medium text-gray-600")], [`Score ${assessment.score}`]),
+          h.p(
+            [h.Class("text-sm font-medium text-on-surface-variant")],
+            [`Score ${assessment.score}`],
+          ),
         ],
       ),
       assessment.reasons.length === 0
-        ? h.p([h.Class("text-sm text-gray-600")], ["No preference evidence matched yet."])
+        ? h.p([h.Class("text-sm text-on-surface-variant")], ["No preference evidence matched yet."])
         : h.div(
             [h.Class("space-y-1")],
             [
               h.p(
-                [h.Class("text-xs font-semibold uppercase tracking-wide text-gray-500")],
+                [h.Class("text-xs font-semibold uppercase tracking-wide text-on-surface-variant")],
                 ["Reasons"],
               ),
               h.ul(
-                [h.Class("list-disc space-y-1 pl-5 text-sm text-gray-700")],
+                [h.Class("list-disc space-y-1 pl-5 text-sm text-on-surface")],
                 assessment.reasons.map((reason) => h.li([], [evidenceText(reason)])),
               ),
             ],
@@ -355,11 +377,11 @@ export const matchAssessmentView = <M>(assessment: MatchAssessment, h: HtmlBuild
             [h.Class("space-y-1")],
             [
               h.p(
-                [h.Class("text-xs font-semibold uppercase tracking-wide text-amber-800")],
+                [h.Class("text-xs font-semibold uppercase tracking-wide text-warning")],
                 ["Concerns"],
               ),
               h.ul(
-                [h.Class("list-disc space-y-1 pl-5 text-sm text-amber-900")],
+                [h.Class("list-disc space-y-1 pl-5 text-sm text-on-surface")],
                 assessment.concerns.map((concern) => h.li([], [concern])),
               ),
             ],
@@ -376,7 +398,7 @@ export const notFoundView = <M>(path: string, h: HtmlBuilder<M>): Html =>
     [h.Class(pageClass)],
     [
       sectionHeading("Page not found", h),
-      h.p([h.Class("text-sm text-gray-500")], [`No screen matches "${path}".`]),
+      h.p([h.Class("text-sm text-on-surface-variant")], [`No screen matches "${path}".`]),
     ],
   );
 
@@ -386,8 +408,8 @@ const problemCardClass = (tone: "info" | "error"): string =>
   clsx(
     "rounded-lg border p-4 text-sm",
     tone === "error"
-      ? "border-red-200 bg-red-50 text-red-800"
-      : "border-blue-200 bg-blue-50 text-blue-800",
+      ? "border-error bg-error-container text-on-error-container"
+      : "border-outline-variant bg-secondary-container text-on-secondary-container",
   );
 
 /**
@@ -419,15 +441,15 @@ export const renderProblem = <M>(problem: Problem, h: HtmlBuilder<M>): Html =>
         [
           h.Role("status"),
           h.AriaLive("polite"),
-          h.Class("rounded-lg border border-indigo-200 bg-indigo-50 p-4"),
+          h.Class("rounded-m3-large border border-secondary-container bg-secondary-container p-4"),
         ],
         [
           h.p(
-            [h.Class("flex items-center gap-2 text-sm font-semibold text-indigo-900")],
+            [h.Class("flex items-center gap-2 text-sm font-semibold text-on-secondary-container")],
             [h.span([h.Class("text-base")], ["✦"]), `This needs the "${capability}" capability.`],
           ),
           h.p(
-            [h.Class("mt-1 text-sm text-indigo-800")],
+            [h.Class("mt-1 text-sm text-on-secondary-container")],
             [
               "Your current plan does not include it. Upgrading unlocks it for every job, not just this one.",
             ],

@@ -51,9 +51,9 @@ const jobListItem = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
       h.div(
         [h.Class("min-w-0")],
         [
-          h.p([h.Class("truncate font-medium text-gray-900")], [job.title]),
+          h.p([h.Class("truncate font-medium text-on-surface")], [job.title]),
           h.p(
-            [h.Class("truncate text-sm text-gray-500")],
+            [h.Class("truncate text-sm text-on-surface-variant")],
             [`${job.employerName} — ${job.location} — ${statusLabel(job)}`],
           ),
         ],
@@ -121,19 +121,19 @@ export const browseView = (model: Model, h: HtmlBuilder<Message>): Html =>
         ],
       ),
       AsyncData.matchDataSplitEmpty(model.browseResults, {
-        onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["Search to see results."]),
-        onLoading: () => h.p([h.Class("text-sm text-gray-500")], ["Loading…"]),
+        onIdle: () => h.p([h.Class("text-sm text-on-surface-variant")], ["Search to see results."]),
+        onLoading: () => h.p([h.Class("text-sm text-on-surface-variant")], ["Loading…"]),
         onFailure: (problem) => renderProblem(problem, h),
         onData: (page) =>
           h.div(
             [h.Class("space-y-4")],
             [
               page.data.length === 0
-                ? h.p([h.Class("text-sm text-gray-500")], ["No matching jobs."])
+                ? h.p([h.Class("text-sm text-on-surface-variant")], ["No matching jobs."])
                 : card(
                     [
                       h.ul(
-                        [h.Class("divide-y divide-gray-100")],
+                        [h.Class("divide-y divide-outline-variant")],
                         page.data.map((job) => jobListItem(job, h)),
                       ),
                     ],

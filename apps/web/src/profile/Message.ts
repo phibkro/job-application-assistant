@@ -1,6 +1,7 @@
 import * as S from "effect/Schema";
 import { m } from "foldkit/message";
 import { Problem } from "../RequestStatus.ts";
+import { colorModes } from "../theme.ts";
 import { MeResponse } from "./Model.ts";
 import * as ExperienceEntry from "./ExperienceEntry.ts";
 
@@ -35,6 +36,19 @@ export const SaveClicked = m("SaveClicked");
 export const SaveSucceeded = m("SaveSucceeded", { response: MeResponse });
 export const SaveFailed = m("SaveFailed", { problem: Problem });
 
+// Appearance (WS-0013-r1): local-only preferences. Both arms schedule a
+// `PersistThemePreference` command; neither touches the server.
+export const ThemePresetChanged = m("ThemePresetChanged", {
+  value: S.Literals(["fjord", "aurora", "birch", "heather", "pine", "polar-night"]),
+});
+export const ColorModeChanged = m("ColorModeChanged", { value: S.Literals(colorModes) });
+/** Sole completion of `PersistThemePreference`. The write already happened
+ *  synchronously inside the Command (DOM attributes + localStorage); like
+ *  the root's `UrlPushed`, this exists so the update loop stays total. It
+ *  lives in THIS union, not the root's: a Submodel's commands complete with
+ *  their own cluster's messages (same rule `SaveProfile` follows). */
+export const ThemePersisted = m("ThemePersisted");
+
 export const Message = S.Union([
   Requested,
   FetchSucceeded,
@@ -53,5 +67,8 @@ export const Message = S.Union([
   SaveClicked,
   SaveSucceeded,
   SaveFailed,
+  ThemePresetChanged,
+  ColorModeChanged,
+  ThemePersisted,
 ]);
 export type Message = typeof Message.Type;

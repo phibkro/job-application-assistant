@@ -23,6 +23,8 @@ export {
   SaveClicked,
   SaveSucceeded,
   SaveFailed,
+  ThemePresetChanged,
+  ColorModeChanged,
   Message,
 } from "./Message.ts";
 export { update } from "./update.ts";

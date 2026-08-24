@@ -10,7 +10,7 @@ import * as Route from "./Route.ts";
 import * as Session from "./Session.ts";
 import { update } from "./update.ts";
 import { browseView } from "./view/Browse.ts";
-import { nav, sessionPanel } from "./view/Chrome.ts";
+import { desktopNavigation, mobileNavigation, sessionPanel } from "./view/Chrome.ts";
 import { feedView } from "./view/Feed.ts";
 import { jobDetailView } from "./view/JobDetail.ts";
 import { notFoundView } from "./view/Shared.ts";
@@ -30,6 +30,19 @@ export const routing: Runtime.RoutingConfig<Message> = {
   onUrlRequest: (request) => UrlRequested({ request }),
   onUrlChange: (url) => UrlChanged({ route: Route.parse(url) }),
 };
+
+// Shell layout (WS-0013-r1). The sidebar/bottom-bar visibility media queries
+// live in `Chrome.ts`; these are the content-side counterparts. Bottom
+// padding keeps the last row of content clear of the fixed mobile bar plus
+// its safe-area inset; on desktop the main column shifts right by the
+// sidebar's width (`ml-66`) and centres within what remains.
+const contentOffset =
+  "w-full px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))] " +
+  "[@media(min-width:48rem)_and_(min-height:34rem)]:pl-6 " +
+  "[@media(min-width:48rem)_and_(min-height:34rem)]:pr-6 " +
+  "[@media(min-width:48rem)_and_(min-height:34rem)]:pb-20 " +
+  "[@media(min-width:48rem)_and_(min-height:34rem)]:w-[min(calc(100%-16.5rem),76rem)] " +
+  "[@media(min-width:48rem)_and_(min-height:34rem)]:ml-66";
 
 /** Reads the previously-stored session token once at startup so a returning
  *  visitor is not shown "signed out" for the one frame before their first
@@ -54,32 +67,18 @@ export const init: Runtime.RoutingApplicationInit<Model, Message> = (url) => {
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
   title: "Job Index",
   body: h.div(
-    [h.Class("min-h-screen bg-gray-50")],
+    [h.Class("min-h-screen bg-surface")],
     [
-      h.header(
-        [h.Class("sticky top-0 z-10 border-b border-gray-200 bg-white")],
-        [
-          h.div(
-            [
-              h.Class(
-                "mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-3",
-              ),
-            ],
-            [
-              h.div(
-                [h.Class("flex flex-wrap items-center gap-6")],
-                [
-                  h.h1([h.Class("text-lg font-semibold text-gray-900")], ["Job Index"]),
-                  nav(model, h),
-                ],
-              ),
-              sessionPanel(model, h),
-            ],
-          ),
-        ],
-      ),
+      // The shell: fixed sidebar on wide screens, fixed bottom bar on narrow
+      // ones (see `Chrome.ts`). `main` carries the content offset for
+      // whichever is showing; `sessionPanel` is the ONE responsive session
+      // surface (top strip on phones, docked at the sidebar's foot on
+      // desktop), so its controls exist exactly once in the DOM.
+      desktopNavigation(model, h),
+      sessionPanel(model, h),
+      mobileNavigation(model, h),
       h.main(
-        [],
+        [h.Class(contentOffset)],
         [
           Match.value(model.page).pipe(
             Match.withReturnType<Html>(),

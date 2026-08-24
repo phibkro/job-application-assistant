@@ -36,12 +36,19 @@ const statusLabel = (job: CanonicalJob): string =>
  */
 const descriptionBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
   job.hydration._tag === "Hydrated"
-    ? h.p([h.Class("mt-4 whitespace-pre-wrap text-sm text-gray-700")], [job.hydration.description])
+    ? h.p(
+        [h.Class("mt-4 whitespace-pre-wrap text-sm text-on-surface")],
+        [job.hydration.description],
+      )
     : h.div(
-        [h.Class("mt-4 rounded-md border border-dashed border-gray-300 bg-gray-50 p-4")],
+        [
+          h.Class(
+            "mt-4 rounded-m3-medium border border-dashed border-outline-variant bg-surface-container-low p-4",
+          ),
+        ],
         [
           h.p(
-            [h.Class("text-sm text-gray-600")],
+            [h.Class("text-sm text-on-surface-variant")],
             [
               "The full description isn't available from this source right now. ",
               "The original listing (below) has it.",
@@ -53,13 +60,16 @@ const descriptionBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
 const jobBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
   card(
     [
-      h.h2([h.Class("text-xl font-semibold text-gray-900")], [job.title]),
+      h.h2([h.Class("text-xl font-semibold text-on-surface")], [job.title]),
       h.p(
-        [h.Class("mt-1 text-sm text-gray-500")],
+        [h.Class("mt-1 text-sm text-on-surface-variant")],
         [`${job.employerName} — ${job.location} — ${statusLabel(job)}`],
       ),
       job.hydration._tag === "Hydrated" && job.hydration.deadline !== undefined
-        ? h.p([h.Class("mt-1 text-sm text-gray-500")], [`Deadline: ${job.hydration.deadline}`])
+        ? h.p(
+            [h.Class("mt-1 text-sm text-on-surface-variant")],
+            [`Deadline: ${job.hydration.deadline}`],
+          )
         : h.empty,
       descriptionBody(job, h),
       h.a(
@@ -68,8 +78,8 @@ const jobBody = (job: CanonicalJob, h: HtmlBuilder<Message>): Html =>
           h.Target("_blank"),
           h.Rel("noopener"),
           h.Class(
-            "mt-4 inline-block text-sm font-medium text-indigo-700 hover:text-indigo-900 " +
-              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
+            "mt-4 inline-block text-sm font-medium text-primary hover:text-on-primary-container " +
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tertiary",
           ),
         ],
         ["Original listing ↗"],
@@ -126,11 +136,11 @@ const draftPreview = (cv: string, letter: string, h: HtmlBuilder<Message>): Html
       h.div(
         [],
         [
-          h.p([h.Class("text-sm font-semibold text-gray-900")], ["CV draft"]),
+          h.p([h.Class("text-sm font-semibold text-on-surface")], ["CV draft"]),
           h.pre(
             [
               h.Class(
-                "mt-1 max-h-64 overflow-auto rounded-md bg-gray-50 p-3 text-xs text-gray-700",
+                "mt-1 max-h-64 overflow-auto rounded-m3-small bg-surface-container-low p-3 text-xs text-on-surface",
               ),
             ],
             [cv],
@@ -140,11 +150,11 @@ const draftPreview = (cv: string, letter: string, h: HtmlBuilder<Message>): Html
       h.div(
         [],
         [
-          h.p([h.Class("text-sm font-semibold text-gray-900")], ["Letter draft"]),
+          h.p([h.Class("text-sm font-semibold text-on-surface")], ["Letter draft"]),
           h.pre(
             [
               h.Class(
-                "mt-1 max-h-64 overflow-auto rounded-md bg-gray-50 p-3 text-xs text-gray-700",
+                "mt-1 max-h-64 overflow-auto rounded-m3-small bg-surface-container-low p-3 text-xs text-on-surface",
               ),
             ],
             [letter],
@@ -205,23 +215,30 @@ const decisionControls = (
  *  in the worker), so surfacing `reason` prominently surfaces the platform. */
 const downgradeNotice = (method: string, reason: string, h: HtmlBuilder<Message>): Html =>
   h.div(
-    [h.Class("rounded-lg border border-amber-300 bg-amber-50 p-4")],
+    [h.Class("rounded-m3-large bg-warning-container p-4")],
     [
       h.p(
-        [h.Class("text-sm font-semibold text-amber-900")],
+        [h.Class("text-sm font-semibold text-on-warning-container")],
         [`Prepared as "${method}" instead of what was requested.`],
       ),
-      h.p([h.Class("mt-1 text-sm text-amber-800")], [reason]),
+      h.p([h.Class("mt-1 text-sm text-on-warning-container")], [reason]),
     ],
   );
 
 const externalApplicationActions = (applicationUrl: string, h: HtmlBuilder<Message>): Html =>
   h.section(
-    [h.Class("mt-4 space-y-3 rounded-md border border-indigo-200 bg-indigo-50 p-4")],
     [
-      h.h3([h.Class("text-base font-semibold text-indigo-950")], ["External submission"]),
+      h.Class(
+        "mt-4 space-y-3 rounded-m3-medium border border-secondary-container bg-secondary-container p-4",
+      ),
+    ],
+    [
+      h.h3(
+        [h.Class("text-base font-semibold text-on-secondary-container")],
+        ["External submission"],
+      ),
       h.p(
-        [h.Class("text-sm text-indigo-900")],
+        [h.Class("text-sm text-on-secondary-container")],
         [
           "Preparation never records a submission. Submit on the employer's site yourself, then explicitly confirm that external submission in Saved. That separate human confirmation is what changes the application status.",
         ],
@@ -266,7 +283,7 @@ const stageView = (
       Saved: (saved) =>
         card(
           [
-            h.p([h.Class("text-sm text-gray-700")], ["Shortlisted."]),
+            h.p([h.Class("text-sm text-on-surface")], ["Shortlisted."]),
             h.div(
               [h.Class("mt-3")],
               [
@@ -287,7 +304,7 @@ const stageView = (
         card(
           [
             h.p(
-              [h.Class("text-sm text-gray-700")],
+              [h.Class("text-sm text-on-surface")],
               [`Draft ready (generator: ${drafted.generator}).`],
             ),
             h.div([h.Class("mt-3")], [draftPreview(drafted.cv, drafted.letter, h)]),
@@ -300,7 +317,7 @@ const stageView = (
           [
             prepared.downgradeReason === null
               ? h.p(
-                  [h.Class("text-sm text-gray-700")],
+                  [h.Class("text-sm text-on-surface")],
                   [`Prepared via "${prepared.method}". Ready to decide.`],
                 )
               : downgradeNotice(prepared.method, prepared.downgradeReason, h),
@@ -323,8 +340,8 @@ const stageView = (
               [
                 h.Class(
                   decided.downgradeReason === null
-                    ? "text-sm text-gray-700"
-                    : "mt-3 text-sm text-gray-700",
+                    ? "text-sm text-on-surface"
+                    : "mt-3 text-sm text-on-surface",
                 ),
               ],
               [`Decision recorded: ${decided.status}.`],
@@ -346,7 +363,7 @@ const applyFlow = (model: Model, job: CanonicalJob, h: HtmlBuilder<Message>): Ht
       [
         sectionHeading("Application", h),
         h.p(
-          [h.Class("text-sm text-gray-500")],
+          [h.Class("text-sm text-on-surface-variant")],
           ["Enter a session token above to shortlist, draft, or apply."],
         ),
       ],
@@ -365,7 +382,7 @@ const applyFlow = (model: Model, job: CanonicalJob, h: HtmlBuilder<Message>): Ht
       sectionHeading("Application", h),
       pending._tag === "Pending"
         ? h.p(
-            [h.Role("status"), h.AriaLive("polite"), h.Class("text-sm text-gray-500")],
+            [h.Role("status"), h.AriaLive("polite"), h.Class("text-sm text-on-surface-variant")],
             ["Updating application…"],
           )
         : h.empty,
@@ -390,9 +407,12 @@ export const jobDetailView = (model: Model, h: HtmlBuilder<Message>): Html => {
   const content =
     model.session._tag === "Authenticated"
       ? AsyncData.matchDataSplitEmpty(model.matchDetail, {
-          onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["No job selected."]),
+          onIdle: () => h.p([h.Class("text-sm text-on-surface-variant")], ["No job selected."]),
           onLoading: () =>
-            h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading match detail…"]),
+            h.p(
+              [h.Role("status"), h.Class("text-sm text-on-surface-variant")],
+              ["Loading match detail…"],
+            ),
           onFailure: (problem) => renderProblem(problem, h),
           onData: ({ job, assessment }) =>
             h.div(
@@ -401,9 +421,9 @@ export const jobDetailView = (model: Model, h: HtmlBuilder<Message>): Html => {
             ),
         })
       : AsyncData.matchDataSplitEmpty(model.publicJobDetail, {
-          onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["No job selected."]),
+          onIdle: () => h.p([h.Class("text-sm text-on-surface-variant")], ["No job selected."]),
           onLoading: () =>
-            h.p([h.Role("status"), h.Class("text-sm text-gray-500")], ["Loading job…"]),
+            h.p([h.Role("status"), h.Class("text-sm text-on-surface-variant")], ["Loading job…"]),
           onFailure: (problem) => renderProblem(problem, h),
           onData: (job) =>
             h.div([h.Class("space-y-6")], [jobBody(job, h), applyFlow(model, job, h)]),

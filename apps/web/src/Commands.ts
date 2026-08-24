@@ -8,12 +8,13 @@ import { ApplicationEvent, SavedSort, SavedView } from "../../worker/src/Api.ts"
 import { CustomLabelId } from "@job-index/domain/Ids";
 import { makeClient } from "./Client.ts";
 import { Decision } from "./Message.ts";
+import { ThemePreferenceSchema, persistThemePreference } from "./theme.ts";
 import * as Msg from "./Message.ts";
+import * as ProfileMessage from "./profile/Message.ts";
 // `./profile/Message.ts` directly, not the `profile/` barrel: the barrel
 // also re-exports `update.ts`, which imports this very module — going
 // through it here would close a circular import. `Model.ts` has the same
 // story with `profile/Model.ts` (see its own comment).
-import * as ProfileMessage from "./profile/Message.ts";
 import { NetworkError, Problem } from "./RequestStatus.ts";
 import * as SavedMessage from "./saved/Message.ts";
 import {
@@ -522,5 +523,22 @@ export const ClearSessionToken = Command.define("ClearSessionToken", {
     Effect.sync(() => {
       Session.clearToken();
       return Msg.StorageSynced({ sessionEpoch });
+    }),
+});
+
+// ---- Appearance (WS-0013-r1) --------------------------------------------
+// The same shape as `PersistSessionToken`: a synchronous local write whose
+// completion exists only so the update loop stays total. The write itself
+// (`persistThemePreference`) validates, applies to the document root
+// immediately — which is what the user sees — and lands the JSON in
+// localStorage under `job-index-theme-v1`.
+
+export const PersistThemePreference = Command.define("PersistThemePreference", {
+  args: { preference: ThemePreferenceSchema },
+  messages: [ProfileMessage.ThemePersisted],
+  execute: ({ preference }) =>
+    Effect.sync(() => {
+      persistThemePreference(preference);
+      return ProfileMessage.ThemePersisted();
     }),
 });

@@ -31,6 +31,16 @@ The approved product direction is the Job Application Assistant mission and MVP 
 - `.github/workflows/pr-preview.yml` provisions same-repository PR stages as `pr-N`, applies `dev/preview-seed.sql`, and destroys the stage on close. The scripts reject shared-stage teardown and fork PRs receive no Cloudflare authority. Provider lifecycle evidence is blocked because this repository has no configured Git remote.
 - `just qualification` seeds 50,000 current-schema vacancies plus representative owner-scoped Saved/application state, asserts current query indexes, times reads, and proves local backup/restore fingerprints, integrity, foreign keys, and repeated query plans.
 - Project license is proprietary (see RFC 0005/0008 amendments).
+- WS-0013 completed the design-system port: semantic Material You tokens in
+  `apps/web` (styles.css `@theme inline`, light+dark palettes, Pine default),
+  a theme preference module (`apps/web/src/theme.ts`, storage key
+  `job-index-theme-v1`) with a Profile appearance section, and the responsive
+  sidebar/bottom-bar shell ported from course-data-platform with provenance
+  headers. Evidence lives in `.artifacts/ws-0013/`; work scope is
+  `work/WS-0013-r1-design-system-port.md`. The apps/web changes are UNSTAGED
+  pending owner integration, and `bun run check`'s imports:check stays red
+  until the owner stages `apps/web/src/theme.ts`,
+  `apps/web/src/theme.test.ts`, and `apps/web/src/view/icons.ts` alongside it.
 
 ## Current command surface
 
@@ -54,6 +64,8 @@ Deploy the repaired candidate to staging with schedules disabled, verify its
 black-box journey and bounded NAV checkpoint, run the authorized disposable
 D1 restore drill, then start the seven-day SLO soak. Production remains blocked
 on those gates, NAV credential rotation, production smoke, and independent G5 review.
+The complete gate sequence with commands, authorities, preconditions, and abort
+criteria is frozen in `work/WS-0014-r1-execution-plan.md`; execute it in that order.
 
 ## Open decisions
 

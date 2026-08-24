@@ -14,6 +14,13 @@ import {
   sectionHeading,
   textareaField,
 } from "../view/Shared.ts";
+import {
+  colorModes,
+  selectedPresetId,
+  themePresets,
+  type ColorMode,
+  type ThemePresetId,
+} from "../theme.ts";
 
 const experienceList = (form: ProfileForm, h: HtmlBuilder<Message.Message>): Html =>
   h.div(
@@ -107,14 +114,14 @@ const profileForm = (
                 h,
               ),
               h.fieldset(
-                [h.Class("space-y-4 border-t border-gray-200 pt-4")],
+                [h.Class("space-y-4 border-t border-outline-variant pt-4")],
                 [
                   h.legend(
-                    [h.Class("text-sm font-semibold text-gray-900")],
+                    [h.Class("text-sm font-semibold text-on-surface")],
                     ["Shortlist preferences"],
                   ),
                   h.p(
-                    [h.Class("text-sm text-gray-500")],
+                    [h.Class("text-sm text-on-surface-variant")],
                     ["These preferences rank and explain your fresh feed."],
                   ),
                   textareaField(
@@ -157,7 +164,7 @@ const profileForm = (
       h.div(
         [h.Class("space-y-3")],
         [
-          h.h3([h.Class("text-sm font-semibold text-gray-900")], ["Experience"]),
+          h.h3([h.Class("text-sm font-semibold text-on-surface")], ["Experience"]),
           experienceList(form, h),
           button(
             {
@@ -171,7 +178,7 @@ const profileForm = (
         ],
       ),
       h.p(
-        [h.Class("text-sm text-gray-500")],
+        [h.Class("text-sm text-on-surface-variant")],
         ["Account capabilities: ", capabilities.length === 0 ? "none" : capabilities.join(", ")],
       ),
       saving._tag === "Failed" ? renderProblem(saving.problem, h) : h.empty,
@@ -185,6 +192,107 @@ const profileForm = (
       ),
     ],
   );
+
+// ---- APPEARANCE (WS-0013-r1) ---------------------------------------------
+// The local preference editor: six named presets (swatch cards), an explicit
+// three-way mode group, and a reset to the default. Rendered for signed-out
+// visitors too — appearance is per-device, not per-account, and never
+// touches the server.
+
+const modeLabel: Record<ColorMode, string> = { system: "System", light: "Light", dark: "Dark" };
+
+const appearanceSection = (model: Model, h: HtmlBuilder<Message.Message>): Html => {
+  const activePreset = selectedPresetId(model.themePreference);
+  return h.section(
+    [h.AriaLabel("Appearance"), h.Class("space-y-4")],
+    [
+      h.h3([h.Class("text-base font-semibold text-on-surface")], ["Appearance"]),
+      h.p(
+        [h.Class("text-sm text-on-surface-variant")],
+        ["Choose a palette and how the app follows your device."],
+      ),
+      h.ul(
+        [h.AriaLabel("Palette"), h.Class("grid grid-cols-2 gap-3 sm:grid-cols-3")],
+        themePresets.map((preset) =>
+          h.keyed("li")(
+            preset.id,
+            [],
+            [
+              button(
+                {
+                  label: `${presetLabel(preset.id)} — ${presetDescription(preset.id)}`,
+                  variant: activePreset === preset.id ? "primary" : "secondary",
+                  ariaPressed: activePreset === preset.id,
+                  className: `theme-preset-card theme-preset-card--${preset.id} w-full flex-col items-start gap-2 rounded-m3-large border p-3 text-left`,
+                  onClick: Message.ThemePresetChanged({ value: preset.id satisfies ThemePresetId }),
+                },
+                h,
+              ),
+            ],
+          ),
+        ),
+      ),
+      h.fieldset(
+        [h.Class("space-y-2")],
+        [
+          h.legend([h.Class("sr-only")], ["Light and dark mode"]),
+          h.div(
+            [h.Class("flex flex-wrap items-center gap-2")],
+            colorModes.map((mode) =>
+              button(
+                {
+                  label: modeLabel[mode],
+                  variant: model.themePreference.mode === mode ? "primary" : "secondary",
+                  ariaPressed: model.themePreference.mode === mode,
+                  onClick: Message.ColorModeChanged({ value: mode }),
+                },
+                h,
+              ),
+            ),
+          ),
+        ],
+      ),
+      h.p(
+        [h.Class("text-sm text-on-surface-variant")],
+        ["Swatch preview: surface, accent container, accent, chart."],
+      ),
+    ],
+  );
+};
+
+function presetLabel(id: ThemePresetId): string {
+  switch (id) {
+    case "fjord":
+      return "Fjord";
+    case "aurora":
+      return "Aurora";
+    case "birch":
+      return "Birch";
+    case "heather":
+      return "Heather";
+    case "pine":
+      return "Pine";
+    case "polar-night":
+      return "Polar Night";
+  }
+}
+
+function presetDescription(id: ThemePresetId): string {
+  switch (id) {
+    case "fjord":
+      return "clear blues over cool mist";
+    case "aurora":
+      return "violet lights over zinc";
+    case "birch":
+      return "warm amber over stone";
+    case "heather":
+      return "rose tones over mauve";
+    case "pine":
+      return "emerald growth on olive";
+    case "polar-night":
+      return "sky glow on near-black";
+  }
+}
 
 /** The Anonymous/Authenticated gate does not belong in this Model: it is
  *  session state the root already owns (`Model.session`), and the profile
@@ -200,14 +308,15 @@ export const view = defineView<Model, Message.Message, ViewInputs>(
       [h.Class(pageClass)],
       [
         sectionHeading("Profile", h),
+        appearanceSection(model, h),
         !isAuthenticated
           ? h.p(
-              [h.Class("text-sm text-gray-500")],
-              ["Enter a session token above to view and edit your CV."],
+              [h.Class("text-sm text-on-surface-variant")],
+              ["Enter your session token in the sidebar to view and edit your CV."],
             )
           : AsyncData.matchDataSplitEmpty(model.profile, {
-              onIdle: () => h.p([h.Class("text-sm text-gray-500")], ["Not loaded yet."]),
-              onLoading: () => h.p([h.Class("text-sm text-gray-500")], ["Loading…"]),
+              onIdle: () => h.p([h.Class("text-sm text-on-surface-variant")], ["Not loaded yet."]),
+              onLoading: () => h.p([h.Class("text-sm text-on-surface-variant")], ["Loading…"]),
               onFailure: (problem) => renderProblem(problem, h),
               onData: (response) =>
                 Option.match(model.profileForm, {

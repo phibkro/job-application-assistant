@@ -2,6 +2,7 @@ import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import { AsyncData } from "foldkit";
 import { Profile } from "@job-index/domain/Profile";
+import { ThemePreferenceSchema, readThemePreference, type ThemePreference } from "../theme.ts";
 import { Problem, RequestIdle, RequestStatus } from "../RequestStatus.ts";
 import * as ExperienceEntry from "./ExperienceEntry.ts";
 
@@ -35,10 +36,17 @@ export const ProfileForm = S.Struct({
 });
 export type ProfileForm = typeof ProfileForm.Type;
 
+/** The local appearance preference rides inside this Submodel's Model (see
+ *  WS-0013-r1): it is a per-visitor setting edited on the Profile page, but
+ *  unlike everything above it is never sent to the server — localStorage and
+ *  the document root are its whole world. */
+export const themePreference: S.Schema<ThemePreference> = ThemePreferenceSchema;
+
 export const Model = S.Struct({
   profile: ProfileAsyncData.schema,
   profileForm: S.Option(ProfileForm),
   profileSaving: RequestStatus,
+  themePreference: ThemePreferenceSchema,
 });
 export type Model = typeof Model.Type;
 
@@ -46,4 +54,11 @@ export const init = (): Model => ({
   profile: ProfileAsyncData.Idle(),
   profileForm: Option.none(),
   profileSaving: RequestIdle(),
+  // The boot-time apply already ran in `entry.ts`; reading here mirrors that
+  // same storage into state so the view renders what is applied.
+  themePreference: readThemePreference(),
 });
+
+// Re-exported for the Message/update modules so they need not reach into
+// `theme.ts` themselves.
+export type { ThemePreference };
