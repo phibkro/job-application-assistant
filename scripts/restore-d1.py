@@ -16,6 +16,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -62,7 +63,13 @@ def sql_literal(value: Any) -> str:
         return "1" if value else "0"
     if isinstance(value, (int, float)):
         return str(value)
-    return "'" + str(value).replace("'", "''") + "'"
+    text = str(value)
+    if "\x00" in text:
+        # U+0000 is legal inside D1 TEXT values (canonicalKey uses it as a
+        # field separator) but cannot survive an argv payload or a file
+        # import; hex round-trips the exact UTF-8 bytes through pure ASCII.
+        return "CAST(unhex('" + text.encode("utf-8").hex() + "') AS TEXT)"
+    return "'" + text.replace("'", "''") + "'"
 
 
 def utc_now() -> str:
@@ -125,17 +132,27 @@ def execute_json(database: str, sql: str) -> Any:
 
 
 def execute_sql(database: str, sql: str) -> None:
-    run_wrangler(
-        [
-            "d1",
-            "execute",
-            database,
-            "--remote",
-            "--yes",
-            "--command",
-            sql,
-        ]
-    )
+    # Row literals may legally contain NUL bytes inside TEXT values, which a
+    # POSIX exec argv can never carry; a temporary SQL file sidesteps argv.
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".sql", encoding="utf-8", delete=False
+    ) as handle:
+        handle.write(sql)
+        path = handle.name
+    try:
+        run_wrangler(
+            [
+                "d1",
+                "execute",
+                database,
+                "--remote",
+                "--yes",
+                "--file",
+                path,
+            ]
+        )
+    finally:
+        os.unlink(path)
 
 
 def execute_schema(database: str) -> None:
