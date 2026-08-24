@@ -147,7 +147,7 @@ deploy_stack() {
   (
     cd infra
     ALCHEMY_STAGE="${environment}" \
-    JOB_INDEX_ACTIVATE_SCHEDULES="${phase}" \
+    JOB_INDEX_ACTIVATE_SCHEDULES="$([ "${phase}" = 1 ] || [ "${JOB_INDEX_ACTIVATE_SCHEDULES:-0}" = 1 ] && echo 1 || echo 0)" \
     NAV_API_TOKEN="${private_nav_token}" \
     bun run alchemy deploy --stage "${environment}" --yes
   )

@@ -3,7 +3,8 @@
 
 The source is read only.  The target is created and deleted by this explicit
 operator command; no target name is accepted if it is already present or is a
-shared stage database.
+shared stage database.  Disposable targets must avoid the shared-stage name
+prefixes; the recommended form is `job-index-restore-drill-<YYYYMMDD>`.
 """
 
 from __future__ import annotations
@@ -261,16 +262,15 @@ def table_count(database: str, table: str, where: str | None = None) -> int:
         raise RestoreError(f"Could not read the row count for table {table}.")
     return int(rows[0]["row_count"])
 
-
 def table_names(database: str) -> list[str]:
     rows = unwrap_rows(
         execute_json(
             database,
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' "
+            "AND substr(name, 1, 4) <> '_cf_' ORDER BY name",
         )
     )
     return [row["name"] for row in rows if isinstance(row.get("name"), str)]
-
 
 
 
@@ -549,7 +549,7 @@ def parse_args() -> argparse.Namespace:
         ),
         epilog=(
             "Example: python3 scripts/restore-d1.py job-index-staging-typescript-db "
-            "job-index-staging-restore-20260813 --confirm"
+            "job-index-restore-drill-20260824 --confirm"
         ),
     )
     parser.add_argument("source", help="Existing remote D1 name to read")

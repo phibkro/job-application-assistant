@@ -15,6 +15,13 @@ assert "db/schema.sql" in SCRIPT
 assert "sqlite_master" in SCRIPT
 assert "PRAGMA foreign_key_list" in SCRIPT
 assert "MAX_INSERT_ROWS" in SCRIPT
+assert (
+    "substr(name, 1, 4) <> '_cf_'" in SCRIPT
+), "provider-internal _cf_ tables must be filtered from the manifest"
+assert "job-index-restore-drill-" in SCRIPT, "epilog must recommend the compliant disposable target form"
+assert (
+    "job-index-staging-restore-" not in SCRIPT
+), "examples must not recommend a shared-stage-prefixed target"
 assert "MAX_INSERT_BYTES" in SCRIPT
 assert '["d1", "create", args.target, "--location", "weur"]' in SCRIPT
 assert '["d1", "delete", args.target, "--skip-confirmation"]' in SCRIPT
