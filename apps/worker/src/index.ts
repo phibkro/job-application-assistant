@@ -91,7 +91,13 @@ export const appLayer = (
     // 404 someone finds in production.
     HttpApiBuilder.layer(api).pipe(
       Layer.provide(
-        Layer.mergeAll(Handlers.corpus, Handlers.feed, Handlers.profile, Handlers.applications),
+        Layer.mergeAll(
+          Handlers.status,
+          Handlers.corpus,
+          Handlers.feed,
+          Handlers.profile,
+          Handlers.applications,
+        ),
       ),
       Layer.provide(Handlers.auth),
     ),

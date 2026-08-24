@@ -20,23 +20,26 @@
 - Explainable personal shortlist: explicit role/location/exclusion preferences, deterministic assessment and stable ranking, evidence/concerns on feed and detail, and save/dismiss continuity.
 - Seeded browser journey: Playwright exercises profile → ranked feed → detail parity → save/dismiss and runs Axe on the changed screens.
 - PR preview lifecycle source: same-repository PRs use isolated `pr-N` Worker/D1/Durable Object stages with deterministic seed data; close events run guarded Alchemy teardown.
+- TypeScript local production qualification: `just qualification` seeds 50,000 current-schema vacancies and representative owner-scoped workspace history, asserts current feed/detail/label/history indexes, records timings, and proves backup/restore fingerprints, integrity, foreign keys, and repeated plans.
 
 ## Known gaps and evidence status
 
 These gaps are current boundaries or evidence limits, not claims that source code is absent where it is implemented:
 
-- **Administrative surface.** API-key principal administration (quotas, revocation, audit log), owned saved-search webhook subscriptions/delivery, and corpus maintenance (audit/dry-run reconcile/purge) are not implemented in the TypeScript service. `ADMIN_SYNC_TOKEN` is still required by production deploy gates and infrastructure secret bindings, but no TypeScript route currently checks it.
-- **Scheduled ingestion.** Revision `c00d67d` passed the full deployment gate and HTTP smoke. Four staged public NAV runs folded one page each, checkpointed the cursor, and wrote run reports in 4.9-7.8 seconds. Staging schedules are disabled after this bounded qualification.
-- **Production qualification.** No current TypeScript evidence proves realistic-corpus query-plan capacity, a clean restore drill, or the black-box staging smoke path. Production qualification remains open.
-- **Staging evidence.** Revision `c00d67d` passed the full deployment gate and HTTP smoke. The staged corpus API serves NAV data, and scheduled ingestion has current checkpoint and run-report evidence.
+- **Administrative surface.** API-key principal administration (quotas, revocation, audit log), owned saved-search webhook subscriptions/delivery, and corpus maintenance (audit/dry-run reconcile/purge) are not implemented in the TypeScript service. The unused `ADMIN_SYNC_TOKEN` production gate and secret binding have been removed rather than pretending that a credential protects absent routes.
+- **Scheduled ingestion.** On 2026-08-13 the current dirty candidate passed a new bounded public NAV run: one page, five observations, four canonical changes, one persisted cursor advance, 1,861 ms, no run failures, and no duplicate `(sourceId, externalId)` groups. Staging schedules were disabled immediately afterward. Earlier revision `c00d67d` also has four one-page run reports.
+- **Production qualification.** Current evidence covers realistic-corpus local query plans and backup/restore plus current staging deployment, HTTP smoke, a complete authenticated owner-scoped mutation journey, and a bounded NAV checkpoint. The TypeScript status route and a complete-table managed D1 recovery command now exist and pass local/live-D1 tests; their staging soak and managed remote restore remain unexecuted. Seven-day soak, successful Cloudflare D1 recovery, NAV credential rotation, production smoke, and independent G5 review remain open.
+- **Staging evidence.** The current dirty candidate serves NAV data from D1 `967bfbad-4577-437c-945e-54c023154b8a`; `.deploy/staging.json` records configuration SHA-256 `ec620f078f963d30dfd1aeeb394a340203fe1aacd931d04afa8131b3f44b8ad9`. Because `source_code_url` is null, this evidence is not tied to an immutable source revision.
 - **OpenAPI contract.** `openapi/job-index-v1.json` is not a current generated artifact; nothing currently generates a replacement from `apps/worker/src/Api.ts`.
 - **PR preview evidence.** Source, policy checks, local seeded E2E, and the full repository gate pass at `b5c23c9`. Provider provisioning and teardown are not yet proven because this checkout has no configured Git remote, so a PR workflow cannot be triggered.
 
 ## Current stabilization focus
 
-Remote staged NAV ingestion is qualified for bounded one-page runs. The current
-focus is realistic-corpus query-plan evidence, a clean restore drill, and the
-black-box staging smoke path. Production qualification remains open.
+Realistic-corpus local and current staging journey evidence are established.
+The soak runner now has a tested TypeScript status contract, and the managed
+D1 recovery procedure now enumerates and verifies the complete generated
+schema. Repaired staging deployment, seven-day soak, and an authorized remote
+restore drill are next. Production qualification remains open.
 
 ## Next work
 

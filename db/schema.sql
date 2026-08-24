@@ -173,6 +173,8 @@ CREATE TABLE IF NOT EXISTS occurrences (
 
 CREATE INDEX IF NOT EXISTS idx_occurrences_canonicalJobId ON occurrences (canonicalJobId);
 
+CREATE INDEX IF NOT EXISTS idx_occurrences_canonicalJobId_active_firstSeenAt ON occurrences (canonicalJobId, active, firstSeenAt);
+
 CREATE INDEX IF NOT EXISTS idx_occurrences_sourceId_active ON occurrences (sourceId, active);
 
 CREATE TABLE IF NOT EXISTS saved_jobs (
@@ -214,6 +216,10 @@ CREATE TABLE IF NOT EXISTS applications (
 CREATE INDEX IF NOT EXISTS idx_applications_profileId ON applications (profileId);
 
 CREATE INDEX IF NOT EXISTS idx_applications_savedJobId ON applications (savedJobId);
+
+CREATE INDEX IF NOT EXISTS idx_applications_profileId_createdAt ON applications (profileId, createdAt);
+
+CREATE INDEX IF NOT EXISTS idx_applications_profileId_savedJobId_createdAt_id ON applications (profileId, savedJobId, createdAt, id);
 
 CREATE TABLE IF NOT EXISTS custom_labels (
   id TEXT NOT NULL,

@@ -55,7 +55,6 @@ private_nav_token="${NAV_PRIVATE_API_TOKEN:-}"
 if [ -z "${private_nav_token}" ] && [ "$(read_dev_var NAV_TOKEN_SOURCE || true)" = "private" ]; then
   private_nav_token="$(read_dev_var NAV_API_TOKEN || true)"
 fi
-admin_token="${ADMIN_SYNC_TOKEN:-$(read_dev_var ADMIN_SYNC_TOKEN || true)}"
 source_code_url="${JOB_INDEX_SOURCE_CODE_URL:-$(read_dev_var SOURCE_CODE_URL || true)}"
 
 if [ "${environment}" = "production" ]; then
@@ -83,15 +82,6 @@ except Exception as exc:
     raise SystemExit(f"Production NAV token is not a usable JWT: {exc}")
 PYTOKEN
   then
-    exit 1
-  fi
-  if [ -z "${admin_token}" ]; then
-    echo "Production requires ADMIN_SYNC_TOKEN." >&2
-    echo "Run just admin-key or provide ADMIN_SYNC_TOKEN." >&2
-    exit 1
-  fi
-  if [ "${#admin_token}" -lt 32 ]; then
-    echo "Production ADMIN_SYNC_TOKEN must contain at least 32 characters." >&2
     exit 1
   fi
   # A corresponding-source URL used to be required here: the AGPL obliges a
@@ -159,7 +149,6 @@ deploy_stack() {
     ALCHEMY_STAGE="${environment}" \
     JOB_INDEX_ACTIVATE_SCHEDULES="${phase}" \
     NAV_API_TOKEN="${private_nav_token}" \
-    ADMIN_SYNC_TOKEN="${admin_token}" \
     bun run alchemy deploy --stage "${environment}" --yes
   )
 }

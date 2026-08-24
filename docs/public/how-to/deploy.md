@@ -10,16 +10,15 @@ Use Linux with Nix and outbound network access.
 For staging, public runtime NAV authentication is the default. You can provide
 a private NAV token.
 
-Production requires both credentials:
+Production requires a NAV-issued private consumer token:
 
 ```sh
 just nav-key
-just admin-key
 ```
 
-The NAV credential must be a usable JWT. `ADMIN_SYNC_TOKEN` must contain at
-least 32 characters. The deploy script checks both values before it changes
-Cloudflare.
+The NAV credential must be a usable JWT. The deploy script checks it before
+it changes Cloudflare. The current TypeScript service has no administrator
+route, so deployment does not create or bind an unused administrator token.
 
 ## Deploy staging
 

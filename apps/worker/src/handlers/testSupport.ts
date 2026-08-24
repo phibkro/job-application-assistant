@@ -16,13 +16,15 @@ import { Applications } from "../services/Applications.ts";
 import { Saved } from "../services/Saved.ts";
 import { Hydration } from "../services/Hydration.ts";
 import { Judgements } from "../services/Judgements.ts";
-import { SavedJobs } from "../services/SavedJobs.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
+import { SavedJobs } from "../services/SavedJobs.ts";
+import { Database } from "../services/Database.ts";
 import { layer as authLayer } from "./auth.ts";
 import { layer as corpusLayer } from "./corpus.ts";
 import { layer as feedLayer } from "./feed.ts";
 import { layer as profileLayer } from "./profile.ts";
 import { layer as applicationsLayer } from "./applications.ts";
+import { layer as ingestionLayer } from "./status.ts";
 
 /**
  * A fake that dies with the caller's name when hit, rather than returning a
@@ -103,6 +105,13 @@ const defaultSourceCatalog = Layer.succeed(SourceCatalog, {
   list: unstubbed("SourceCatalog", "list"),
 });
 
+const defaultDatabase = Layer.succeed(Database, {
+  query: unstubbed("Database", "query"),
+  run: unstubbed("Database", "run"),
+  runAffected: unstubbed("Database", "runAffected"),
+  atomic: unstubbed("Database", "atomic"),
+});
+
 const platform = Layer.mergeAll(Path.layer, FileSystem.layerNoop({}));
 
 export interface Fakes {
@@ -116,6 +125,7 @@ export interface Fakes {
   readonly savedJobs?: Layer.Layer<SavedJobs>;
   readonly saved?: Layer.Layer<Saved>;
   readonly judgements?: Layer.Layer<Judgements>;
+  readonly database?: Layer.Layer<Database>;
   readonly sourceCatalog?: Layer.Layer<SourceCatalog>;
 }
 
@@ -126,23 +136,28 @@ export interface Fakes {
  * called directly.
  */
 export const buildHandler = (fakes: Fakes = {}) => {
+  const serviceLayers = Layer.mergeAll(
+    fakes.corpus ?? defaultCorpus,
+    fakes.accounts ?? defaultAccounts,
+    fakes.profiles ?? defaultProfiles,
+    fakes.drafting ?? defaultDrafting,
+    fakes.applications ?? defaultApplications,
+    fakes.entitlements ?? defaultEntitlements,
+    fakes.hydration ?? defaultHydration,
+    fakes.savedJobs ?? defaultSavedJobs,
+    fakes.saved ?? defaultSaved,
+    fakes.judgements ?? defaultJudgements,
+    fakes.sourceCatalog ?? defaultSourceCatalog,
+    fakes.database ?? defaultDatabase,
+  );
   const appLayer = HttpApiBuilder.layer(api).pipe(
+    Layer.provide(ingestionLayer),
     Layer.provide(corpusLayer),
     Layer.provide(feedLayer),
     Layer.provide(profileLayer),
     Layer.provide(applicationsLayer),
     Layer.provide(authLayer),
-    Layer.provide(fakes.corpus ?? defaultCorpus),
-    Layer.provide(fakes.accounts ?? defaultAccounts),
-    Layer.provide(fakes.profiles ?? defaultProfiles),
-    Layer.provide(fakes.drafting ?? defaultDrafting),
-    Layer.provide(fakes.applications ?? defaultApplications),
-    Layer.provide(fakes.entitlements ?? defaultEntitlements),
-    Layer.provide(fakes.hydration ?? defaultHydration),
-    Layer.provide(fakes.savedJobs ?? defaultSavedJobs),
-    Layer.provide(fakes.saved ?? defaultSaved),
-    Layer.provide(fakes.judgements ?? defaultJudgements),
-    Layer.provide(fakes.sourceCatalog ?? defaultSourceCatalog),
+    Layer.provide(serviceLayers),
     Layer.provide(Etag.layer),
     Layer.provide(HttpPlatform.layer),
     Layer.provide(platform),

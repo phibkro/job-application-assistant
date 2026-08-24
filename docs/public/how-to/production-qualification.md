@@ -1,11 +1,8 @@
 # Qualify the first production release
 
-> **Historical, partially superseded.** Written for the Rust worker's
-> WS-0011 qualification gates (`just fix`/`just qualification`/
-> `query_plan_test.py`/`restore_drill.py`), all retired by RFC 0015's
-> cutover with no TypeScript port yet — see `memory-bank/progress.md`'s
-> "Known gaps". The Cloudflare plan baseline below still applies to either
-> implementation.
+The local gate qualifies the current TypeScript schema and read paths. It does
+not replace staging, Cloudflare D1, soak, credential-rotation, or independent
+review evidence.
 
 ## Cloudflare plan baseline
 
@@ -16,12 +13,22 @@ Before each production release, compare the bounded workload settings and observ
 ## Local qualification
 
 ```sh
-just fix
 just verify
 just qualification
 ```
 
-The suite seeds 50,000 jobs and verifies indexed query plans, performs a SQLite backup/restore drill, runs host-safe unit tests, and exercises the real Worker, D1 binding, controlled NAV server, ownership boundaries, maintenance, and webhook outbox.
+`just qualification` creates a clean database from `db/schema.sql`, seeds
+50,000 deterministic vacancies with provenance and representative Saved and
+application history, and asserts the indexes used by current feed, browse,
+detail, label, and history queries. It records seven timing samples per query,
+backs the database up into a clean SQLite target, compares deterministic state
+fingerprints, runs integrity and foreign-key checks, and repeats every plan
+probe against the restored database.
+
+The machine-readable report is
+`.artifacts/qualification/report.json`. Override the corpus size only for a
+quick local diagnostic: `just qualification 5000`. Release evidence must use
+the default 50,000 rows.
 
 ## Staging soak
 

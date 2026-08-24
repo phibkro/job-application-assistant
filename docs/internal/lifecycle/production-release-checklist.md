@@ -1,9 +1,8 @@
 # Production release checklist
 
-> Written against the retired Rust worker's WS-0011 qualification gates.
-> Items struck through below have no TypeScript equivalent yet (see
-> `memory-bank/progress.md`'s "Known gaps") and must be re-established or
-> explicitly waived before this checklist is trusted again.
+> The checklist covers the current TypeScript service. Administrative,
+> maintenance, and webhook items remain explicit gaps rather than being
+> inferred from unrelated qualification evidence.
 
 - [ ] `bun run check` and `just verify` pass from a clean checkout.
 - [ ] Production account plan and current Workers/D1 limits reviewed against observed staging usage.
@@ -11,9 +10,10 @@
 - [ ] `db/schema.sql` matches the domain models (`bun run schema:check`).
 - [ ] Staging deployment evidence attached.
 - [ ] Seven-day soak satisfies `ops/slo.json`.
-- [ ] ~~Query-plan report uses the expected indexes at realistic corpus size.~~ Gap: no TypeScript port of `query_plan_test.py`.
-- [ ] ~~D1 restore/Time Travel drill completed and timed.~~ Gap: no TypeScript port of `restore_drill.py`.
-- [ ] NAV and administrator credentials rotated successfully.
+- [ ] `just qualification` report uses the expected indexes at 50,000 vacancies.
+- [ ] Local backup/restore report preserves fingerprints, integrity, foreign keys, and query plans.
+- [ ] NAV credential rotated successfully.
+- [x] The retired `ADMIN_SYNC_TOKEN` deployment requirement is removed; the current TypeScript service has no administrator route.
 - [ ] ~~Owned routes reject missing and cross-principal credentials.~~ Gap: no principal/API-key administration exists.
 - [ ] ~~Maintenance defaults to dry run and repair results are audited.~~ Gap: no maintenance surface exists.
 - [ ] ~~Webhook signature, at-least-once deduplication, retry, dead state, and replay behavior verified.~~ Gap: no webhook outbox exists.

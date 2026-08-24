@@ -22,7 +22,8 @@ CREATE TABLE saved_jobs (
 CREATE TABLE applications (
   id TEXT NOT NULL PRIMARY KEY,
   profileId TEXT NOT NULL,
-  savedJobId TEXT NOT NULL
+  savedJobId TEXT NOT NULL,
+  createdAt TEXT NOT NULL
 );
 INSERT INTO saved_jobs (id, profileId, canonicalJobId, jobSnapshot, note, createdAt)
 VALUES ('saved-1', 'profile-1', 'job-1', '{}', 'keep me', '2026-01-02T03:04:05Z');

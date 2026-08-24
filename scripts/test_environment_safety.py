@@ -95,7 +95,7 @@ assert './scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"' 
 
 
 justfile = (ROOT / "justfile").read_text()
-for recipe in ["deploy-staging:", "deploy-production:", "admin-key:"]:
+for recipe in ["deploy-staging:", "deploy-production:"]:
     assert recipe in justfile, recipe
 
 deploy = (ROOT / "scripts/deploy.sh").read_text()
@@ -115,7 +115,6 @@ assert 'wrangler d1 migrations apply "$database_name"' in migrate_d1
 assert 'mktemp --suffix=.jsonc' in migrate_d1
 assert 'environment="${1:-staging}"' in deploy
 assert "Production requires a NAV-issued private consumer token" in deploy
-assert "Production requires ADMIN_SYNC_TOKEN" in deploy
 assert "smoke-production.sh" in deploy
 assert "JOB_INDEX_DEV_VARS_FILE" in deploy
 assert "bootstrap-publish" in deploy

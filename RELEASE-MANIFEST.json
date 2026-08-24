@@ -10,7 +10,6 @@
   "compatibility_date": "2026-05-25",
   "commands": [
     "just nav-key",
-    "just admin-key",
     "just check",
     "just verify",
     "just preview",

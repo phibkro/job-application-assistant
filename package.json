@@ -25,7 +25,8 @@
     "bundle:check": "bun build apps/worker/src/index.ts --target=browser --conditions=workerd --conditions=worker --external \"cloudflare:*\" > /dev/null",
     "imports:check": "bun run scripts/ts/tracked-imports.ts",
     "catalog": "bun run scripts/ts/catalog.ts --emit",
-    "catalog:check": "bun run scripts/ts/catalog.ts"
+    "catalog:check": "bun run scripts/ts/catalog.ts",
+    "qualification": "python3 scripts/qualify.py"
   },
   "dependencies": {
     "effect": "4.0.0-rc.108"

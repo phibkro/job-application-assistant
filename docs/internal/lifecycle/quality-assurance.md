@@ -13,6 +13,7 @@
 bun run check         # TypeScript workspace: format, lint, typecheck, schema drift, bundle, tests
 just check             # repository, credential, and script gates
 just verify             # just check + bun run check
+just qualification     # 50k current-schema plans plus local backup/restore
 just preview             # the whole stack served locally, for a real-journey proof
 ./deploy                 # verify + destructive staging acceptance
 ./deploy-production       # verify + non-destructive production acceptance
@@ -33,6 +34,10 @@ just preview             # the whole stack served locally, for a real-journey pr
 5. **Real local integration (`just preview`):** the built interface and
    bundled Worker served together against a seeded local D1 — the proof that
    deleting or changing a service did not take a working one with it.
+6. **Realistic-corpus qualification (`just qualification`):** 50,000
+   deterministic current-schema vacancies plus representative owned workspace
+   state, asserted query indexes and timings, then backup/restore integrity,
+   foreign-key, fingerprint, and repeated-plan checks.
 
 ## Evidence discipline
 
@@ -43,9 +48,8 @@ as evidence.
 
 ## Remaining production gates
 
-See `memory-bank/progress.md`'s "Known gaps left by the cutover": query-plan
-regression at scale, a restore drill, and the administrative surface
-(principals, webhook delivery, maintenance) all existed only in the retired
-Rust worker and are not yet re-established. Beyond those: live staging soak,
-credential rotation, and independent G5 review of the production
-configuration.
+Realistic query-plan and local backup/restore evidence is re-established by
+`just qualification`. The administrative surface (principals, webhook
+delivery, maintenance) remains absent. Production still requires current
+black-box staging evidence, a seven-day soak, Cloudflare D1 restore/Time
+Travel, credential rotation, and independent G5 review.

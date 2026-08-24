@@ -83,19 +83,10 @@ assert_preflight_failure \
   env NAV_PRIVATE_API_TOKEN=not-a-jwt
 
 assert_preflight_failure \
-  "Production requires ADMIN_SYNC_TOKEN." \
-  env NAV_PRIVATE_API_TOKEN="${private_token}"
-
-assert_preflight_failure \
-  "Production ADMIN_SYNC_TOKEN must contain at least 32 characters." \
-  env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=too-short
-
-assert_preflight_failure \
   "NAV rejected the configured private token during feed validation (HTTP 401)." \
-  env NAV_PRIVATE_API_TOKEN="${private_token}" ADMIN_SYNC_TOKEN=0123456789abcdef0123456789abcdef CURL_STATUS=401
+  env NAV_PRIVATE_API_TOKEN="${private_token}" CURL_STATUS=401
 
-# The source-URL preflight assertions are gone with the AGPL obligation that
-# required them. The credential gates above stay: those protect production,
-# not a licence term.
+# The source-URL and retired administrator-token preflight assertions are gone:
+# neither represents a capability in the current TypeScript service.
 
 echo "Production deployment preflight tests passed without invoking Wrangler."

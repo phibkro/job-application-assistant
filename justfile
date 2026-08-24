@@ -17,9 +17,6 @@ nav-key:
 nav-key-cloudflare:
   ./scripts/dispatch.sh _nav-key-cloudflare
 
-# Configure or rotate the local administrative bearer token.
-admin-key:
-  ./scripts/dispatch.sh _admin-key
 
 # Repository, credential, and script gates: format/lint/type-check the
 # TypeScript workspace separately with `bun run check`.
@@ -30,6 +27,16 @@ check:
 # lint, format, schema drift, bundle, tests).
 verify:
   ./scripts/dispatch.sh _verify
+
+# Seed 50,000 current-schema rows, assert real query indexes, and restore a copy.
+qualification rows="50000":
+  ./scripts/dispatch.sh _qualification {{rows}}
+# Restore every canonical D1 table into a disposable remote target, verify
+# qualification invariants, and delete the target. Requires explicit names.
+d1-restore source target:
+  ./scripts/dispatch.sh _d1-restore {{source}} {{target}}
+
+
 
 # Run a bounded staging soak. Use duration=604800 for seven days.
 soak base_url duration="300" interval="30":
@@ -50,7 +57,7 @@ deploy:
 deploy-staging:
   ./scripts/dispatch.sh _deploy-staging
 
-# Deploy production. Requires private NAV and administrative secrets.
+# Deploy production. Requires a private NAV credential.
 deploy-production:
   ./scripts/dispatch.sh _deploy-production
 
@@ -70,11 +77,10 @@ _nav-key-cloudflare:
   ./scripts/setup.sh
   ./scripts/configure-nav-key.sh --cloudflare
 
-_admin-key:
-  ./scripts/configure-admin-key.sh
 
 _check: _setup
   ./scripts/check.sh
+  python3 scripts/test_d1_restore.py
 
 _preview: _setup
   ./scripts/preview.sh
@@ -84,6 +90,11 @@ _deploy-preview: _setup
 
 _soak base_url duration interval: _setup
   python3 scripts/soak.py "{{base_url}}" --duration "{{duration}}" --interval "{{interval}}"
+
+_qualification rows: _setup
+  python3 scripts/qualify.py --rows "{{rows}}"
+_d1-restore source target: _setup
+  python3 scripts/restore-d1.py "{{source}}" "{{target}}" --confirm
 
 # The TypeScript workspace's own gates (bun run check: format, lint,
 # typecheck, schema drift, bundle, tests) run beside the repository/script

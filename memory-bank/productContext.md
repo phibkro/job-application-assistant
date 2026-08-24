@@ -16,6 +16,6 @@ The user should be able to ask: “What genuinely new or changed opportunities m
 
 ## Current product posture
 
-The source implements the canonical corpus and the browse/save/draft/apply workspace, with TypeScript/Effect Worker infrastructure declared for every Alchemy stage. Scheduled ingestion now selects the Feed tier implemented by this deployment, and production declares only the matching NAV ingestion cron. These are implementation claims, not live deployment evidence: staging evidence is stale, while production qualification, administrative routes, and generated OpenAPI coverage remain open.
+The source implements the canonical corpus and browse/save/draft/apply workspace, with TypeScript/Effect Worker infrastructure declared for every Alchemy stage. Scheduled ingestion selects the implemented Feed tier, and production declares only the NAV ingestion cron. A deterministic 50,000-row query-plan and local backup/restore gate covers current schema and owner-scoped workspace state. This is local evidence only: current staging, production, administrative-route, and generated OpenAPI evidence remains open.
 
 Core explanation: [`docs/public/explanation/canonical-corpus.md`](../docs/public/explanation/canonical-corpus.md)

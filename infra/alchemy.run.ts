@@ -105,7 +105,6 @@ const secretBindings = () => {
   const bindings: Record<string, Redacted.Redacted<string>> = {};
   for (const name of [
     "NAV_API_TOKEN",
-    "ADMIN_SYNC_TOKEN",
     "LINKEDIN_CLIENT_ID",
     "LINKEDIN_CLIENT_SECRET",
     "CLOUDFLARE_ACCOUNT_ID",

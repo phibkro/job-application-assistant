@@ -22,6 +22,7 @@ export {
   PUBLIC_TOKEN_URL,
 } from "./credential.ts";
 export type { NavCredential } from "./credential.ts";
+export { NAV_PLATFORM_ID } from "./decode.ts";
 
 const NAV_BASE_URL = "https://pam-stilling-feed.nav.no";
 const FEED_PAGE_SIZE = 5;

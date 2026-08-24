@@ -24,9 +24,9 @@ The generated D1 schema, ordered migration ledger, and researched source catalog
 have executable check and deployment commands. Only NAV is registered as an
 ingestion adapter.
 
-These are source claims, not live deployment evidence. Staging evidence is
-stale. Production qualification, administrative routes, and generated OpenAPI
-coverage remain gaps; see [current progress](memory-bank/progress.md).
+These are source claims, not live deployment evidence. Local 50,000-row
+query-plan and backup/restore qualification is executable; current staging,
+production, administrative-route, and generated OpenAPI evidence remains open.
 
 ## Run it
 
@@ -50,6 +50,7 @@ save-to-submission-confirmation journey.
 nix shell nixpkgs#bun -c bun run check   # TypeScript workspace: format, lint, typecheck, schema, catalog, bundle, tests
 nix develop --command just check          # repository, credential, and script gates
 nix develop --command just verify         # just check + bun run check
+nix develop --command just qualification  # 50k query plans plus backup/restore
 nix develop --command just preview        # the whole stack, served locally
 ```
 
@@ -59,7 +60,6 @@ Without a host `just`, use `./bootstrap <command>`.
 
 ```sh
 just nav-key
-just admin-key
 ./deploy
 ```
 
@@ -68,7 +68,6 @@ Production is always explicit:
 
 ```sh
 just nav-key
-just admin-key
 ./deploy-production
 ```
 
@@ -100,8 +99,8 @@ selects the Feed tier implemented by this deployment; production declares only
 the matching NAV ingestion cron.
 
 For Effect idioms, use the official local source at `../effect`. The project is
-pinned to `effect@4.0.0-beta.104`, while the checkout currently reports
-beta.107; check exact API compatibility before copying an example.
+pinned to `effect@4.0.0-rc.108`; check exact API compatibility before copying
+an example from another revision.
 
 ## Documentation
 

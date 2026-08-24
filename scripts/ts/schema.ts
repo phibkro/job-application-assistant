@@ -256,7 +256,7 @@ const tables: Record<string, TableSpec> = {
     // A source identifies its own advert by external id; two rows for one
     // would double-count provenance and break absence detection.
     unique: [["sourceId", "externalId"]],
-    indexes: [["canonicalJobId"], ["sourceId", "active"]],
+    indexes: [["canonicalJobId"], ["canonicalJobId", "active", "firstSeenAt"], ["sourceId", "active"]],
   },
   saved_jobs: {
     model: SavedJob,
@@ -272,7 +272,12 @@ const tables: Record<string, TableSpec> = {
     model: ApplicationRecord,
     primaryKey: ["id"],
     unique: [["profileId", "id"]],
-    indexes: [["profileId"], ["savedJobId"]],
+    indexes: [
+      ["profileId"],
+      ["savedJobId"],
+      ["profileId", "createdAt"],
+      ["profileId", "savedJobId", "createdAt", "id"],
+    ],
     foreignKeys: [
       {
         columns: ["profileId", "savedJobId"],

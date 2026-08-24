@@ -250,6 +250,23 @@ export const MatchPage = Schema.Struct({
 });
 export type MatchPage = typeof MatchPage.Type;
 
+export const IngestionStatus = Schema.Struct({
+  lag_seconds: Schema.NullOr(Schema.Number),
+  consecutive_failures: Schema.Number,
+});
+export type IngestionStatus = typeof IngestionStatus.Type;
+
+/**
+ * Public ingestion observability. This route intentionally exposes only
+ * bounded lag and failure counters; it has no control or administrative
+ * capability.
+ */
+const ingestion = HttpApiGroup.make("ingestion").add(
+  HttpApiEndpoint.get("navStatus", "/api/sources/nav/status", {
+    success: Schema.Struct({ data: IngestionStatus }),
+  }),
+);
+
 /**
  * Browsing the corpus. Unauthenticated reads stay possible so the catalogue is
  * inspectable without an account.
@@ -474,4 +491,4 @@ const applications = HttpApiGroup.make("applications")
   )
   .middleware(Authenticated);
 
-export const api = HttpApi.make("job-index").add(corpus, feed, profile, applications);
+export const api = HttpApi.make("job-index").add(ingestion, corpus, feed, profile, applications);

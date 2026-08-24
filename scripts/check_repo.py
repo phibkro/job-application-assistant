@@ -65,11 +65,11 @@ REQUIRED = [
     "scripts/capture-nav-fixture.sh",
     "scripts/setup.sh",
     "scripts/configure-nav-key.sh",
-    "scripts/configure-admin-key.sh",
     "scripts/dispatch.sh",
     "scripts/test_bootstrap.sh",
     "scripts/deploy.sh",
     "scripts/soak.py",
+    "scripts/qualify.py",
     "ops/slo.json",
     "docs/internal/lifecycle/production-release-checklist.md",
     "docs/public/reference/api-v1.md",
@@ -229,7 +229,7 @@ if release_manifest_path in parsed and isinstance(parsed[release_manifest_path],
 for executable in [
     "bootstrap", "deploy", "deploy-production", "scripts/setup.sh",
     "scripts/dispatch.sh", "scripts/test_bootstrap.sh", "scripts/deploy.sh",
-    "scripts/soak.py",
+    "scripts/soak.py", "scripts/qualify.py",
 ]:
     path = ROOT / executable
     if path.is_file() and not path.stat().st_mode & 0o111:
