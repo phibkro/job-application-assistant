@@ -8,6 +8,7 @@ import type { Profile } from "@job-index/domain/Profile";
 import { Accounts, Profiles } from "../services/Accounts.ts";
 import { Corpus } from "../services/Corpus.ts";
 import { Judgements } from "../services/Judgements.ts";
+import { Hydration } from "../services/Hydration.ts";
 import { buildHandler } from "./testSupport.ts";
 
 const alice = "alice" as ProfileId;
@@ -31,6 +32,23 @@ const profile: Profile = {
   experience: [],
   education: [],
 };
+
+const baseJob = (): CanonicalJob => ({
+  id: "cj_1" as CanonicalJobId,
+  title: "Baker",
+  employerName: "Bakery AS",
+  location: "Oslo",
+  applicationUrl: "https://example.com/1",
+  publishedAt: "2026-01-01T00:00:00Z",
+  status: { _tag: "Active" },
+  sequence: 5 as Sequence,
+  changedAt: "2026-01-01T00:00:00Z",
+  sources: [],
+  hydration: { _tag: "Unhydrated" },
+});
+
+const hydrationReturning = (job: CanonicalJob | undefined) =>
+  Layer.succeed(Hydration, { hydrate: () => Effect.succeed(job) });
 
 describe("feed (authenticated)", () => {
   it("fresh reads Corpus.fresh scoped to CurrentPrincipal.profileId", async () => {
@@ -121,5 +139,51 @@ describe("feed (authenticated)", () => {
       }),
     );
     expect(res.status).not.toBe(200);
+  });
+});
+
+describe("getMatch (authenticated)", () => {
+  const profilesLayer = Layer.succeed(Profiles, {
+    get: () => Effect.die("unused"),
+    set: () => Effect.die("unused"),
+    getVersioned: () => Effect.die("unused"),
+    setVersioned: () => Effect.die("unused"),
+    answers: () => Effect.die("unused"),
+    answer: () => Effect.die("unused"),
+    unanswered: () => Effect.die("unused"),
+  });
+
+  it("a match that hydration learned has closed upstream fails with Gone, not NotFound", async () => {
+    const job: CanonicalJob = {
+      ...baseJob(),
+      status: { _tag: "Closed", closedAt: "2026-08-20T00:00:00Z" },
+    };
+    const { handler } = buildHandler({
+      accounts: authedAs(alice),
+      hydration: hydrationReturning(job),
+      profiles: profilesLayer,
+    });
+    const res = await handler(
+      new Request("http://localhost/api/v1/me/matches/cj_1", { headers: authHeaders }),
+    );
+    expect(res.status).toBe(410);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      _tag: "Gone",
+      message: "job cj_1 has closed upstream",
+      closedAt: "2026-08-20T00:00:00Z",
+    });
+  });
+
+  it("an unknown id still fails with NotFound", async () => {
+    const { handler } = buildHandler({
+      accounts: authedAs(alice),
+      hydration: hydrationReturning(undefined),
+      profiles: profilesLayer,
+    });
+    const res = await handler(
+      new Request("http://localhost/api/v1/me/matches/cj_missing", { headers: authHeaders }),
+    );
+    expect(res.status).toBe(404);
   });
 });

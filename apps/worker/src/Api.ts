@@ -4,6 +4,7 @@ import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
 import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
+import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
 import * as Context from "effect/Context";
 import type { PrincipalId, ProfileId } from "@job-index/domain/Ids";
 import {
@@ -80,6 +81,21 @@ export class NotFound extends Schema.TaggedError<NotFound>()(
   { httpApiStatus: 404 },
 ) {}
 
+/**
+ * The vacancy existed and was real, but the source has closed it upstream —
+ * the resource is gone, not missing (RFC 9110 §15.5.11). Distinct from
+ * `NotFound` so a client can tell "never heard of this id" from "this ad has
+ * closed since you saw it", which the interface renders as a graceful notice
+ * rather than an error.
+ */
+export class Gone extends Schema.TaggedError<Gone>()(
+  "Gone",
+  {
+    message: Schema.String,
+    closedAt: Schema.optional(Schema.String),
+  },
+  { httpApiStatus: 410 },
+) {}
 /** Returned when the account's tier lacks the capability. Distinct from Forbidden. */
 /** 402, not 426: the account must pay, not change protocol. */
 export class UpgradeRequired extends Schema.TaggedError<UpgradeRequired>()(
@@ -359,7 +375,16 @@ const feed = HttpApiGroup.make("feed")
     HttpApiEndpoint.get("getMatch", "/api/v1/me/matches/:id", {
       params: { id: Schema.String },
       success: MatchedJob,
-      error: Schema.Union([Unauthorized, NotFound]),
+      // `Gone` is a first-class answer here, not a generic miss: hydration
+      // may legitimately learn the ad closed upstream, and the client
+      // renders that differently from "no such id".
+      //
+      // Declared as an ARRAY of per-status-annotated schemas, not one
+      // `Schema.Union`: a union node carries no `httpApiStatus` of its own,
+      // so every member encoded through it would answer as 500 (the
+      // framework resolves the status once, off the top node). Separate
+      // array entries each keep their own status; the router picks by tag.
+      error: [Unauthorized, HttpApiSchema.status(404)(NotFound), HttpApiSchema.status(410)(Gone)],
     }),
     HttpApiEndpoint.post("dismiss", "/api/v1/me/feed/:id/dismiss", {
       params: { id: Schema.String },

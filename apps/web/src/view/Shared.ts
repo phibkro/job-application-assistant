@@ -436,6 +436,22 @@ export const renderProblem = <M>(problem: Problem, h: HtmlBuilder<M>): Html =>
     Match.tag("NotFound", ({ message }) =>
       h.div([h.Role("alert"), h.Class(problemCardClass("error"))], [h.p([], [message])]),
     ),
+    Match.tag("Gone", ({ closedAt }) =>
+      h.div(
+        [h.Role("status"), h.AriaLive("polite"), h.Class(problemCardClass("info"))],
+        [
+          h.p([h.Class("font-semibold")], ["This ad has closed upstream."]),
+          h.p(
+            [h.Class("mt-1")],
+            [
+              typeof closedAt === "string" && closedAt.length > 0
+                ? `The employer removed or filled this vacancy on ${closedAt.slice(0, 10)}. It stays listed in browse under status “Closed”.`
+                : "The employer removed or filled this vacancy. It stays listed in browse under status “Closed”.",
+            ],
+          ),
+        ],
+      ),
+    ),
     Match.tag("UpgradeRequired", ({ capability }) =>
       h.div(
         [

@@ -199,12 +199,16 @@ export default Alchemy.Stack(
       // fall back to the app shell because the interface routes client-side;
       // `/api/*` runs the Worker first so the asset router cannot shadow an
       // endpoint with the shell.
+      //
+      // Routing fields sit at the TOP LEVEL of `assets`, per Alchemy's
+      // `AssetsProps extends AssetsConfig` — not nested under a wrangler-style
+      // `config:` key. A `config` sub-object is forwarded verbatim into
+      // metadata.assets.config.config, which the Cloudflare API silently drops,
+      // leaving SPA fallback off (the deep-link 404 regression of 2026-08-25).
       assets: {
         directory: "../apps/web/dist",
-        config: {
-          notFoundHandling: "single-page-application",
-          runWorkerFirst: ["/api/*"],
-        },
+        notFoundHandling: "single-page-application",
+        runWorkerFirst: ["/api/*"],
       },
       compatibility: { date: "2026-05-25" },
       // The workers.dev URL stays on alongside the custom domain: it is what

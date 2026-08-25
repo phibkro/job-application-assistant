@@ -7,6 +7,7 @@ import { ts } from "foldkit/schema";
 // look like, not a client-side guess that can drift from the server's.
 import {
   ForbiddenByPlatform,
+  Gone,
   InvalidApplicationTransition,
   LabelConflict,
   NotFound,
@@ -20,6 +21,7 @@ import {
 // to the worker contract directly.
 export {
   ForbiddenByPlatform,
+  Gone,
   InvalidApplicationTransition,
   LabelConflict,
   NotFound,
@@ -36,6 +38,7 @@ export const NetworkError = ts("NetworkError", { detail: S.String });
 export const Problem = S.Union([
   Unauthorized,
   NotFound,
+  Gone,
   UpgradeRequired,
   ForbiddenByPlatform,
   LabelConflict,
