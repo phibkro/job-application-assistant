@@ -40,8 +40,47 @@ describe("decodeEnv", () => {
   });
 
   it("accepts a complete environment", () => {
-    expect(
-      decodeEnv({ DB: binding, SOURCE_LEASE: sourceLease, ENVIRONMENT: "staging" }).ENVIRONMENT,
-    ).toBe("staging");
+    const decoded = decodeEnv({ DB: binding, SOURCE_LEASE: sourceLease, ENVIRONMENT: "staging" });
+    expect(decoded.ENVIRONMENT).toBe("staging");
+    // The documented default: attempt at most once per six hours.
+    expect(decoded.INGESTION_ATTEMPT_FLOOR_MS).toBe(21_600_000);
+  });
+
+  it("keeps a valid lazy-ingestion floor override", () => {
+    const decoded = decodeEnv({
+      DB: binding,
+      SOURCE_LEASE: sourceLease,
+      ENVIRONMENT: "staging",
+      INGESTION_ATTEMPT_FLOOR_MS: "3600000",
+    });
+    expect(decoded.INGESTION_ATTEMPT_FLOOR_MS).toBe(3_600_000);
+  });
+
+  it.each(["0", "-1", "1.5", "six-hours", ""])(
+    "fails loud on a malformed lazy-ingestion floor override (%j)",
+    (floor) => {
+      try {
+        decodeEnv({
+          DB: binding,
+          SOURCE_LEASE: sourceLease,
+          ENVIRONMENT: "staging",
+          INGESTION_ATTEMPT_FLOOR_MS: floor,
+        });
+        expect.unreachable("decodeEnv should have thrown");
+      } catch (error) {
+        expect((error as EnvironmentIncomplete).message).toContain("INGESTION_ATTEMPT_FLOOR_MS");
+      }
+    },
+  );
+
+  it("retains a native Workers AI binding for the model layer", () => {
+    const ai = { run: () => Promise.resolve({ response: "[]" }) };
+    const decoded = decodeEnv({
+      DB: binding,
+      SOURCE_LEASE: sourceLease,
+      ENVIRONMENT: "staging",
+      AI: ai,
+    });
+    expect(decoded.AI).toBe(ai);
   });
 });

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
+import * as Effect from "effect/Effect";
+import { Database } from "../services/Database.ts";
+import { layer } from "./Live.ts";
+
+const run = <A>(effect: Effect.Effect<A, never, Database>): Promise<A> =>
+  Effect.runPromise(Effect.provide(effect, layer(env.DB)));
 
 /**
  * The falsifier this migration exists to make possible: a test that passes
@@ -19,5 +25,71 @@ import { env } from "cloudflare:workers";
 describe("D1's transaction primitive, against the real local binding", () => {
   it("rejects an application-level BEGIN outright — bun:sqlite silently accepts the identical statement", async () => {
     await expect(env.DB.prepare("BEGIN").run()).rejects.toThrow();
+  });
+
+  it("returns D1 batch meta.changes in order and preserves changes() across statements", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const won = yield* db.atomicAffected([
+          {
+            sql: "INSERT INTO freshness (profileId, seenThrough, updatedAt) VALUES (?, ?, ?)",
+            bindings: ["d1-atomic-counts", 1, "2026-01-01T00:00:00.000Z"],
+          },
+          {
+            sql: "UPDATE freshness SET seenThrough = ? WHERE profileId = ? AND changes() = 1",
+            bindings: [2, "d1-atomic-counts"],
+          },
+        ]);
+        const lost = yield* db.atomicAffected([
+          {
+            sql: "UPDATE freshness SET seenThrough = ? WHERE profileId = ?",
+            bindings: [3, "missing"],
+          },
+          {
+            sql: "UPDATE freshness SET seenThrough = ? WHERE profileId = ? AND changes() = 1",
+            bindings: [4, "d1-atomic-counts"],
+          },
+        ]);
+        const rows = yield* db.query<{ seenThrough: number }>(
+          "SELECT seenThrough FROM freshness WHERE profileId = ?",
+          ["d1-atomic-counts"],
+        );
+        return { won, lost, seenThrough: rows[0]?.seenThrough };
+      }),
+    );
+
+    expect(result).toEqual({
+      won: [1, 1],
+      lost: [0, 0],
+      seenThrough: 2,
+    });
+  });
+
+  it("rolls back the first statement when the second statement violates a constraint", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const exit = yield* Effect.exit(
+          db.atomicAffected([
+            {
+              sql: "INSERT INTO freshness (profileId, seenThrough, updatedAt) VALUES (?, ?, ?)",
+              bindings: ["d1-rolled-back", 1, "2026-01-01T00:00:00.000Z"],
+            },
+            {
+              sql: "INSERT INTO freshness (profileId, seenThrough, updatedAt) VALUES (?, ?, ?)",
+              bindings: ["d1-rolled-back", 2, "2026-01-01T00:00:00.000Z"],
+            },
+          ]),
+        );
+        const rows = yield* db.query("SELECT profileId FROM freshness WHERE profileId = ?", [
+          "d1-rolled-back",
+        ]);
+        return { exit, rowCount: rows.length };
+      }),
+    );
+
+    expect(result.exit._tag).toBe("Failure");
+    expect(result.rowCount).toBe(0);
   });
 });

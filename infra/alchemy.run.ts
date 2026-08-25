@@ -73,12 +73,11 @@ const MAIL_FROM = "noreply@phibkro.org";
 const MAIL_VERIFIED_DESTINATION = "philib.krogh@gmail.com";
 
 /**
- * Production is published in two phases so a cron-enabled version can never
- * run before its credentials exist. Staging deploys with schedules off, but
- * an operator can activate the same trigger temporarily to qualify ingestion
- * against the staged Worker and D1.
+ * WS-0017: cron-driven ingestion is retired. No stage declares a trigger;
+ * the Worker's lazy freshness gate (`apps/worker/src/ingestion/lazy.ts`)
+ * fires on authenticated site usage instead, and the scheduled export
+ * survives only for local preview (`scripts/preview.sh --test-scheduled`).
  */
-const ACTIVATE_SCHEDULES = process.env.JOB_INDEX_ACTIVATE_SCHEDULES === "1";
 
 /**
  * Secrets are declared here rather than uploaded separately, because this
@@ -137,16 +136,12 @@ const environmentVars = {
 } as const;
 
 /**
- * Production activates it in the credential-first deployment's second phase.
- * Staging accepts the same explicit activation flag for bounded qualification;
- * the normal staging deployment always supplies `0`.
- * Add another trigger only when the scheduled handler dispatches a distinct,
- * implemented workload for it.
+ * WS-0017 removed the ingestion trigger. Explicitly empty rather than
+ * omitted: "no schedules" is a decision a reader and Alchemy's diff can both
+ * see. Reintroduce a trigger only with a workload that needs one — and note
+ * the rollback story in work/WS-0017-r1-lazy-ingestion.md if ever reverted.
  */
-const INGESTION_CRON = "0,15,30,45 * * * *";
-const SCHEDULES_ALLOWED = PRODUCTION || STAGE === "staging";
-
-const CRONS = SCHEDULES_ALLOWED && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];
+const CRONS: ReadonlyArray<string> = [];
 
 export default Alchemy.Stack(
   "JobIndex",
@@ -224,7 +219,7 @@ export default Alchemy.Stack(
         MAIL_FROM,
         ...secretBindings(),
       },
-      crons: PR_STAGE ? [] : STAGE === "preview" ? [INGESTION_CRON] : CRONS,
+      crons: [...CRONS],
       observability: {
         enabled: true,
         logs: { enabled: true, invocationLogs: true },

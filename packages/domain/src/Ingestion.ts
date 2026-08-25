@@ -79,3 +79,18 @@ export class IngestionFailure extends Model.Class<IngestionFailure>("IngestionFa
   /** The cursor being fetched when this failure happened — which page broke. */
   cursor: Schema.String,
 }) {}
+
+/**
+ * The lazy-ingestion freshness gate (WS-0017): one row per platform, the
+ * wall-clock stamp of the last ingestion *attempt* the gate fired — success,
+ * failure, or lease-held skip alike. Deliberately not `source_state`'s
+ * checkpoint time (that updates even when a page fails, and does not exist
+ * before a first complete page) and deliberately not derived from
+ * `ingestion_runs`: the claim must be a single compare-and-set over one row
+ * (`atomicAffected`), and "an attempt was made" is a different fact from
+ * "a run succeeded". Not profile-scoped, so erasure never touches it.
+ */
+export class IngestionGate extends Model.Class<IngestionGate>("IngestionGate")({
+  platformId: PlatformId,
+  lastAttemptAt: Model.DateTimeInsert,
+}) {}

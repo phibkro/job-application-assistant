@@ -1,6 +1,8 @@
 import * as Data from "effect/Data";
 import type { D1Database } from "../db/D1.ts";
 import type { SourceLeaseNamespace } from "../ingestion/SourceLeaseObject.ts";
+import type { WorkersAi } from "../inference/model/index.ts";
+import { DEFAULT_ATTEMPT_FLOOR_MS } from "../ingestion/lazy.ts";
 
 /**
  * The Worker's environment, checked at the edge of the program.
@@ -27,6 +29,19 @@ export interface Env {
    * token is never bundled or copied into deployment evidence.
    */
   readonly NAV_API_TOKEN?: string;
+  /**
+   * Minimum interval between lazy ingestion *attempts*, in milliseconds
+   * (WS-0017). Default 21_600_000 (6 hours): the gate fires at most once per
+   * floor per platform, and failures back off through the same floor because
+   * an attempt stamps the marker whether it succeeded or not. The success
+   * target — corpus staleness of roughly a day — is a consequence of this
+   * floor plus owner usage, not a second timer; there is deliberately no
+   * success-staleness knob. Absence keeps the default.
+   */
+  readonly INGESTION_ATTEMPT_FLOOR_MS: number;
+  /** Optional native Workers AI binding. Absence keeps the deterministic
+   * heuristic fallback available; presence enables entitled model requests. */
+  readonly AI?: WorkersAi;
 }
 
 export class EnvironmentIncomplete extends Data.TaggedError("EnvironmentIncomplete")<{
@@ -57,8 +72,38 @@ const isSourceLeaseNamespace = (value: unknown): value is SourceLeaseNamespace =
   typeof (value as { idFromName?: unknown }).idFromName === "function" &&
   typeof (value as { get?: unknown }).get === "function";
 
+const isWorkersAi = (value: unknown): value is WorkersAi =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as { run?: unknown }).run === "function";
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
+
+/**
+ * The lazy-ingestion attempt floor, in milliseconds. A plain environment
+ * variable, not a binding — but a malformed override is still a deployment
+ * wiring bug, so it fails with the same named error as a missing D1 binding
+ * rather than silently running at some accidental cadence. Absent keeps the
+ * documented default (six hours).
+ */
+const decodeFloorMs = (value: unknown): number => {
+  if (value === undefined) {
+    return DEFAULT_ATTEMPT_FLOOR_MS;
+  }
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new EnvironmentIncomplete({
+      missing: ["INGESTION_ATTEMPT_FLOOR_MS (a positive integer millisecond count)"],
+    });
+  }
+  return parsed;
+};
 
 export const decodeEnv = (env: unknown): Env => {
   const bag = (typeof env === "object" && env !== null ? env : {}) as Record<string, unknown>;
@@ -79,8 +124,10 @@ export const decodeEnv = (env: unknown): Env => {
 
   return {
     DB: bag.DB as D1Database,
-    SOURCE_LEASE: bag.SOURCE_LEASE as SourceLeaseNamespace,
     ENVIRONMENT: bag.ENVIRONMENT as string,
+    SOURCE_LEASE: bag.SOURCE_LEASE as SourceLeaseNamespace,
     NAV_API_TOKEN: isNonEmptyString(bag.NAV_API_TOKEN) ? bag.NAV_API_TOKEN : undefined,
+    INGESTION_ATTEMPT_FLOOR_MS: decodeFloorMs(bag.INGESTION_ATTEMPT_FLOOR_MS),
+    AI: isWorkersAi(bag.AI) ? bag.AI : undefined,
   };
 };

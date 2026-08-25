@@ -30,6 +30,23 @@ CREATE TABLE IF NOT EXISTS delivery_platforms (
 
 CREATE INDEX IF NOT EXISTS idx_delivery_platforms_hostPattern ON delivery_platforms (hostPattern);
 
+CREATE TABLE IF NOT EXISTS proposals (
+  id TEXT NOT NULL,
+  profileId TEXT NOT NULL,
+  sourceKind TEXT NOT NULL CHECK (sourceKind IN ('text', 'pdf')),
+  fieldPath TEXT NOT NULL,
+  proposedValue TEXT NOT NULL,
+  evidenceExcerpt TEXT NOT NULL,
+  confidence TEXT NOT NULL CHECK (confidence IN ('high', 'medium', 'low')),
+  engine TEXT NOT NULL DEFAULT 'heuristic' CHECK (engine IN ('heuristic', 'model')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'discarded')),
+  createdAt TEXT NOT NULL,
+  decidedAt TEXT,
+  PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_proposals_profileId_status ON proposals (profileId, status);
+
 CREATE TABLE IF NOT EXISTS submissions (
   id TEXT NOT NULL,
   profileId TEXT NOT NULL,
@@ -301,6 +318,12 @@ CREATE TABLE IF NOT EXISTS ingestion_failures (
 
 CREATE INDEX IF NOT EXISTS idx_ingestion_failures_platformId_occurredAt ON ingestion_failures (platformId, occurredAt);
 
+CREATE TABLE IF NOT EXISTS ingestion_gate (
+  platformId TEXT NOT NULL,
+  lastAttemptAt TEXT NOT NULL,
+  PRIMARY KEY (platformId)
+);
+
 -- Wrangler records ordered D1 migrations in this table. A generated
 -- snapshot already has each migration's target shape, so it records the
 -- migration only when that shape is present. Existing databases without
@@ -313,3 +336,9 @@ CREATE TABLE IF NOT EXISTS d1_migrations (
 
 INSERT OR IGNORE INTO d1_migrations (name)
 SELECT '0001_saved-workspace.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('saved_jobs') WHERE name = 'updatedAt');
+
+INSERT OR IGNORE INTO d1_migrations (name)
+SELECT '0002_profile-proposals.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('proposals') WHERE name = 'decidedAt');
+
+INSERT OR IGNORE INTO d1_migrations (name)
+SELECT '0003_ingestion-gate.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('ingestion_gate') WHERE name = 'lastAttemptAt');

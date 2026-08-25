@@ -40,7 +40,12 @@ const fakeSourceLeaseNamespace = (): Env["SOURCE_LEASE"] => ({
  * the production entry was caught importing a Bun-only test layer.
  */
 const withEnv = <A>(effect: Effect.Effect<A, never, Corpus | Profiles>): Promise<A> => {
-  const env = { DB: makeFakeD1(), SOURCE_LEASE: fakeSourceLeaseNamespace(), ENVIRONMENT: "test" };
+  const env = {
+    DB: makeFakeD1(),
+    SOURCE_LEASE: fakeSourceLeaseNamespace(),
+    ENVIRONMENT: "test",
+    INGESTION_ATTEMPT_FLOOR_MS: 21_600_000,
+  };
   return Effect.runPromise(Effect.provide(effect, services(env)));
 };
 
@@ -89,6 +94,7 @@ const handlerFor = (environment: string) =>
       DB: makeFakeD1(),
       SOURCE_LEASE: fakeSourceLeaseNamespace(),
       ENVIRONMENT: environment,
+      INGESTION_ATTEMPT_FLOOR_MS: 21_600_000,
     }),
   ).handler;
 

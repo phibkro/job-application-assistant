@@ -7,6 +7,8 @@ import { buildHandler } from "./testSupport.ts";
 type QueryRows = {
   readonly checkpoint?: string;
   readonly failures: number;
+  /** The gate marker row, when one exists. */
+  readonly lastAttemptAt?: string;
 };
 
 const database = (rows: QueryRows): Layer.Layer<Database> =>
@@ -17,10 +19,15 @@ const database = (rows: QueryRows): Layer.Layer<Database> =>
           ? rows.checkpoint === undefined
             ? []
             : [{ startedAt: rows.checkpoint }]
-          : [{ count: rows.failures }]) as unknown as ReadonlyArray<A>,
+          : sql.includes("ingestion_gate")
+            ? rows.lastAttemptAt === undefined
+              ? []
+              : [{ lastAttemptAt: rows.lastAttemptAt }]
+            : [{ count: rows.failures }]) as unknown as ReadonlyArray<A>,
       ),
     run: () => Effect.die("unused"),
     runAffected: () => Effect.die("unused"),
+    atomicAffected: () => Effect.die("unused"),
     atomic: () => Effect.die("unused"),
   });
 
@@ -41,30 +48,55 @@ describe("GET /api/sources/nav/status", () => {
     vi.useRealTimers();
   });
 
-  it("returns zero lag and failures before NAV has any history", async () => {
+  it("returns zero lag, no failures, and no attempt stamp before NAV has any history", async () => {
     await expect(getStatus({ failures: 0 })).resolves.toEqual({
-      data: { lag_seconds: null, consecutive_failures: 0 },
+      data: { lag_seconds: null, consecutive_failures: 0, lastAttemptAt: null },
     });
   });
 
   it("computes lag from the persisted successful checkpoint and clamps clock skew to zero", async () => {
     await expect(
       getStatus({ checkpoint: "2026-08-13T11:00:00.000Z", failures: 0 }),
-    ).resolves.toEqual({ data: { lag_seconds: 3600, consecutive_failures: 0 } });
+    ).resolves.toEqual({
+      data: { lag_seconds: 3600, consecutive_failures: 0, lastAttemptAt: null },
+    });
     await expect(
       getStatus({ checkpoint: "2026-08-13T13:00:00.000Z", failures: 0 }),
-    ).resolves.toEqual({ data: { lag_seconds: 0, consecutive_failures: 0 } });
+    ).resolves.toEqual({
+      data: { lag_seconds: 0, consecutive_failures: 0, lastAttemptAt: null },
+    });
   });
 
   it("counts failures newer than the latest successful checkpoint", async () => {
     await expect(
       getStatus({ checkpoint: "2026-08-13T11:00:00.000Z", failures: 2 }),
-    ).resolves.toEqual({ data: { lag_seconds: 3600, consecutive_failures: 2 } });
+    ).resolves.toEqual({
+      data: { lag_seconds: 3600, consecutive_failures: 2, lastAttemptAt: null },
+    });
   });
 
   it("resets consecutive failures after a later successful checkpoint", async () => {
     await expect(
       getStatus({ checkpoint: "2026-08-13T11:59:00.000Z", failures: 0 }),
-    ).resolves.toEqual({ data: { lag_seconds: 60, consecutive_failures: 0 } });
+    ).resolves.toEqual({
+      data: { lag_seconds: 60, consecutive_failures: 0, lastAttemptAt: null },
+    });
+  });
+
+  // WS-0017: the lazy gate's own liveness travels beside the corpus lag.
+  it("reports the marker row's stamp as lastAttemptAt when the gate has armed", async () => {
+    await expect(
+      getStatus({
+        checkpoint: "2026-08-13T11:00:00.000Z",
+        failures: 1,
+        lastAttemptAt: "2026-08-13T12:00:00.000Z",
+      }),
+    ).resolves.toEqual({
+      data: {
+        lag_seconds: 3600,
+        consecutive_failures: 1,
+        lastAttemptAt: "2026-08-13T12:00:00.000Z",
+      },
+    });
   });
 });

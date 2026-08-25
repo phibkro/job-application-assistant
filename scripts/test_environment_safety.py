@@ -36,22 +36,26 @@ assert '"NAV_API_TOKEN"' in infra
 for obsolete in ("ALLOW_NAV_SYNC_WITHOUT_TOKEN", "NAV_USE_PUBLIC_TOKEN"):
     assert obsolete not in infra, obsolete
 
-# Triggers activate only through an explicit flag. The production deploy sets
-# it only after credentials and schema exist; staging sets it only for a
-# bounded qualification run.
-schedule_activation_guard = (
-    'const SCHEDULES_ALLOWED = PRODUCTION || STAGE === "staging";',
-    "const CRONS = SCHEDULES_ALLOWED && ACTIVATE_SCHEDULES ? [INGESTION_CRON] : [];",
-)
-for line in schedule_activation_guard:
-    assert line in infra
-assert 'process.env.JOB_INDEX_ACTIVATE_SCHEDULES === "1"' in infra
-assert 'const INGESTION_CRON = "0,15,30,45 * * * *";' in infra
-for inactive_cron in (
-    '"2,7,12,17,22,27,32,37,42,47,52,57 * * * *"',
-    '"4,9,14,19,24,29,34,39,44,49,54,59 * * * *"',
+# WS-0017 retired the ingestion trigger: no stage declares a cron. The gate
+# pins the exact empty literal (a renamed trigger array would evade a
+# name-based check) and rejects any five-field cron-looking string in the
+# infra program outright. The local preview hook above (`/__scheduled*`,
+# `--test-scheduled`) is deliberately still protected: the scheduled export
+# survives for local testing only.
+EMPTY_CRONS_LITERAL = "const CRONS: ReadonlyArray<string> = [];"
+assert EMPTY_CRONS_LITERAL in infra, "infra must declare exactly " + EMPTY_CRONS_LITERAL
+for retired in (
+    "JOB_INDEX_ACTIVATE_SCHEDULES",
+    "INGESTION_CRON",
+    "SCHEDULES_ALLOWED",
 ):
-    assert inactive_cron not in infra, inactive_cron
+    assert retired not in infra, retired
+infra_code_for_crons = re.sub(r"/\*[\s\S]*?\*/", "", infra)
+infra_code_for_crons = re.sub(r"(^|[^:])//.*$", r"\1", infra_code_for_crons, flags=re.MULTILINE)
+cron_pattern = re.compile(r"[\"'][0-9*/,-]+(?:\s+[0-9*/,-]+){4}[\"']")
+assert not cron_pattern.search(infra_code_for_crons), (
+    "cron-looking schedule literal found in infra; no stage may declare a trigger"
+)
 
 # Every stage starts from one generated snapshot. Ordered TypeScript-era
 # migrations then preserve databases created by an earlier snapshot. Alchemy
@@ -121,11 +125,13 @@ assert "bootstrap-publish" in deploy
 assert "run_logged web-build" in deploy
 assert "run_logged worker-build bun build apps/worker/src/index.ts" in deploy
 assert deploy.index("run_logged worker-build") < deploy.index("deploy_stack 0")
-# The two-phase production publication: schedules off, then on.
+# The two-phase production publication: a first version before the database
+# upgrade, then the final publication once the schema is current. WS-0017
+# removed schedule activation — both phases are now trigger-free, but the
+# ordered publication itself stays asserted.
 assert "deploy_stack 0" in deploy
 assert '"${deployment_url}" "${environment}"' in deploy
 assert "deploy_stack 1" in deploy
-assert "JOB_INDEX_ACTIVATE_SCHEDULES" in deploy
 production_phase = deploy.rsplit('if [ "${environment}" = "production" ]; then', 1)[
     1
 ].split("else", 1)[0]

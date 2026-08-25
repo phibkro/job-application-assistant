@@ -135,7 +135,7 @@ run_logged() {
   "$@" 2>&1 | tee "${log_dir}/${name}.log"
 }
 
-# Alchemy declares the D1 database, Worker, bindings, and cron triggers in
+# Alchemy declares the D1 database, Worker, and bindings in
 # infra/alchemy.run.ts. This script runs the gates, deploys that stack, applies
 # the generated database files, and records smoke evidence.
 #
@@ -143,11 +143,9 @@ run_logged() {
 # is declared in full on each deploy — uploading them separately afterwards
 # would leave them to be dropped by the next one.
 deploy_stack() {
-  local phase="$1"
   (
     cd infra
     ALCHEMY_STAGE="${environment}" \
-    JOB_INDEX_ACTIVATE_SCHEDULES="$([ "${phase}" = 1 ] || [ "${JOB_INDEX_ACTIVATE_SCHEDULES:-0}" = 1 ] && echo 1 || echo 0)" \
     NAV_API_TOKEN="${private_nav_token}" \
     bun run alchemy deploy --stage "${environment}" --yes
   )
@@ -231,16 +229,16 @@ JSON
   database_config=""
 }
 
-# Production publishes without cron triggers, upgrades the database, and only
-# then publishes the cron-enabled version. A scheduled ingestion can therefore
-# never reach a table shape from the previous release.
+# Production publishes a first version before the database upgrade so no
+# request can reach a table shape from the previous release mid-apply; the
+# second publication follows once the schema is current. (WS-0017: both
+# publications are schedule-free — lazy ingestion needs no trigger phase.)
 if [ "${environment}" = "production" ]; then
   run_logged bootstrap-publish deploy_stack 0
   apply_database
   run_logged publish deploy_stack 1
 else
   run_logged publish deploy_stack 0
-  apply_database
 fi
 
 nav_auth_mode="public-runtime"

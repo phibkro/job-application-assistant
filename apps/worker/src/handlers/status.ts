@@ -4,6 +4,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { NAV_PLATFORM_ID } from "@job-index/adapters/nav";
 import { api } from "../Api.ts";
 import * as IngestionStatus from "../db/repositories/IngestionStatus.ts";
+import * as IngestionGate from "../db/repositories/IngestionGate.ts";
 import { Database } from "../services/Database.ts";
 
 /**
@@ -22,6 +23,11 @@ export const layer = HttpApiBuilder.group(api, "ingestion", (handlers) =>
         Database,
         database,
       );
+      const gate = yield* Effect.provideService(
+        IngestionGate.find(NAV_PLATFORM_ID),
+        Database,
+        database,
+      );
       const now = yield* DateTime.now;
       const checkpointAt = state.checkpointAt;
       const lagSeconds =
@@ -37,6 +43,10 @@ export const layer = HttpApiBuilder.group(api, "ingestion", (handlers) =>
         data: {
           lag_seconds: lagSeconds,
           consecutive_failures: state.consecutiveFailures,
+          // The lazy gate's own liveness (WS-0017): when the last attempt
+          // fired. `null` with recent authenticated traffic is the
+          // "gate never armed" signature.
+          lastAttemptAt: gate?.lastAttemptAt ?? null,
         },
       };
     }),

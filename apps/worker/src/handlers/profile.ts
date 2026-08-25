@@ -4,7 +4,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { QuestionKey } from "@job-index/domain/Answer";
 import { fromJson, toJson, toMarkdown } from "@job-index/domain/Profile";
 import { historyToJson, historyToMarkdown } from "@job-index/domain/Applications";
-import { api, CurrentPrincipal, InvalidProfileJson } from "../Api.ts";
+import { api, CurrentPrincipal, InvalidProfileJson, StaleProfileUpdate } from "../Api.ts";
 import { Applications } from "../services/Applications.ts";
 import { Profiles } from "../services/Accounts.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
@@ -21,6 +21,7 @@ const ALL_CAPABILITIES: ReadonlyArray<Capability> = [
   "automated-apply",
   "agent-acquisition",
   "scheduled-applications",
+  "model-inference",
 ];
 
 export const layer = HttpApiBuilder.group(api, "profile", (handlers) =>
@@ -30,7 +31,7 @@ export const layer = HttpApiBuilder.group(api, "profile", (handlers) =>
         const profiles = yield* Profiles;
         const entitlements = yield* Entitlements;
         const principal = yield* CurrentPrincipal;
-        const profile = yield* profiles.get(principal.profileId);
+        const current = yield* profiles.getVersioned(principal.profileId);
         const held = yield* Effect.all(
           ALL_CAPABILITIES.map((capability) =>
             Effect.map(entitlements.has(principal.profileId, capability), (has) =>
@@ -38,14 +39,28 @@ export const layer = HttpApiBuilder.group(api, "profile", (handlers) =>
             ),
           ),
         );
-        return { profile, capabilities: held.filter((c) => c !== undefined) };
+        return {
+          profile: current.profile,
+          capabilities: held.filter((c) => c !== undefined),
+          profileUpdatedAt: current.profileUpdatedAt,
+        };
       }),
     )
     .handle("setProfile", ({ payload }) =>
       Effect.gen(function* () {
         const profiles = yield* Profiles;
         const principal = yield* CurrentPrincipal;
-        return yield* profiles.set(principal.profileId, payload);
+        return yield* profiles
+          .setVersioned(principal.profileId, payload.profile, payload.expectedUpdatedAt)
+          .pipe(
+            Effect.mapError(
+              (error) =>
+                new StaleProfileUpdate({
+                  expectedUpdatedAt: error.expectedUpdatedAt,
+                  actualUpdatedAt: error.actualUpdatedAt,
+                }),
+            ),
+          );
       }),
     )
     /**
@@ -93,7 +108,17 @@ export const layer = HttpApiBuilder.group(api, "profile", (handlers) =>
           try: () => fromJson(payload.json),
           catch: (error) => new InvalidProfileJson({ message: describeImportFailure(error) }),
         });
-        return yield* profiles.set(principal.profileId, profile);
+        return yield* profiles
+          .setVersioned(principal.profileId, profile, payload.expectedUpdatedAt)
+          .pipe(
+            Effect.mapError(
+              (error) =>
+                new StaleProfileUpdate({
+                  expectedUpdatedAt: error.expectedUpdatedAt,
+                  actualUpdatedAt: error.actualUpdatedAt,
+                }),
+            ),
+          );
       }),
     ),
 );

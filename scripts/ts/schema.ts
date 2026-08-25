@@ -34,6 +34,7 @@ import { DeliveryPlatform, Submission } from "../../packages/domain/src/Delivery
 import { Freshness, Judgement } from "../../packages/domain/src/Freshness.ts";
 import {
   IngestionFailure,
+  IngestionGate,
   IngestionRun,
   SourceState,
 } from "../../packages/domain/src/Ingestion.ts";
@@ -41,6 +42,7 @@ import { CanonicalJobRecord, OccurrenceRecord } from "../../packages/domain/src/
 import { Session } from "../../packages/domain/src/Access.ts";
 import { Principal } from "../../packages/domain/src/Principal.ts";
 import { ProfileRecord } from "../../packages/domain/src/Profile.ts";
+import { Proposal } from "../../packages/domain/src/Proposals.ts";
 import { CatalogRecord } from "../../packages/domain/src/Source.ts";
 import { Subscription } from "../../packages/domain/src/Subscription.ts";
 
@@ -93,11 +95,16 @@ const columnTypes: Record<string, string> = {
   savedJobId: "TEXT NOT NULL",
   note: "TEXT NOT NULL DEFAULT ''",
   method: "TEXT NOT NULL CHECK (method IN ('assisted', 'automated'))",
-  status:
-    "TEXT NOT NULL CHECK (status IN ('ready', 'submitted', 'rejected', 'interview', 'offer', 'withdrawn'))",
+  status: "TEXT NOT NULL CHECK (status IN ('ready', 'submitted', 'rejected', 'interview', 'offer', 'withdrawn'))",
   letter: "TEXT NOT NULL",
   generator: "TEXT NOT NULL",
   downgradeReason: "TEXT",
+  // Profile proposals (WS-0016).
+  sourceKind: "TEXT NOT NULL CHECK (sourceKind IN ('text', 'pdf'))",
+  fieldPath: "TEXT NOT NULL",
+  proposedValue: "TEXT NOT NULL",
+  evidenceExcerpt: "TEXT NOT NULL",
+  engine: "TEXT NOT NULL DEFAULT 'heuristic' CHECK (engine IN ('heuristic', 'model'))",
   notes: "TEXT NOT NULL DEFAULT ''",
   policy: "TEXT NOT NULL CHECK (policy IN ('Allowed', 'AssistedOnly', 'Prohibited', 'Unreviewed'))",
   // JSON-encoded structures.
@@ -148,12 +155,15 @@ const columnTypes: Record<string, string> = {
   stoppedReason: "TEXT NOT NULL",
   durationMs: "INTEGER NOT NULL",
   failureTag: "TEXT NOT NULL",
+  // Lazy-ingestion freshness gate (WS-0017).
+  lastAttemptAt: "TEXT NOT NULL",
   publishedAt: "TEXT NOT NULL",
   firstSeenAt: "TEXT NOT NULL",
   lastSeenAt: "TEXT NOT NULL",
   deadline: "TEXT",
   statusClosedAt: "TEXT",
   learnedAt: "TEXT",
+  decidedAt: "TEXT",
   revokedAt: "TEXT",
 };
 
@@ -171,6 +181,9 @@ type Key = { readonly primaryKey: ReadonlyArray<string> } | { readonly appendOnl
 
 type TableSpec = Key & {
   readonly model: unknown;
+  /** Per-table column-type overrides: two tables may share a field name
+   * (e.g. `confidence`) while asserting different CHECK domains. */
+  readonly columnOverrides?: Readonly<Record<string, string>>;
   readonly unique?: ReadonlyArray<ReadonlyArray<string>>;
   readonly indexes?: ReadonlyArray<ReadonlyArray<string>>;
   readonly foreignKeys?: ReadonlyArray<{
@@ -191,6 +204,16 @@ const tables: Record<string, TableSpec> = {
     model: DeliveryPlatform,
     primaryKey: ["id"],
     indexes: [["hostPattern"]],
+  },
+  proposals: {
+    model: Proposal,
+    primaryKey: ["id"],
+    columnOverrides: {
+      confidence: "TEXT NOT NULL CHECK (confidence IN ('high', 'medium', 'low'))",
+      engine: "TEXT NOT NULL DEFAULT 'heuristic' CHECK (engine IN ('heuristic', 'model'))",
+      status: "TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'discarded'))",
+    },
+    indexes: [["profileId", "status"]],
   },
   submissions: {
     model: Submission,
@@ -358,6 +381,13 @@ const tables: Record<string, TableSpec> = {
     appendOnly: "rowid",
     indexes: [["platformId", "occurredAt"]],
   },
+  ingestion_gate: {
+    model: IngestionGate,
+    // One freshness-gate row per platform (WS-0017): the stamp the lazy
+    // claim compare-and-sets. No index beyond the key — the gate reads and
+    // writes one platform's row by that key alone.
+    primaryKey: ["platformId"],
+  },
 };
 
 const fieldsOf = (model: unknown): ReadonlyArray<string> => {
@@ -384,6 +414,15 @@ const migrations = [
     name: "0001_saved-workspace.sql",
     currentWhen: "EXISTS (SELECT 1 FROM pragma_table_info('saved_jobs') WHERE name = 'updatedAt')",
   },
+  {
+    name: "0002_profile-proposals.sql",
+    currentWhen: "EXISTS (SELECT 1 FROM pragma_table_info('proposals') WHERE name = 'decidedAt')",
+  },
+  {
+    name: "0003_ingestion-gate.sql",
+    currentWhen:
+      "EXISTS (SELECT 1 FROM pragma_table_info('ingestion_gate') WHERE name = 'lastAttemptAt')",
+  },
 ] as const;
 
 const render = (): string => {
@@ -400,7 +439,7 @@ const render = (): string => {
       checkColumns(table, "primary key", spec.primaryKey, fields);
     }
     const columns = fields.map((field) => {
-      const type = columnTypes[field];
+      const type = spec.columnOverrides?.[field] ?? columnTypes[field];
       if (type === undefined) {
         throw new Error(
           `no column type declared for ${table}.${field}; add one to scripts/ts/schema.ts`,

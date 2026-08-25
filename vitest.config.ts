@@ -60,6 +60,7 @@ export default defineConfig({
       "apps/worker/src/db/Erase.test.ts",
       "apps/worker/src/db/transactionSemantics.live.test.ts",
       "apps/worker/src/ingestion/live.test.ts",
+      "apps/worker/src/ingestion/lazy.live.test.ts",
       "apps/worker/src/ingestion/SourceLeaseObject.test.ts",
       "apps/worker/src/corpus/live.test.ts",
       "apps/worker/src/handlers/corpus.live.test.ts",

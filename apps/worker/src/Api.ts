@@ -25,6 +25,12 @@ import {
 import { CatalogEntry } from "@job-index/domain/Source";
 import { AnswerShape } from "@job-index/domain/Answer";
 import { Profile } from "@job-index/domain/Profile";
+import {
+  Confidence as DomainConfidence,
+  Engine as DomainEngine,
+  ProposalStatus as DomainProposalStatus,
+  SourceKind as DomainSourceKind,
+} from "@job-index/domain/Proposals";
 
 /**
  * The contract between the worker and everything that calls it.
@@ -105,6 +111,16 @@ export class InvalidProfileJson extends Schema.TaggedError<InvalidProfileJson>()
   { httpApiStatus: 400 },
 ) {}
 
+/** A whole-profile replacement was based on a version that is no longer current. */
+export class StaleProfileUpdate extends Schema.TaggedError<StaleProfileUpdate>()(
+  "StaleProfileUpdate",
+  {
+    expectedUpdatedAt: Schema.NullOr(Schema.String),
+    actualUpdatedAt: Schema.NullOr(Schema.String),
+  },
+  { httpApiStatus: 409 },
+) {}
+
 export class LabelConflict extends Schema.TaggedError<LabelConflict>()(
   "LabelConflict",
   { name: Schema.String, normalizedName: Schema.String },
@@ -115,6 +131,37 @@ export class ReservedLabelMutation extends Schema.TaggedError<ReservedLabelMutat
   "ReservedLabelMutation",
   { name: Schema.String },
   { httpApiStatus: 400 },
+) {}
+
+/** The import payload is not text/plain or application/pdf, exceeds a bound, or will not parse. */
+export class UnsupportedDocument extends Schema.TaggedError<UnsupportedDocument>()(
+  "UnsupportedDocument",
+  { message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
+/** A decision already rendered a verdict; proposals never re-open. */
+export class ProposalAlreadyDecided extends Schema.TaggedError<ProposalAlreadyDecided>()(
+  "ProposalAlreadyDecided",
+  { id: Schema.String, status: Schema.String },
+  { httpApiStatus: 409 },
+) {}
+
+/** An edited accept value failed to decode against the proposal's field path. */
+export class InvalidProposalValue extends Schema.TaggedError<InvalidProposalValue>()(
+  "InvalidProposalValue",
+  { fieldPath: Schema.String, message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
+/** Profile churn exhausted the bounded, safe proposal-accept retry loop. */
+export class ProfileDecisionConflict extends Schema.TaggedError<ProfileDecisionConflict>()(
+  "ProfileDecisionConflict",
+  {
+    id: Schema.String,
+    retryable: Schema.Literals([true]),
+  },
+  { httpApiStatus: 409 },
 ) {}
 
 export class InvalidApplicationTransition extends Schema.TaggedError<InvalidApplicationTransition>()(
@@ -253,6 +300,8 @@ export type MatchPage = typeof MatchPage.Type;
 export const IngestionStatus = Schema.Struct({
   lag_seconds: Schema.NullOr(Schema.Number),
   consecutive_failures: Schema.Number,
+  /** WS-0017: when the lazy gate last armed an attempt; null before the first. */
+  lastAttemptAt: Schema.NullOr(Schema.String),
 });
 export type IngestionStatus = typeof IngestionStatus.Type;
 
@@ -328,13 +377,20 @@ const profile = HttpApiGroup.make("profile")
       success: Schema.Struct({
         profile: Profile,
         capabilities: Schema.Array(Schema.String),
+        profileUpdatedAt: Schema.NullOr(Schema.String),
       }),
       error: Unauthorized,
     }),
     HttpApiEndpoint.put("setProfile", "/api/v1/me/profile", {
-      payload: Profile,
-      success: Profile,
-      error: Unauthorized,
+      payload: Schema.Struct({
+        profile: Profile,
+        expectedUpdatedAt: Schema.NullOr(Schema.String),
+      }),
+      success: Schema.Struct({
+        profile: Profile,
+        profileUpdatedAt: Schema.NullOr(Schema.String),
+      }),
+      error: [Unauthorized, StaleProfileUpdate],
     }),
     /**
      * `shape` travels with the answer because nothing else can carry it: the
@@ -379,9 +435,15 @@ const profile = HttpApiGroup.make("profile")
      * dropping a field a typo introduced.
      */
     HttpApiEndpoint.put("importProfile", "/api/v1/me/profile/import", {
-      payload: Schema.Struct({ json: Schema.String }),
-      success: Profile,
-      error: [Unauthorized, InvalidProfileJson],
+      payload: Schema.Struct({
+        json: Schema.String,
+        expectedUpdatedAt: Schema.NullOr(Schema.String),
+      }),
+      success: Schema.Struct({
+        profile: Profile,
+        profileUpdatedAt: Schema.NullOr(Schema.String),
+      }),
+      error: [Unauthorized, InvalidProfileJson, StaleProfileUpdate],
     }),
   )
   .middleware(Authenticated);
@@ -491,4 +553,96 @@ const applications = HttpApiGroup.make("applications")
   )
   .middleware(Authenticated);
 
-export const api = HttpApi.make("job-index").add(ingestion, corpus, feed, profile, applications);
+/**
+ * One proposed profile fact (WS-0016). Declared once here for the same
+ * reason `JobPage` is: the web client decodes this shape, and a second
+ * hand-written copy is exactly the drift one declaration prevents.
+ */
+export const ProposalView = Schema.Struct({
+  id: Schema.String,
+  sourceKind: DomainSourceKind,
+  fieldPath: Schema.String,
+  proposedValue: Schema.String,
+  evidenceExcerpt: Schema.String,
+  confidence: DomainConfidence,
+  engine: DomainEngine,
+  status: DomainProposalStatus,
+  createdAt: Schema.String,
+});
+export type ProposalView = typeof ProposalView.Type;
+
+export const ProposalsResponse = Schema.Struct({ data: Schema.Array(ProposalView) });
+
+/**
+ * The create response may carry a `downgradeReason` when the requested model
+ * engine could not run and the heuristic tier served instead — a success
+ * with a reason, not a failure (the applications `prepare` precedent).
+ */
+export const ProposalCreateResponse = Schema.Struct({
+  data: Schema.Array(ProposalView),
+  downgradeReason: Schema.NullOr(Schema.String),
+});
+export type ProposalCreateResponse = typeof ProposalCreateResponse.Type;
+export type ProposalsResponse = typeof ProposalsResponse.Type;
+
+export const ProposalDecisionResponse = Schema.Struct({
+  decision: Schema.Literals(["accepted", "discarded"]),
+  profile: Profile,
+  profileUpdatedAt: Schema.NullOr(Schema.String),
+});
+export type ProposalDecisionResponse = typeof ProposalDecisionResponse.Type;
+
+/**
+ * Document→profile inference with per-field human confirmation.
+ *
+ * The heuristic tier is free for every principal — the default request never
+ * consults entitlements. The model tier rides the same capability gate as
+ * model drafting: `engine: "model"` without `model-inference` fails 402.
+ * Extraction and inference run transiently inside `create`; no route here,
+ * and nothing behind them, retains raw document bytes.
+ */
+const proposals = HttpApiGroup.make("proposals")
+  .add(
+    HttpApiEndpoint.post("create", "/api/v1/me/profile/proposals", {
+      payload: Schema.Struct({
+        content: Schema.String,
+        mimeType: Schema.String,
+        engine: Schema.optional(DomainEngine),
+      }),
+      success: ProposalCreateResponse,
+      error: [Unauthorized, UpgradeRequired, UnsupportedDocument],
+    }),
+    HttpApiEndpoint.get("list", "/api/v1/me/profile/proposals", {
+      success: ProposalsResponse,
+      error: Unauthorized,
+    }),
+    /**
+     * Accept-with-edit carries the edited JSON text in `value`, decoded
+     * against the proposal's own field path; discard takes no value.
+     */
+    HttpApiEndpoint.post("decide", "/api/v1/me/profile/proposals/:id/decision", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({
+        decision: Schema.Literals(["accepted", "discarded"]),
+        value: Schema.optional(Schema.String),
+      }),
+      success: ProposalDecisionResponse,
+      error: [
+        Unauthorized,
+        NotFound,
+        ProposalAlreadyDecided,
+        InvalidProposalValue,
+        ProfileDecisionConflict,
+      ],
+    }),
+  )
+  .middleware(Authenticated);
+
+export const api = HttpApi.make("job-index").add(
+  ingestion,
+  corpus,
+  feed,
+  profile,
+  applications,
+  proposals,
+);

@@ -24,30 +24,53 @@
 - WS-0013 design-system port: semantic Material You tokens, theme preference
   module with Profile appearance section, and the responsive
   sidebar/bottom-bar shell in `apps/web`, ported from course-data-platform
-  with provenance headers (unstaged pending owner integration; evidence in
-  `.artifacts/ws-0013/`).
+  with provenance headers and integrated in `d56f5e2`; evidence is in
+  `.artifacts/ws-0013/`.
+- WS-0016 S1 document-to-profile inference is implementation-complete but
+  UNCOMMITTED/UNTRACKED pending owner integration. Pasted text and PDFs through
+  `unpdf@1.8.1` produce deterministic heuristic proposals behind a
+  model-inference capability seam; the AI binding is deliberately unprovisioned
+  until prompt review. It uses no Firecrawl and performs transient parsing with
+  no raw-document retention.
+- WS-0016 has owner-scoped pending proposals with evidence/confidence,
+  per-field edit/accept/discard UI, atomic D1 profile-first CAS with bounded
+  retries, and optimistic revisions for every whole-profile write. `bun run
+  check` passed with 681 unit tests passed, 4 skipped, and 84 workerd tests;
+  full Playwright passed 2/2 with Axe, responsive, and keyboard journey
+  coverage; actual independent R2 review passed. Evidence is in
+  `.artifacts/ws-0016/`; scope is
+  `work/WS-0016-r1-document-profile-inference.md`. Exactly 18 new paths remain
+  untracked, with the empty index restored.
+- The approved closed-loop roadmap is WS-0015. S1 is delivered source; S2
+  document studio is the next value slice after owner integration of S1.
+  Firecrawl Parse is a future escalation tier requiring operator data-processor
+  approval and Zero Data Retention. Workers AI provisioning waits for prompt
+  review.
 
 ## Known gaps and evidence status
 
 These gaps are current boundaries or evidence limits, not claims that source code is absent where it is implemented:
 
 - **Administrative surface.** API-key principal administration (quotas, revocation, audit log), owned saved-search webhook subscriptions/delivery, and corpus maintenance (audit/dry-run reconcile/purge) are not implemented in the TypeScript service. The unused `ADMIN_SYNC_TOKEN` production gate and secret binding have been removed rather than pretending that a credential protects absent routes.
-- **Scheduled ingestion.** On 2026-08-13 the current dirty candidate passed a new bounded public NAV run: one page, five observations, four canonical changes, one persisted cursor advance, 1,861 ms, no run failures, and no duplicate `(sourceId, externalId)` groups. Staging schedules were disabled immediately afterward. Earlier revision `c00d67d` also has four one-page run reports.
-- **Production qualification.** Current evidence covers realistic-corpus local query plans and backup/restore plus current staging deployment, HTTP smoke, a complete authenticated owner-scoped mutation journey, and a bounded NAV checkpoint. The TypeScript status route and a complete-table managed D1 recovery command now exist and pass local/live-D1 tests; their staging soak and managed remote restore remain unexecuted. Seven-day soak, successful Cloudflare D1 recovery, NAV credential rotation, production smoke, and independent G5 review remain open.
-- **Staging evidence.** The current dirty candidate serves NAV data from D1 `967bfbad-4577-437c-945e-54c023154b8a`; `.deploy/staging.json` records configuration SHA-256 `ec620f078f963d30dfd1aeeb394a340203fe1aacd931d04afa8131b3f44b8ad9`. Because `source_code_url` is null, this evidence is not tied to an immutable source revision.
+- **Scheduled ingestion.** Gate 2's authenticated owner journey passed, but its bounded NAV checkpoint is blocked by Cloudflare platform cron non-dispatch. The trigger installs and is API-visible, yet this Worker receives no ticks while control Workers on the same account do. Operator escalation to Cloudflare support is required. Staging schedules are off.
+- **Production qualification.** Local P1 integration and Gate 1 staging redeploy passed at commit `dfa0fe3` with immutable source provenance. Gate 2's authenticated owner journey passed. Gate 3's authorized disposable complete-table D1 restore drill passed across 22 tables with equal source/target digests, owner invariants, and NAV cursor; the target was deleted. The seven-day soak depends on the dispatch fix. NAV private-token rotation, production smoke/deploy, and independent G5 remain operator/human gates. Production stays blocked.
+- **Staging evidence.** The Gate 1 redeploy at `dfa0fe3` has immutable source provenance, and staging schedules are off. Local `main` is four qualification commits ahead of `origin` and unpushed: `d4e10e6`, `d56f5e2`, `ed3c1eb`, and `dfa0fe3`.
 - **OpenAPI contract.** `openapi/job-index-v1.json` is not a current generated artifact; nothing currently generates a replacement from `apps/worker/src/Api.ts`.
-- **PR preview evidence.** Source, policy checks, local seeded E2E, and the full repository gate pass at `b5c23c9`. Provider provisioning and teardown are not yet proven because this checkout has no configured Git remote, so a PR workflow cannot be triggered.
+- **PR preview evidence.** Source, policy checks, local seeded E2E, and the full repository gate pass at `b5c23c9`. The repository now has a configured `origin`; provider provisioning and teardown evidence remains a separate lifecycle gate.
 
 ## Current stabilization focus
 
-Realistic-corpus local and current staging journey evidence are established.
-The soak runner now has a tested TypeScript status contract, and the managed
-D1 recovery procedure now enumerates and verifies the complete generated
-schema. Repaired staging deployment, seven-day soak, and an authorized remote
-restore drill are next. Production qualification remains open.
+Local P1 integration, Gate 1's immutable-provenance staging redeploy, Gate 2's
+authenticated owner journey, and Gate 3's disposable complete-table D1 restore
+drill are established. WS-0017 retires cron-driven ingestion by owner decision
+2026-08-25, superseding the bounded NAV checkpoint; the seven-day soak re-points
+at lazy-ingestion gate evidence. Production remains blocked on the soak,
+NAV private-token rotation, production smoke/deploy, and independent G5 review.
+WS-0016 S1 source is complete but awaits owner integration.
 
 ## Next work
 
-- Complete TypeScript production qualification without enabling production schedules before its remaining gates pass.
+- **OWNER:** integrate and commit WS-0016, then push the accumulated local commits. After that, S2 document studio is the next WS-0015 value slice.
+- **OPERATOR:** open the Cloudflare cron support ticket, rotate the NAV private token, and decide on and remove the leftover active `job-index-preview` cron.
+- After platform dispatch works, rerun one bounded checkpoint and begin the seven-day soak. Keep production blocked until all remaining operator/human gates pass.
 - Decide separately whether to port administrative capabilities and generate a replacement OpenAPI contract.
-- After MVP stabilization, evaluate future candidates from the [product vision](../docs/internal/product/vision.md): ATS-friendly document assistance and bounded Cloudflare Agents SDK/browser/computer-control support. These are not committed architecture, and submission still requires explicit human approval.

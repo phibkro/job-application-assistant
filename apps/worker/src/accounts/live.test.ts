@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { PrincipalId, ProfileId } from "@job-index/domain/Ids";
+import { PrincipalId, ProfileId, ProposalId } from "@job-index/domain/Ids";
+import { Proposal } from "@job-index/domain/Proposals";
 import type { Profile } from "@job-index/domain/Profile";
 import { layerSqlite } from "../db/Sqlite.ts";
 import { Database } from "../services/Database.ts";
@@ -10,6 +13,9 @@ import { Accounts, Profiles } from "../services/Accounts.ts";
 import { layer as accountsLayer } from "./index.ts";
 import { sha256Hex } from "./hash.ts";
 import { PRINCIPAL_FIELDS } from "./sql.ts";
+import { profileWriteForPendingProposal, readProfileRow, toDomainProfile } from "./profileRow.ts";
+import { acceptProposal } from "./profiles.ts";
+import * as Proposals from "../db/repositories/Proposals.ts";
 
 /**
  * Accounts against a real SQL engine running the generated schema.
@@ -33,6 +39,8 @@ const run = <A>(effect: Effect.Effect<A, never, Accounts | Profiles | Database>)
 
 const profileId = Schema.decodeUnknownSync(ProfileId)("profile-1");
 const principalId = Schema.decodeUnknownSync(PrincipalId)("principal-1");
+const proposalId = Schema.decodeUnknownSync(ProposalId);
+const otherProfileId = Schema.decodeUnknownSync(ProfileId)("profile-2");
 
 const sample: Profile = {
   headline: "Support engineer",
@@ -43,6 +51,26 @@ const sample: Profile = {
   experience: [],
   education: [],
 };
+
+const proposal = (
+  id: string,
+  fieldPath: string,
+  proposedValue: unknown,
+  owner = profileId,
+): Proposal =>
+  new Proposal({
+    id: proposalId(id),
+    profileId: owner,
+    sourceKind: "text",
+    fieldPath,
+    proposedValue,
+    evidenceExcerpt: String(proposedValue),
+    confidence: "high",
+    engine: "heuristic",
+    status: "pending",
+    createdAt: DateTime.makeUnsafe("2026-08-25T01:00:00.000Z"),
+    decidedAt: Option.none(),
+  });
 
 const insertPrincipal = `INSERT INTO principals (${PRINCIPAL_FIELDS.join(", ")}) VALUES (${PRINCIPAL_FIELDS.map(() => "?").join(", ")})`;
 
@@ -57,28 +85,39 @@ const seedPrincipal = (db: Database["Service"], apiKeyHash: string) =>
   ]);
 
 describe("accounts on a real SQLite engine", () => {
-  it("writing and reading back a profile round-trips the CV through the generated schema", async () => {
-    const profile = await run(
+  it("writing and reading back a versioned profile round-trips the CV through the generated schema", async () => {
+    const current = await run(
       Effect.gen(function* () {
         const profiles = yield* Profiles;
-        yield* profiles.set(profileId, sample);
-        return yield* profiles.get(profileId);
+        const written = yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+        return {
+          written,
+          read: yield* profiles.getVersioned(profileId),
+        };
       }),
     );
-    expect(profile).toEqual(sample);
+    expect(current.read).toEqual(current.written);
+    expect(current.read.profile).toEqual(sample);
+    expect(current.read.profileUpdatedAt).not.toBeNull();
   });
 
-  it("a second write updates the existing row rather than violating the primary key", async () => {
+  it("a second versioned write updates the existing row rather than violating the primary key", async () => {
     const updated: Profile = { ...sample, headline: "Senior support engineer" };
-    const profile = await run(
+    const current = await run(
       Effect.gen(function* () {
         const profiles = yield* Profiles;
-        yield* profiles.set(profileId, sample);
-        yield* profiles.set(profileId, updated);
-        return yield* profiles.get(profileId);
+        const first = yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+        const second = yield* profiles
+          .setVersioned(profileId, updated, first.profileUpdatedAt)
+          .pipe(Effect.orDie);
+        return {
+          second,
+          read: yield* profiles.getVersioned(profileId),
+        };
       }),
     );
-    expect(profile).toEqual(updated);
+    expect(current.read).toEqual(current.second);
+    expect(current.read.profile).toEqual(updated);
   });
 
   it("authenticates a principal by its api key hash", async () => {
@@ -110,5 +149,218 @@ describe("accounts on a real SQLite engine", () => {
     );
     expect(outcome.before).toBe(profileId);
     expect(outcome.after).toBeUndefined();
+  });
+
+  it("retries two distinct stale proposal snapshots and preserves both merges", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const profiles = yield* Profiles;
+        yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+        const firstId = proposalId("sqlite-distinct-a");
+        const secondId = proposalId("sqlite-distinct-b");
+        yield* Proposals.insert(proposal(firstId, "skills.0", "TypeScript"));
+        yield* Proposals.insert(proposal(secondId, "skills.1", "SQLite"));
+        const observed = yield* readProfileRow(db, profileId);
+        if (observed === undefined) return yield* Effect.die("missing seeded profile");
+        const current = toDomainProfile(observed);
+        const first = profileWriteForPendingProposal(
+          profileId,
+          { ...current, skills: [...current.skills, "TypeScript"] },
+          firstId,
+          observed,
+          "2026-08-25T02:00:00.000Z",
+        );
+        const staleSecond = profileWriteForPendingProposal(
+          profileId,
+          { ...current, skills: [...current.skills, "SQLite"] },
+          secondId,
+          observed,
+          "2026-08-25T02:00:00.000Z",
+        );
+        const firstVector = yield* db.atomicAffected([
+          first.write,
+          Proposals.markAcceptedAfterProfileWrite(firstId, profileId, "2026-08-25T02:00:00.000Z"),
+        ]);
+        const staleVector = yield* db.atomicAffected([
+          staleSecond.write,
+          Proposals.markAcceptedAfterProfileWrite(secondId, profileId, "2026-08-25T02:00:00.000Z"),
+        ]);
+        const retried = yield* acceptProposal(
+          db,
+          profileId,
+          secondId,
+          "2026-08-25T02:00:00.001Z",
+          (latest) => ({ ...latest, skills: [...latest.skills, "SQLite"] }),
+        );
+        return {
+          firstVector,
+          staleVector,
+          retried,
+          current: yield* profiles.getVersioned(profileId),
+        };
+      }),
+    );
+
+    expect(result.firstVector).toEqual([1, 1]);
+    expect(result.staleVector).toEqual([0, 0]);
+    expect(result.retried?.profile.skills).toEqual(["Zendesk", "TypeScript", "SQLite"]);
+    expect(result.current).toEqual(result.retried);
+  });
+
+  it("preserves an ordinary save on accept retry and rejects the earlier stale replacement", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const profiles = yield* Profiles;
+        const initial = yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+        const id = proposalId("sqlite-save-before-accept");
+        yield* Proposals.insert(proposal(id, "skills.0", "TypeScript"));
+        const observed = yield* readProfileRow(db, profileId);
+        if (observed === undefined) return yield* Effect.die("missing seeded profile");
+        const staleAccept = profileWriteForPendingProposal(
+          profileId,
+          { ...toDomainProfile(observed), skills: [...sample.skills, "TypeScript"] },
+          id,
+          observed,
+          "2026-08-25T02:00:00.000Z",
+        );
+        yield* profiles
+          .setVersioned(
+            profileId,
+            { ...sample, summary: "Saved in another tab" },
+            initial.profileUpdatedAt,
+          )
+          .pipe(Effect.orDie);
+        const staleVector = yield* db.atomicAffected([
+          staleAccept.write,
+          Proposals.markAcceptedAfterProfileWrite(id, profileId, "2026-08-25T02:00:00.000Z"),
+        ]);
+        const retried = yield* acceptProposal(
+          db,
+          profileId,
+          id,
+          "2026-08-25T02:00:00.001Z",
+          (latest) => ({ ...latest, skills: [...latest.skills, "TypeScript"] }),
+        );
+        const stalePut = yield* Effect.exit(
+          profiles.setVersioned(
+            profileId,
+            { ...sample, headline: "Stale replacement" },
+            initial.profileUpdatedAt,
+          ),
+        );
+        return {
+          staleVector,
+          retried,
+          stalePut,
+          current: yield* profiles.getVersioned(profileId),
+        };
+      }),
+    );
+
+    expect(result.staleVector).toEqual([0, 0]);
+    expect(result.stalePut._tag).toBe("Failure");
+    expect(result.current).toEqual(result.retried);
+    expect(result.current.profile.summary).toBe("Saved in another tab");
+    expect(result.current.profile.skills).toEqual(["Zendesk", "TypeScript"]);
+  });
+
+  it("handles missing profiles, both decision orders, and foreign owners with owner-scoped CAS", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const profiles = yield* Profiles;
+        const acceptFirstId = proposalId("sqlite-accept-first");
+        const discardFirstId = proposalId("sqlite-discard-first");
+        const foreignId = proposalId("sqlite-foreign");
+        yield* Proposals.insert(proposal(acceptFirstId, "skills.0", "Accepted"));
+        yield* Proposals.insert(proposal(discardFirstId, "skills.1", "Discarded"));
+        yield* Proposals.insert(proposal(foreignId, "skills.0", "Private", otherProfileId));
+
+        const accepted = yield* acceptProposal(
+          db,
+          profileId,
+          acceptFirstId,
+          "2026-08-25T02:00:00.000Z",
+          (current) => ({ ...current, skills: [...current.skills, "Accepted"] }),
+        );
+        const discardAfterAccept = yield* Proposals.markDiscarded(
+          acceptFirstId,
+          profileId,
+          "2026-08-25T02:00:00.001Z",
+        );
+        const discarded = yield* Proposals.markDiscarded(
+          discardFirstId,
+          profileId,
+          "2026-08-25T02:00:00.001Z",
+        );
+        const acceptAfterDiscard = yield* acceptProposal(
+          db,
+          profileId,
+          discardFirstId,
+          "2026-08-25T02:00:00.002Z",
+          (current) => ({ ...current, skills: [...current.skills, "Discarded"] }),
+        );
+        const foreignDiscard = yield* Proposals.markDiscarded(
+          foreignId,
+          profileId,
+          "2026-08-25T02:00:00.002Z",
+        );
+        return {
+          accepted,
+          discardAfterAccept,
+          discarded,
+          acceptAfterDiscard,
+          foreignDiscard,
+          foreignRead: yield* Proposals.findByIdForProfile(foreignId, profileId),
+          current: yield* profiles.getVersioned(profileId),
+        };
+      }),
+    );
+
+    expect(result.accepted?.profile.skills).toEqual(["Accepted"]);
+    expect(result.discardAfterAccept).toBe(0);
+    expect(result.discarded).toBe(1);
+    expect(result.acceptAfterDiscard).toBeUndefined();
+    expect(result.foreignDiscard).toBe(0);
+    expect(result.foreignRead).toBeUndefined();
+    expect(result.current.profile.skills).toEqual(["Accepted"]);
+  });
+
+  it("rolls back a missing-profile merge when the second decision statement fails", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const profiles = yield* Profiles;
+        const id = proposalId("sqlite-rollback");
+        yield* Proposals.insert(proposal(id, "skills.0", "TypeScript"));
+        const prepared = profileWriteForPendingProposal(
+          profileId,
+          { ...sample, skills: ["TypeScript"] },
+          id,
+          undefined,
+          "2026-08-25T02:00:00.000Z",
+        );
+        const exit = yield* Effect.exit(
+          db.atomicAffected([
+            prepared.write,
+            {
+              sql: "UPDATE proposals SET status = 'invalid', decidedAt = ? WHERE id = ? AND profileId = ? AND status = 'pending' AND changes() = 1",
+              bindings: ["2026-08-25T02:00:00.000Z", id, profileId],
+            },
+          ]),
+        );
+        return {
+          exit,
+          current: yield* profiles.getVersioned(profileId),
+          stored: yield* Proposals.findByIdForProfile(id, profileId),
+        };
+      }),
+    );
+
+    expect(result.exit._tag).toBe("Failure");
+    expect(result.current.profileUpdatedAt).toBeNull();
+    expect(result.stored?.status).toBe("pending");
   });
 });
