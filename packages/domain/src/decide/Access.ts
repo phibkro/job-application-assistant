@@ -25,7 +25,13 @@ export type Decision = typeof Decision.Type;
 
 const grants: Record<Tier["_tag"], ReadonlyArray<Capability>> = {
   Free: [],
-  Premium: ["model-drafting", "automated-apply", "agent-acquisition", "scheduled-applications"],
+  Premium: [
+    "model-drafting",
+    "automated-apply",
+    "agent-acquisition",
+    "scheduled-applications",
+    "model-inference",
+  ],
 };
 
 /** Whether the tier includes the capability. Total, and trivially testable. */

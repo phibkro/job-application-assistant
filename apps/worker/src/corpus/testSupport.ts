@@ -189,15 +189,21 @@ export const makeTestDatabase = (): DatabaseShape => {
   // in-memory map mutated synchronously, so no reader can observe a partial
   // batch. Real batch semantics belong to the layers in `db/`, and
   // `live.test.ts` exercises this slot against one of them.
-  const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
+  const atomicAffected = (writes: ReadonlyArray<Write>): Effect.Effect<ReadonlyArray<number>> =>
     Effect.sync(() => {
+      const affected: Array<number> = [];
       for (const write of writes) {
         Effect.runSync(run(write.sql, write.bindings));
+        affected.push(1);
       }
+      return affected;
     });
+
+  const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
+    atomicAffected(writes).pipe(Effect.asVoid);
 
   const runAffected = (sql: string, bindings: ReadonlyArray<unknown>): Effect.Effect<number> =>
     run(sql, bindings).pipe(Effect.as(1));
 
-  return { query, run, runAffected, atomic };
+  return { query, run, runAffected, atomicAffected, atomic };
 };

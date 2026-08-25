@@ -51,6 +51,10 @@ export type ApplicationId = typeof ApplicationId.Type;
 export const CustomLabelId = Schema.String.pipe(Schema.brand("CustomLabelId"));
 export type CustomLabelId = typeof CustomLabelId.Type;
 
+/** A proposed profile fact awaiting its owner's per-field decision. */
+export const ProposalId = Schema.String.pipe(Schema.brand("ProposalId"));
+export type ProposalId = typeof ProposalId.Type;
+
 export const SavedSearchId = Schema.String.pipe(Schema.brand("SavedSearchId"));
 export type SavedSearchId = typeof SavedSearchId.Type;
 

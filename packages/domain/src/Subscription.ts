@@ -27,6 +27,7 @@ export const Capability = Schema.Literals([
   "automated-apply",
   "agent-acquisition",
   "scheduled-applications",
+  "model-inference",
 ]);
 export type Capability = typeof Capability.Type;
 

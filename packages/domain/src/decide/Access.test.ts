@@ -86,11 +86,17 @@ describe("permits", () => {
           "automated-apply" as const,
           "agent-acquisition" as const,
           "scheduled-applications" as const,
+          "model-inference" as const,
         ),
         (capability) => {
           expect(permits({ _tag: "Free" }, capability)).toBe(false);
         },
       ),
     );
+  });
+
+  it("grants model inference to Premium but not Free", () => {
+    expect(permits({ _tag: "Free" }, "model-inference")).toBe(false);
+    expect(permits({ _tag: "Premium", until: "2027-01-01" }, "model-inference")).toBe(true);
   });
 });

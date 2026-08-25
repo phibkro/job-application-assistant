@@ -29,7 +29,8 @@
     "qualification": "python3 scripts/qualify.py"
   },
   "dependencies": {
-    "effect": "4.0.0-rc.108"
+    "effect": "4.0.0-rc.108",
+    "unpdf": "1.8.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

@@ -9,7 +9,14 @@
 export interface D1PreparedStatement {
   bind(...values: ReadonlyArray<unknown>): D1PreparedStatement;
   all<T = unknown>(): Promise<{ readonly results: ReadonlyArray<T> }>;
-  run(): Promise<unknown>;
+  run(): Promise<D1Result>;
+}
+
+export interface D1Result<T = unknown> {
+  readonly results: ReadonlyArray<T>;
+  readonly meta: {
+    readonly changes: number;
+  };
 }
 
 export interface D1Database {
@@ -20,7 +27,5 @@ export interface D1Database {
    * back together. See `Live.ts` for why `Database.transaction` is built on
    * this rather than on `BEGIN`/`COMMIT`.
    */
-  batch<T = unknown>(
-    statements: ReadonlyArray<D1PreparedStatement>,
-  ): Promise<ReadonlyArray<{ results: ReadonlyArray<T> }>>;
+  batch(statements: ReadonlyArray<D1PreparedStatement>): Promise<ReadonlyArray<D1Result>>;
 }

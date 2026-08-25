@@ -17,6 +17,10 @@ import { normalizeBinding } from "./Binding.ts";
 const SCHEMA_PATH = node_path.resolve(import.meta.dirname, "../../../../db/schema.sql");
 
 const bind = (bindings: ReadonlyArray<unknown>) => bindings.map(normalizeBinding);
+const changesOf = (result: unknown): number => {
+  if (typeof result !== "object" || result === null || !("changes" in result)) return 0;
+  return typeof result.changes === "number" ? result.changes : 0;
+};
 
 /**
  * A `Database` layer over a real SQLite engine (`bun:sqlite`), for tests.
@@ -54,32 +58,30 @@ export const layerSqlite = (location: string = ":memory:"): Layer.Layer<Database
       });
 
     const runAffected = (sql: string, bindings: ReadonlyArray<unknown>): Effect.Effect<number> =>
-      Effect.sync(() => {
-        const result = db.query(sql).run(...bind(bindings));
-        if (typeof result === "object" && result !== null && "changes" in result) {
-          const changes = result.changes;
-          return typeof changes === "number" ? changes : 0;
-        }
-        return 0;
-      });
+      Effect.sync(() => changesOf(db.query(sql).run(...bind(bindings))));
     // All-or-nothing over the given list. Every write runs between BEGIN and
     // COMMIT; anything SQLite rejects rolls the whole list back before the
     // defect propagates, so a partial batch is not a state a caller can see.
-    const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
+    const atomicAffected = (writes: ReadonlyArray<Write>): Effect.Effect<ReadonlyArray<number>> =>
       writes.length === 0
-        ? Effect.void
+        ? Effect.succeed([])
         : Effect.sync(() => {
+            const affected: Array<number> = [];
             db.exec("BEGIN");
             try {
               for (const write of writes) {
-                db.query(write.sql).run(...bind(write.bindings));
+                affected.push(changesOf(db.query(write.sql).run(...bind(write.bindings))));
               }
               db.exec("COMMIT");
+              return affected;
             } catch (cause) {
               db.exec("ROLLBACK");
               throw cause;
             }
           });
 
-    return Database.of({ query, run, runAffected, atomic });
+    const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
+      atomicAffected(writes).pipe(Effect.asVoid);
+
+    return Database.of({ query, run, runAffected, atomicAffected, atomic });
   });

@@ -62,7 +62,7 @@ test("edits preferences and uses the explainable shortlist", async ({ page }) =>
     frontend.getByRole("link", { name: "View" }).click(),
   ]);
   await expect(page.getByRole("heading", { name: "Frontendutvikler", exact: true })).toBeVisible();
-  const detailAssessment = page.locator("[data-match-assessment]:visible");
+  const detailAssessment = page.locator("[data-match-assessment]").last();
   await expect(detailAssessment).toHaveAttribute("data-fit", fit ?? "");
   expect(await detailAssessment.innerText()).toBe(assessmentText);
   await assertAccessible(page);

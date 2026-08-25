@@ -16,8 +16,11 @@ import type { Database } from "../services/Database.ts";
 import type { Drafting } from "../services/Drafting.ts";
 import type { Entitlements } from "../services/Entitlements.ts";
 import type { Hydration } from "../services/Hydration.ts";
+import type { Ids } from "../services/Ids.ts";
 import type { Ingestion } from "../services/Ingestion.ts";
 import type { Judgements } from "../services/Judgements.ts";
+import type { Extraction } from "../services/Extraction.ts";
+import type { HeuristicInference, ModelInference } from "../services/Inference.ts";
 import type { Policy } from "../services/Policy.ts";
 import type { Saved } from "../services/Saved.ts";
 import type { SavedJobs } from "../services/SavedJobs.ts";
@@ -37,6 +40,9 @@ import { layer as catalogLayer } from "../catalog/index.ts";
 import { layer as draftingLayer } from "../drafting/index.ts";
 import { layer as hydrationLayer } from "../hydration/index.ts";
 import { layer as ingestionLayer } from "../ingestion/index.ts";
+import { layer as extractionLayer } from "../extraction/index.ts";
+import { layer as heuristicEngineLayer } from "../inference/heuristic/index.ts";
+import { layer as modelEngineLayer } from "../inference/model/index.ts";
 import { hydrationLeaseLayer, layer as sourceLeaseLayer } from "../ingestion/SourceLeaseObject.ts";
 import { layer as idsLayer } from "./Ids.ts";
 import type { Env } from "./Env.ts";
@@ -101,6 +107,10 @@ export type Services =
   | SavedJobs
   | Saved
   | SourceCatalog
+  | Extraction
+  | HeuristicInference
+  | ModelInference
+  | Ids
   | Ingestion;
 
 /**
@@ -136,6 +146,9 @@ export const services = (env: Env): Layer.Layer<Services> => {
     corpusLayer,
     accountsLayer,
     draftingLayer,
+    extractionLayer,
+    heuristicEngineLayer,
+    modelEngineLayer(env.AI),
     catalogLayer,
     idsLayer,
   ).pipe(Layer.provideMerge(databaseLayer(env.DB)));

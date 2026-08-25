@@ -2,17 +2,18 @@ import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { ProfileId } from "@job-index/domain/Ids";
+import { ProfileId, ProposalId } from "@job-index/domain/Ids";
 import { QuestionKey } from "@job-index/domain/Answer";
 import type { AnswerShape } from "@job-index/domain/Answer";
 import type { Profile } from "@job-index/domain/Profile";
 import { Profiles } from "../services/Accounts.ts";
-import { layer } from "./profiles.ts";
-import { unansweredOf } from "./profiles.ts";
+import type { Database } from "../services/Database.ts";
+import { acceptProposal, layer, ProfileDecisionAtomicityDefect, unansweredOf } from "./profiles.ts";
 import { emptyState, fakeDatabaseLayer, type FakeState } from "./fixtures.ts";
 
 const profileId = Schema.decodeUnknownSync(ProfileId)("profile-1");
 const question = (raw: string) => Schema.decodeUnknownSync(QuestionKey)(raw);
+const proposalId = Schema.decodeUnknownSync(ProposalId)("proposal-defect");
 
 const run = <A>(state: FakeState, effect: Effect.Effect<A, never, Profiles>) =>
   Effect.runPromise(effect.pipe(Effect.provide(layer), Effect.provide(fakeDatabaseLayer(state))));
@@ -33,34 +34,98 @@ const sample: Profile = {
   education: [],
 };
 
-describe("get / set", () => {
-  it("returns an empty CV for a profile with none set yet", async () => {
-    const profile = await run(
+describe("versioned get / set", () => {
+  it("returns an empty CV with a null version when no profile row exists", async () => {
+    const current = await run(
       emptyState(),
-      withProfiles((profiles) => profiles.get(profileId)),
+      withProfiles((profiles) => profiles.getVersioned(profileId)),
     );
-    expect(profile).toEqual({
-      headline: "",
-      summary: "",
-      location: "",
-      languages: "",
-      skills: [],
-      experience: [],
-      education: [],
+    expect(current).toEqual({
+      profile: {
+        headline: "",
+        summary: "",
+        location: "",
+        languages: "",
+        skills: [],
+        experience: [],
+        education: [],
+      },
+      profileUpdatedAt: null,
     });
   });
 
-  it("set then get round-trips the CV", async () => {
+  it("setVersioned then getVersioned round-trips the CV and new version", async () => {
     const state = emptyState();
-    await run(
+    const written = await run(
       state,
-      withProfiles((profiles) => profiles.set(profileId, sample)),
+      withProfiles((profiles) => profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie)),
     );
     const read = await run(
       state,
-      withProfiles((profiles) => profiles.get(profileId)),
+      withProfiles((profiles) => profiles.getVersioned(profileId)),
     );
-    expect(read).toEqual(sample);
+    expect(written.profile).toEqual(sample);
+    expect(written.profileUpdatedAt).not.toBeNull();
+    expect(read).toEqual(written);
+  });
+
+  it("rejects a stale replacement once and preserves the winning profile", async () => {
+    const state = emptyState();
+    const result = await run(
+      state,
+      withProfiles((profiles) =>
+        Effect.gen(function* () {
+          const first = yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+          const winner = yield* profiles
+            .setVersioned(profileId, { ...sample, headline: "Winner" }, first.profileUpdatedAt)
+            .pipe(Effect.orDie);
+          const stale = yield* Effect.exit(
+            profiles.setVersioned(
+              profileId,
+              { ...sample, headline: "Stale" },
+              first.profileUpdatedAt,
+            ),
+          );
+          return {
+            winner,
+            stale,
+            current: yield* profiles.getVersioned(profileId),
+          };
+        }),
+      ),
+    );
+
+    expect(result.stale._tag).toBe("Failure");
+
+    expect(result.current).toEqual(result.winner);
+    expect(result.current.profile.headline).toBe("Winner");
+  });
+});
+describe("proposal decision affected vectors", () => {
+  it("dies with a typed defect for a mixed vector", async () => {
+    const database: Database["Service"] = {
+      query: <A>() => Effect.succeed([] as ReadonlyArray<A>),
+      run: () => Effect.void,
+      runAffected: () => Effect.succeed(0),
+      atomicAffected: () => Effect.succeed([1, 0]),
+      atomic: () => Effect.void,
+    };
+    const exit = await Effect.runPromise(
+      Effect.exit(
+        acceptProposal(
+          database,
+          profileId,
+          proposalId,
+          "2026-08-25T03:00:00.000Z",
+          (profile) => profile,
+        ),
+      ),
+    );
+
+    expect(exit._tag).toBe("Failure");
+    if (exit._tag === "Failure") {
+      expect(String(exit.cause)).toContain(ProfileDecisionAtomicityDefect.name);
+    }
   });
 });
 

@@ -19,12 +19,16 @@ import { Judgements } from "../services/Judgements.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
 import { Database } from "../services/Database.ts";
+import { Ids } from "../services/Ids.ts";
+import { Extraction } from "../services/Extraction.ts";
+import { HeuristicInference, ModelInference } from "../services/Inference.ts";
 import { layer as authLayer } from "./auth.ts";
 import { layer as corpusLayer } from "./corpus.ts";
 import { layer as feedLayer } from "./feed.ts";
 import { layer as profileLayer } from "./profile.ts";
 import { layer as applicationsLayer } from "./applications.ts";
 import { layer as ingestionLayer } from "./status.ts";
+import { layer as proposalsLayer } from "./proposals.ts";
 
 /**
  * A fake that dies with the caller's name when hit, rather than returning a
@@ -61,6 +65,8 @@ const defaultAccounts = Layer.succeed(Accounts, {
 const defaultProfiles = Layer.succeed(Profiles, {
   get: unstubbed("Profiles", "get"),
   set: unstubbed("Profiles", "set"),
+  getVersioned: unstubbed("Profiles", "getVersioned"),
+  setVersioned: unstubbed("Profiles", "setVersioned"),
   answers: unstubbed("Profiles", "answers"),
   answer: unstubbed("Profiles", "answer"),
   unanswered: unstubbed("Profiles", "unanswered"),
@@ -101,6 +107,23 @@ const defaultJudgements = Layer.succeed(Judgements, {
   record: unstubbed("Judgements", "record"),
 });
 
+let idCounter = 0;
+const defaultIds = Layer.succeed(Ids, {
+  next: Effect.sync(() => "test-id-" + ++idCounter),
+});
+
+const defaultExtraction = Layer.succeed(Extraction, {
+  extract: unstubbed("Extraction", "extract"),
+});
+
+const defaultHeuristicInference = Layer.succeed(HeuristicInference, {
+  propose: unstubbed("HeuristicInference", "propose"),
+});
+
+const defaultModelInference = Layer.succeed(ModelInference, {
+  propose: unstubbed("ModelInference", "propose"),
+});
+
 const defaultSourceCatalog = Layer.succeed(SourceCatalog, {
   list: unstubbed("SourceCatalog", "list"),
 });
@@ -109,6 +132,7 @@ const defaultDatabase = Layer.succeed(Database, {
   query: unstubbed("Database", "query"),
   run: unstubbed("Database", "run"),
   runAffected: unstubbed("Database", "runAffected"),
+  atomicAffected: unstubbed("Database", "atomicAffected"),
   atomic: unstubbed("Database", "atomic"),
 });
 
@@ -127,6 +151,10 @@ export interface Fakes {
   readonly judgements?: Layer.Layer<Judgements>;
   readonly database?: Layer.Layer<Database>;
   readonly sourceCatalog?: Layer.Layer<SourceCatalog>;
+  readonly extraction?: Layer.Layer<Extraction>;
+  readonly heuristicInference?: Layer.Layer<HeuristicInference>;
+  readonly modelInference?: Layer.Layer<ModelInference>;
+  readonly ids?: Layer.Layer<Ids>;
 }
 
 /**
@@ -149,11 +177,16 @@ export const buildHandler = (fakes: Fakes = {}) => {
     fakes.judgements ?? defaultJudgements,
     fakes.sourceCatalog ?? defaultSourceCatalog,
     fakes.database ?? defaultDatabase,
+    fakes.extraction ?? defaultExtraction,
+    fakes.heuristicInference ?? defaultHeuristicInference,
+    fakes.modelInference ?? defaultModelInference,
+    fakes.ids ?? defaultIds,
   );
   const appLayer = HttpApiBuilder.layer(api).pipe(
     Layer.provide(ingestionLayer),
     Layer.provide(corpusLayer),
     Layer.provide(feedLayer),
+    Layer.provide(proposalsLayer),
     Layer.provide(profileLayer),
     Layer.provide(applicationsLayer),
     Layer.provide(authLayer),

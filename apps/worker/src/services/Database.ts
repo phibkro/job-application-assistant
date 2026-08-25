@@ -31,6 +31,15 @@ export class Database extends Context.Service<
      */
     readonly runAffected: (sql: string, bindings: ReadonlyArray<unknown>) => Effect.Effect<number>;
     /**
+     * All-or-nothing writes with the affected-row count from each statement.
+     *
+     * The vector preserves statement order. It is the only reliable way to
+     * validate a multi-statement compare-and-swap against D1: SQLite's
+     * connection-wide `changes()` can guard the next statement, while the
+     * returned counts prove that every guarded transition won.
+     */
+    readonly atomicAffected: (writes: ReadonlyArray<Write>) => Effect.Effect<ReadonlyArray<number>>;
+    /**
      * All-or-nothing, over a list of writes decided in advance.
      *
      * A list rather than "wrap this effect", because D1 has no interactive

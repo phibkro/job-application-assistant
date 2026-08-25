@@ -3,6 +3,7 @@ import type { ProfileId } from "@job-index/domain/Ids";
 import { Database } from "../services/Database.ts";
 import type { Write } from "../services/Database.ts";
 import * as Answers from "./repositories/Answers.ts";
+import * as Proposals from "./repositories/Proposals.ts";
 import * as Sessions from "./repositories/Sessions.ts";
 import * as Freshness from "./repositories/Freshness.ts";
 import * as Judgements from "./repositories/Judgements.ts";
@@ -73,6 +74,7 @@ const purges: ReadonlyArray<{
 }> = [
   { table: "sessions", write: Sessions.deleteByProfileWrite },
   { table: "answers", write: Answers.deleteByProfileWrite },
+  { table: "proposals", write: Proposals.deleteByProfileWrite },
   { table: "label_assignments", write: Labels.deleteAssignmentsByProfileWrite },
   { table: "active_applications", write: ActiveApplications.deleteByProfileWrite },
   { table: "applications", write: ApplicationRecords.deleteByProfileWrite },

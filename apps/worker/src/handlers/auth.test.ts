@@ -101,6 +101,8 @@ describe("the Authenticated middleware", () => {
             education: [],
           }),
         set: () => Effect.die("unused"),
+        getVersioned: () => Effect.die("unused"),
+        setVersioned: () => Effect.die("unused"),
         answers: () => Effect.die("unused"),
         answer: () => Effect.die("unused"),
         unanswered: () => Effect.die("unused"),

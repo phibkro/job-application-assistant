@@ -33,6 +33,22 @@ export const INSERT_PROFILE = `-- accounts:insertProfile\nINSERT INTO profiles (
 
 export const UPDATE_PROFILE = `-- accounts:updateProfile\nUPDATE profiles SET ${PROFILE_UPDATE_FIELDS.map((field) => `${field} = ?`).join(", ")} WHERE profileId = ?`;
 
+/** Whole-profile optimistic replacement when the caller observed no row. */
+export const INSERT_PROFILE_IF_MISSING = `-- accounts:insertProfileIfMissing\nINSERT INTO profiles (${columns(PROFILE_FIELDS)}) SELECT ${placeholders(PROFILE_FIELDS)} WHERE NOT EXISTS (SELECT 1 FROM profiles WHERE profileId = ?)`;
+
+/** Whole-profile optimistic replacement when the caller observed this version. */
+export const UPDATE_PROFILE_IF_VERSION = `-- accounts:updateProfileIfVersion\nUPDATE profiles SET ${PROFILE_UPDATE_FIELDS.map((field) => `${field} = ?`).join(", ")} WHERE profileId = ? AND updatedAt = ?`;
+
+/**
+ * Profile-first proposal acceptance. The prior CV and version are both part
+ * of the compare-and-swap, and the owner-scoped pending proposal must still
+ * exist at the same transaction snapshot.
+ */
+export const UPDATE_PROFILE_FOR_PENDING_PROPOSAL = `-- accounts:updateProfileForPendingProposal\nUPDATE profiles SET cv = ?, updatedAt = ? WHERE profileId = ? AND cv = ? AND updatedAt = ? AND EXISTS (SELECT 1 FROM proposals WHERE id = ? AND profileId = ? AND status = 'pending')`;
+
+/** Missing profiles merge from `emptyProfile` and insert only while the same owner-scoped proposal is pending. */
+export const INSERT_PROFILE_FOR_PENDING_PROPOSAL = `-- accounts:insertProfileForPendingProposal\nINSERT INTO profiles (${columns(PROFILE_FIELDS)}) SELECT ${placeholders(PROFILE_FIELDS)} WHERE NOT EXISTS (SELECT 1 FROM profiles WHERE profileId = ?) AND EXISTS (SELECT 1 FROM proposals WHERE id = ? AND profileId = ? AND status = 'pending')`;
+
 export const FIND_PRINCIPAL_BY_API_KEY_HASH = `-- accounts:findPrincipalByApiKeyHash\nSELECT ${columns(PRINCIPAL_FIELDS)} FROM principals WHERE apiKeyHash = ?`;
 
 export const PROFILE_FOR_PRINCIPAL = `-- accounts:profileForPrincipal\nSELECT profileId FROM principals WHERE principalId = ?`;

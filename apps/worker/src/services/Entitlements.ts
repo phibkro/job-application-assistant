@@ -18,7 +18,8 @@ export type Capability =
   | "model-drafting"
   | "automated-apply"
   | "agent-acquisition"
-  | "scheduled-applications";
+  | "scheduled-applications"
+  | "model-inference";
 
 export class Entitlements extends Context.Service<
   Entitlements,

@@ -6,11 +6,13 @@ import type { Profile } from "@job-index/domain/Profile";
 import { Database } from "../services/Database.ts";
 import {
   emptyProfile,
+  nextProfileUpdatedAt,
   readProfileRow,
   toDomainErasure,
   toDomainProfile,
   writeErasureRequested,
   writeProfile,
+  writeProfileIfVersion,
 } from "./profileRow.ts";
 import { emptyState, fakeDatabaseLayer, type FakeState } from "./fixtures.ts";
 
@@ -92,6 +94,51 @@ describe("writeProfile / readProfileRow", () => {
     // createdAt marks the row's first write, not its most recent one.
     expect(row?.createdAt).toBe("2026-01-01T00:00:00.000Z");
     expect(row?.updatedAt).toBe("2026-01-03T00:00:00.000Z");
+  });
+
+  it("advances updatedAt when the clock is equal to or behind the stored version", async () => {
+    expect(nextProfileUpdatedAt("2026-01-03T00:00:00.000Z", "2026-01-03T00:00:00.000Z")).toBe(
+      "2026-01-03T00:00:00.001Z",
+    );
+    expect(nextProfileUpdatedAt("2026-01-03T00:00:00.001Z", "2025-12-31T23:59:59.000Z")).toBe(
+      "2026-01-03T00:00:00.002Z",
+    );
+  });
+
+  it("rejects a stale whole-profile replacement and preserves the winner", async () => {
+    const state = emptyState();
+    await run(
+      state,
+      withDb((db) => writeProfile(db, profileId, sample, "2026-01-01T00:00:00.000Z")),
+    );
+    const winner: Profile = { ...sample, headline: "Winner" };
+    const stale: Profile = { ...sample, headline: "Stale" };
+    const result = await run(
+      state,
+      withDb((db) =>
+        Effect.gen(function* () {
+          const won = yield* writeProfileIfVersion(
+            db,
+            profileId,
+            winner,
+            "2026-01-01T00:00:00.000Z",
+            "2026-01-01T00:00:00.000Z",
+          );
+          const lost = yield* writeProfileIfVersion(
+            db,
+            profileId,
+            stale,
+            "2026-01-01T00:00:00.000Z",
+            "2026-01-01T00:00:00.000Z",
+          );
+          return { won, lost, row: yield* readProfileRow(db, profileId) };
+        }),
+      ),
+    );
+
+    expect(result.won?.profileUpdatedAt).toBe("2026-01-01T00:00:00.001Z");
+    expect(result.lost).toBeUndefined();
+    expect(toDomainProfile(result.row!)).toEqual(winner);
   });
 });
 

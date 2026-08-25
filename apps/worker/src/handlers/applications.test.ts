@@ -222,6 +222,8 @@ describe("applications.draft", () => {
       profiles: Layer.succeed(Profiles, {
         get: () => Effect.succeed(blankProfile),
         set: () => Effect.die("unused"),
+        getVersioned: () => Effect.die("unused"),
+        setVersioned: () => Effect.die("unused"),
         answers: () => Effect.die("unused"),
         answer: () => Effect.die("unused"),
         unanswered: () => Effect.die("unused"),
@@ -241,6 +243,8 @@ describe("applications.draft", () => {
       profiles: Layer.succeed(Profiles, {
         get: () => Effect.succeed(blankProfile),
         set: () => Effect.die("unused"),
+        getVersioned: () => Effect.die("unused"),
+        setVersioned: () => Effect.die("unused"),
         answers: () => Effect.die("unused"),
         answer: () => Effect.die("unused"),
         unanswered: () => Effect.die("unused"),

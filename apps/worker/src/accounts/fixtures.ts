@@ -124,7 +124,7 @@ const runQuery = (
   }
 };
 
-const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknown>): void => {
+const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknown>): number => {
   switch (op) {
     case "insertProfile": {
       const [profileId, cv, erasure, createdAt, updatedAt] = bindings as [
@@ -135,7 +135,19 @@ const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknow
         string,
       ];
       state.profiles.push({ profileId, cv, erasure, createdAt, updatedAt });
-      return;
+      return 1;
+    }
+    case "insertProfileIfMissing": {
+      const [profileId, cv, erasure, createdAt, updatedAt] = bindings as [
+        string,
+        string,
+        string,
+        string,
+        string,
+      ];
+      if (state.profiles.some((profile) => profile.profileId === profileId)) return 0;
+      state.profiles.push({ profileId, cv, erasure, createdAt, updatedAt });
+      return 1;
     }
     case "updateProfile": {
       const [cv, erasure, updatedAt, profileId] = bindings as [string, string, string, string];
@@ -145,7 +157,24 @@ const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknow
       const existing = state.profiles[index];
       if (existing === undefined) throw new Error("unreachable: index came from findIndex");
       state.profiles[index] = { ...existing, cv, erasure, updatedAt };
-      return;
+      return 1;
+    }
+    case "updateProfileIfVersion": {
+      const [cv, erasure, updatedAt, profileId, expectedUpdatedAt] = bindings as [
+        string,
+        string,
+        string,
+        string,
+        string,
+      ];
+      const index = state.profiles.findIndex(
+        (profile) => profile.profileId === profileId && profile.updatedAt === expectedUpdatedAt,
+      );
+      if (index === -1) return 0;
+      const existing = state.profiles[index];
+      if (existing === undefined) throw new Error("unreachable: index came from findIndex");
+      state.profiles[index] = { ...existing, cv, erasure, updatedAt };
+      return 1;
     }
     case "insertAnswer": {
       const [profileId, question, label, shape, value, origin, createdAt, updatedAt] = bindings as [
@@ -168,7 +197,7 @@ const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknow
         createdAt,
         updatedAt,
       });
-      return;
+      return 1;
     }
     case "updateAnswer": {
       const [value, updatedAt, profileId, question] = bindings as [string, string, string, string];
@@ -183,7 +212,7 @@ const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknow
       const existing = state.answers[index];
       if (existing === undefined) throw new Error("unreachable: index came from findIndex");
       state.answers[index] = { ...existing, value, updatedAt };
-      return;
+      return 1;
     }
     default:
       throw new Error(`fake Database: unhandled run op "${op}"`);
@@ -195,16 +224,15 @@ export const fakeDatabaseLayer = (state: FakeState): Layer.Layer<Database> =>
     query: <A>(sql: string, bindings: ReadonlyArray<unknown>) =>
       Effect.sync(() => runQuery(state, opOf(sql), bindings) as ReadonlyArray<A>),
     run: (sql: string, bindings: ReadonlyArray<unknown>) =>
-      Effect.sync(() => runCommand(state, opOf(sql), bindings)),
-    runAffected: (sql: string, bindings: ReadonlyArray<unknown>) =>
       Effect.sync(() => {
         runCommand(state, opOf(sql), bindings);
-        return 1;
       }),
-    // Applied in order, with no rollback: this fake is a plain in-memory
-    // store mutated synchronously, so there is no partial state for another
-    // reader to observe. Real batch semantics are exercised against the
-    // persistence slot's own layers.
+    runAffected: (sql: string, bindings: ReadonlyArray<unknown>) =>
+      Effect.sync(() => runCommand(state, opOf(sql), bindings)),
+    // The fake pins account orchestration; real rollback semantics are covered
+    // by the SQLite and workerd database layers.
+    atomicAffected: (writes: ReadonlyArray<Write>) =>
+      Effect.sync(() => writes.map((write) => runCommand(state, opOf(write.sql), write.bindings))),
     atomic: (writes: ReadonlyArray<Write>) =>
       Effect.sync(() => {
         for (const write of writes) {

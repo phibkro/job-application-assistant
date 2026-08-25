@@ -34,6 +34,7 @@ describe("layerSqlite", () => {
       "delivery_platforms",
       "freshness",
       "ingestion_failures",
+      "ingestion_gate",
       "ingestion_runs",
       "judgements",
       "label_assignments",
@@ -41,6 +42,7 @@ describe("layerSqlite", () => {
       "platform_policies",
       "principals",
       "profiles",
+      "proposals",
       "saved_jobs",
       "sessions",
       "source_catalog",
@@ -185,5 +187,44 @@ describe("layerSqlite", () => {
       }),
     );
     expect(counts).toEqual([1, 1, 0]);
+  });
+
+  it("returns one count per atomic statement and carries changes() to the next statement", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const won = yield* db.atomicAffected([
+          {
+            sql: "INSERT INTO freshness (profileId, seenThrough, updatedAt) VALUES (?, ?, ?)",
+            bindings: ["atomic-counts", 1, "2026-01-01T00:00:00.000Z"],
+          },
+          {
+            sql: "UPDATE freshness SET seenThrough = ? WHERE profileId = ? AND changes() = 1",
+            bindings: [2, "atomic-counts"],
+          },
+        ]);
+        const lost = yield* db.atomicAffected([
+          {
+            sql: "UPDATE freshness SET seenThrough = ? WHERE profileId = ?",
+            bindings: [3, "missing"],
+          },
+          {
+            sql: "UPDATE freshness SET seenThrough = ? WHERE profileId = ? AND changes() = 1",
+            bindings: [4, "atomic-counts"],
+          },
+        ]);
+        const rows = yield* db.query<{ seenThrough: number }>(
+          "SELECT seenThrough FROM freshness WHERE profileId = ?",
+          ["atomic-counts"],
+        );
+        return { won, lost, seenThrough: rows[0]?.seenThrough };
+      }),
+    );
+
+    expect(result).toEqual({
+      won: [1, 1],
+      lost: [0, 0],
+      seenThrough: 2,
+    });
   });
 });

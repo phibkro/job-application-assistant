@@ -341,7 +341,11 @@ describe("session", () => {
         ...initialModel.profile,
         profile: {
           _tag: "Success",
-          data: { profile: { headline: "x" } as never, capabilities: [] },
+          data: {
+            profile: { headline: "x" } as never,
+            capabilities: [],
+            profileUpdatedAt: null,
+          },
         },
       },
       applications: [{ jobId: "job-1", stage: Option.none(), pending: { _tag: "Idle" } }],

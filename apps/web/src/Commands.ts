@@ -3,6 +3,8 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import { Command, Http, Navigation } from "foldkit";
+import * as Dom from "foldkit/dom";
+import * as FoldkitFile from "foldkit/file";
 import { Profile } from "@job-index/domain/Profile";
 import { ApplicationEvent, SavedSort, SavedView } from "../../worker/src/Api.ts";
 import { CustomLabelId } from "@job-index/domain/Ids";
@@ -185,20 +187,38 @@ export const FetchProfile = Command.define("FetchProfile", {
 
 export const SaveProfile = Command.define("SaveProfile", {
   // `capabilities` travels through as the value already sitting in the
-  // Model (from the last `/me`), not a second fetch: `setProfile` cannot
-  // change what an account is entitled to, so there is nothing new to ask
-  // the server for.
-  args: { profile: Profile, capabilities: S.Array(S.String) },
+  // Model (from the last `/me`), not a second fetch. The nullable revision is
+  // the optimistic-concurrency token for a profile that may not exist yet.
+  // Generation and base revision return with either completion so update can
+  // reject a response whose request no longer owns the save slot.
+  args: {
+    profile: Profile,
+    capabilities: S.Array(S.String),
+    expectedUpdatedAt: S.NullOr(S.String),
+    generation: S.Number,
+  },
   messages: [ProfileMessage.SaveSucceeded, ProfileMessage.SaveFailed],
-  execute: ({ profile, capabilities }) =>
+  execute: ({ profile, capabilities, expectedUpdatedAt, generation }) =>
     withHttp(
       Effect.gen(function* () {
         const client = yield* makeClient(currentToken());
-        const saved = yield* client.profile.setProfile({ payload: profile });
-        return ProfileMessage.SaveSucceeded({ response: { profile: saved, capabilities } });
+        const saved = yield* client.profile.setProfile({
+          payload: { profile, expectedUpdatedAt },
+        });
+        return ProfileMessage.SaveSucceeded({
+          response: { ...saved, capabilities },
+          generation,
+          baseProfileUpdatedAt: expectedUpdatedAt,
+        });
       }).pipe(
         Effect.catch((error) =>
-          Effect.succeed(ProfileMessage.SaveFailed({ problem: toProblem(error) })),
+          Effect.succeed(
+            ProfileMessage.SaveFailed({
+              generation,
+              baseProfileUpdatedAt: expectedUpdatedAt,
+              problem: toProblem(error),
+            }),
+          ),
         ),
       ),
     ),
@@ -541,4 +561,190 @@ export const PersistThemePreference = Command.define("PersistThemePreference", {
       persistThemePreference(preference);
       return ProfileMessage.ThemePersisted();
     }),
+});
+
+// --- WS-0016: document→profile proposal import ------------------------------
+
+export const MAX_PDF_PROFILE_FILE_BYTES = 512 * 1024;
+export const MAX_TEXT_PROFILE_FILE_BYTES = 800_000;
+export const MAX_TEXT_PROFILE_CHARACTERS = 200_000;
+
+export type ProfileFileIo = Readonly<{
+  name: (file: FoldkitFile.File) => string;
+  mimeType: (file: FoldkitFile.File) => string;
+  size: (file: FoldkitFile.File) => number;
+  readAsDataUrl: (file: FoldkitFile.File) => Effect.Effect<string, FoldkitFile.FileReadError>;
+  readAsText: (file: FoldkitFile.File) => Effect.Effect<string, FoldkitFile.FileReadError>;
+}>;
+
+const liveProfileFileIo: ProfileFileIo = {
+  name: FoldkitFile.name,
+  mimeType: FoldkitFile.mimeType,
+  size: FoldkitFile.size,
+  readAsDataUrl: FoldkitFile.readAsDataUrl,
+  readAsText: FoldkitFile.readAsText,
+};
+
+/**
+ * Classifies the native file and bounds allocation before invoking either
+ * FileReader operation. PDF retains its 512 KiB raw-byte boundary. Plain text
+ * permits the maximum four-byte UTF-8 representation, then enforces the
+ * worker contract's 200,000-character limit after decoding.
+ */
+export const readProfileFile = (file: FoldkitFile.File, io: ProfileFileIo = liveProfileFileIo) =>
+  Effect.gen(function* () {
+    const name = io.name(file).toLowerCase();
+    const declaredType = io.mimeType(file);
+    const isPdf = declaredType === "application/pdf" || name.endsWith(".pdf");
+    const isText = declaredType === "text/plain" || name.endsWith(".txt");
+    if (!isPdf && !isText) {
+      return yield* Effect.fail(NetworkError({ detail: "Select a PDF or plain-text document." }));
+    }
+    const byteLimit = isPdf ? MAX_PDF_PROFILE_FILE_BYTES : MAX_TEXT_PROFILE_FILE_BYTES;
+    if (io.size(file) > byteLimit) {
+      return yield* Effect.fail(
+        NetworkError({
+          detail: isPdf
+            ? "PDF files must be 512 KiB or smaller."
+            : "Plain-text files must be 800,000 bytes or smaller.",
+        }),
+      );
+    }
+    const content = isPdf
+      ? yield* Effect.map(io.readAsDataUrl(file), (dataUrl) => {
+          const separator = dataUrl.indexOf(",");
+          return separator < 0 ? "" : dataUrl.slice(separator + 1);
+        })
+      : yield* io.readAsText(file);
+    if (isText && content.length > MAX_TEXT_PROFILE_CHARACTERS) {
+      return yield* Effect.fail(
+        NetworkError({ detail: "Plain-text files must be 200,000 characters or fewer." }),
+      );
+    }
+    return {
+      content,
+      mimeType: isPdf ? ("application/pdf" as const) : ("text/plain" as const),
+    };
+  });
+
+/** Reads a file chosen by the Profile page's native file input, then imports it. */
+export const ImportProfileFile = Command.define("ImportProfileFile", {
+  args: { file: FoldkitFile.File, generation: S.Number },
+  messages: [ProfileMessage.ImportSucceeded, ProfileMessage.ImportFailed],
+  execute: ({ file, generation }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const document = yield* readProfileFile(file);
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.proposals.create({ payload: document });
+        return ProfileMessage.ImportSucceeded({
+          generation,
+          mimeType: document.mimeType,
+          response,
+        });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(ProfileMessage.ImportFailed({ generation, problem: toProblem(error) })),
+        ),
+      ),
+    ),
+});
+
+/** Paste/upload a past document; the worker proposes facts, transiently. */
+export const ImportProfileDocument = Command.define("ImportProfileDocument", {
+  args: {
+    content: S.String,
+    mimeType: S.Literals(["text/plain", "application/pdf"]),
+    generation: S.Number,
+  },
+  messages: [ProfileMessage.ImportSucceeded, ProfileMessage.ImportFailed],
+  execute: ({ content, mimeType, generation }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.proposals.create({
+          payload: { content, mimeType },
+        });
+        return ProfileMessage.ImportSucceeded({ generation, mimeType, response });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(ProfileMessage.ImportFailed({ generation, problem: toProblem(error) })),
+        ),
+      ),
+    ),
+});
+
+export const FetchProposals = Command.define("FetchProposals", {
+  args: { generation: S.Number },
+  messages: [ProfileMessage.ProposalsFetchSucceeded, ProfileMessage.ProposalsFetchFailed],
+  execute: ({ generation }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.proposals.list();
+        return ProfileMessage.ProposalsFetchSucceeded({ generation, response });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            ProfileMessage.ProposalsFetchFailed({ generation, problem: toProblem(error) }),
+          ),
+        ),
+      ),
+    ),
+});
+
+/** Accept (optionally editing the value first) or discard one proposal. */
+export const DecideProposal = Command.define("DecideProposal", {
+  args: {
+    proposalId: S.String,
+    decision: S.Literals(["accepted", "discarded"]),
+    value: S.OptionFromNullOr(S.String),
+    valueKind: S.Literals(["scalar", "structured"]),
+    generation: S.Number,
+  },
+  messages: [ProfileMessage.ProposalDecisionSucceeded, ProfileMessage.ProposalDecisionFailed],
+  execute: ({ proposalId, decision, value, valueKind, generation }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const encodedValue = Option.map(value, (edited) =>
+          valueKind === "scalar" ? (JSON.stringify(edited) ?? '""') : edited,
+        );
+        const payload: { decision: "accepted" | "discarded"; value?: string } = Option.isSome(
+          encodedValue,
+        )
+          ? { decision, value: encodedValue.value }
+          : { decision };
+        const response = yield* client.proposals.decide({
+          params: { id: proposalId },
+          payload,
+        });
+        return ProfileMessage.ProposalDecisionSucceeded({
+          id: proposalId,
+          generation,
+          response,
+        });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            ProfileMessage.ProposalDecisionFailed({
+              id: proposalId,
+              generation,
+              problem: toProblem(error),
+            }),
+          ),
+        ),
+      ),
+    ),
+});
+
+/** Moves review focus after a successful card removal, after render commits. */
+export const FocusProposalReview = Command.define("FocusProposalReview", {
+  args: { selector: S.String },
+  messages: [ProfileMessage.ProposalFocusSettled],
+  execute: ({ selector }) =>
+    Effect.gen(function* () {
+      yield* Dom.focus(selector, { makeFocusable: true });
+      return ProfileMessage.ProposalFocusSettled();
+    }).pipe(Effect.catch(() => Effect.succeed(ProfileMessage.ProposalFocusSettled()))),
 });

@@ -2,7 +2,7 @@ import { Database as BunSqlite } from "bun:sqlite";
 import * as node_fs from "node:fs";
 import * as node_path from "node:path";
 import { normalizeBinding } from "./Binding.ts";
-import type { D1Database, D1PreparedStatement } from "./D1.ts";
+import type { D1Database, D1PreparedStatement, D1Result } from "./D1.ts";
 
 /** Same generated snapshot `Sqlite.ts` reads — one schema, read twice, never copied. */
 const SCHEMA_PATH = node_path.resolve(import.meta.dirname, "../../../../db/schema.sql");
@@ -36,9 +36,9 @@ export const makeFakeD1 = (): D1Database & { readonly batchCalls: Array<number> 
       const result = db.query(sql).run(...bound.map(normalizeBinding));
       if (typeof result === "object" && result !== null && "changes" in result) {
         const changes = result.changes;
-        return { meta: { changes: typeof changes === "number" ? changes : 0 } };
+        return { results: [], meta: { changes: typeof changes === "number" ? changes : 0 } };
       }
-      return { meta: { changes: 0 } };
+      return { results: [], meta: { changes: 0 } };
     },
   });
 
@@ -52,6 +52,7 @@ export const makeFakeD1 = (): D1Database & { readonly batchCalls: Array<number> 
       // Mirrors D1: the whole list commits or rolls back as one SQLite
       // transaction (see D1.ts's docstring for the citation).
       db.exec("BEGIN");
+      const results: Array<D1Result> = [];
       try {
         // Deliberately sequential, not Promise.all: D1's own docs say batched
         // statements "execute and commit, sequentially, non-concurrently" —
@@ -59,14 +60,14 @@ export const makeFakeD1 = (): D1Database & { readonly batchCalls: Array<number> 
         // guarantee it exists to pin (e.g. Answers.upsert's delete-then-insert).
         for (const s of statements) {
           // eslint-disable-next-line no-await-in-loop
-          await s.run();
+          results.push(await s.run());
         }
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
         throw error;
       }
-      return [];
+      return results;
     },
   };
 };

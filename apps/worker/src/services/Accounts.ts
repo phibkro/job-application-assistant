@@ -1,9 +1,20 @@
 import type * as Effect from "effect/Effect";
+import * as Data from "effect/Data";
 import * as Context from "effect/Context";
 import type { Credential } from "@job-index/domain/Access";
 import type { Profile } from "@job-index/domain/Profile";
 import type { Answer, AnswerShape, QuestionKey } from "@job-index/domain/Answer";
 import type { ProfileId } from "@job-index/domain/Ids";
+
+export interface VersionedProfile {
+  readonly profile: Profile;
+  readonly profileUpdatedAt: string | null;
+}
+
+export class StaleProfileWrite extends Data.TaggedError("StaleProfileWrite")<{
+  readonly expectedUpdatedAt: string | null;
+  readonly actualUpdatedAt: string | null;
+}> {}
 
 /**
  * Identity, and the profile it carries.
@@ -32,7 +43,18 @@ export class Profiles extends Context.Service<
   Profiles,
   {
     readonly get: (profile: ProfileId) => Effect.Effect<Profile>;
+    /** Internal unconditional replacement for account setup and focused tests. */
     readonly set: (profile: ProfileId, value: Profile) => Effect.Effect<Profile>;
+    readonly getVersioned: (profile: ProfileId) => Effect.Effect<VersionedProfile>;
+    /**
+     * Whole-profile compare-and-swap. A stale version is never retried because
+     * doing so would replace changes the caller did not review.
+     */
+    readonly setVersioned: (
+      profile: ProfileId,
+      value: Profile,
+      expectedUpdatedAt: string | null,
+    ) => Effect.Effect<VersionedProfile, StaleProfileWrite>;
     readonly answers: (profile: ProfileId) => Effect.Effect<ReadonlyArray<Answer>>;
     /**
      * Records an answer.

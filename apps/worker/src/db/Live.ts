@@ -4,20 +4,14 @@ import * as Layer from "effect/Layer";
 import { Database } from "../services/Database.ts";
 import type { Write } from "../services/Database.ts";
 import { normalizeBinding } from "./Binding.ts";
-import type { D1Database, D1PreparedStatement } from "./D1.ts";
+import type { D1Database, D1PreparedStatement, D1Result } from "./D1.ts";
 
 const bind = (
   statement: D1PreparedStatement,
   bindings: ReadonlyArray<unknown>,
 ): D1PreparedStatement => statement.bind(...bindings.map(normalizeBinding));
 
-const changesOf = (result: unknown): number => {
-  if (typeof result !== "object" || result === null || !("meta" in result)) return 0;
-  const meta = result.meta;
-  if (typeof meta !== "object" || meta === null || !("changes" in meta)) return 0;
-  const changes = meta.changes;
-  return typeof changes === "number" ? changes : 0;
-};
+const changesOf = (result: D1Result): number => result.meta.changes;
 
 /**
  * Builds the `Database` service implementation over a real D1 binding.
@@ -61,14 +55,20 @@ const build = (d1: D1Database): Context.Service.Shape<typeof Database> => {
 
   // An empty batch is a no-op rather than an error: a sweep that decides
   // nothing needs writing is a normal outcome, not a caller mistake.
-  const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
+  const atomicAffected = (writes: ReadonlyArray<Write>): Effect.Effect<ReadonlyArray<number>> =>
     writes.length === 0
-      ? Effect.void
+      ? Effect.succeed([])
       : Effect.tryPromise(() =>
           d1.batch(writes.map((write) => bind(d1.prepare(write.sql), write.bindings))),
-        ).pipe(Effect.asVoid, Effect.orDie);
+        ).pipe(
+          Effect.map((results) => results.map(changesOf)),
+          Effect.orDie,
+        );
 
-  return { query: realQuery, run: realRun, runAffected: realRunAffected, atomic };
+  const atomic = (writes: ReadonlyArray<Write>): Effect.Effect<void> =>
+    atomicAffected(writes).pipe(Effect.asVoid);
+
+  return { query: realQuery, run: realRun, runAffected: realRunAffected, atomicAffected, atomic };
 };
 
 /**

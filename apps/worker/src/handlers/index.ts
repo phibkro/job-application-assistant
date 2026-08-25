@@ -1,6 +1,7 @@
 import { layer as authLayer } from "./auth.ts";
 import { layer as corpusLayer } from "./corpus.ts";
 import { layer as feedLayer } from "./feed.ts";
+import { layer as proposalsLayer } from "./proposals.ts";
 import { layer as profileLayer } from "./profile.ts";
 import { layer as applicationsLayer } from "./applications.ts";
 import { layer as statusLayer } from "./status.ts";
@@ -20,4 +21,5 @@ export const corpus = corpusLayer;
 export const feed = feedLayer;
 export const profile = profileLayer;
 export const applications = applicationsLayer;
+export const proposals = proposalsLayer;
 export const status = statusLayer;

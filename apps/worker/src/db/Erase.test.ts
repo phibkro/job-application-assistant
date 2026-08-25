@@ -13,6 +13,8 @@ import {
 } from "@job-index/domain/Applications";
 import { Submission } from "@job-index/domain/Delivery";
 import { Freshness, Judgement } from "@job-index/domain/Freshness";
+import { Proposal } from "@job-index/domain/Proposals";
+import * as ProposalsRepo from "./repositories/Proposals.ts";
 import { Subscription } from "@job-index/domain/Subscription";
 import type { JobSnapshot } from "@job-index/domain/Job";
 import { Database } from "../services/Database.ts";
@@ -187,6 +189,21 @@ const seedAccount = (profileId: string) =>
         providerRef: "cus_1",
         provider: "stripe",
         updatedAt: now,
+      }),
+    );
+    yield* ProposalsRepo.insert(
+      new Proposal({
+        id: `${profileId}-proposal` as never,
+        profileId: profileId as never,
+        sourceKind: "text",
+        fieldPath: "skills.0",
+        proposedValue: "TypeScript",
+        evidenceExcerpt: "Skills: TypeScript",
+        confidence: "high",
+        engine: "heuristic",
+        status: "pending",
+        createdAt: now,
+        decidedAt: OptionMod.none(),
       }),
     );
   });
