@@ -5,7 +5,7 @@ import type { Update } from "foldkit";
 import { evo } from "foldkit/struct";
 import * as Applications from "./Applications.ts";
 import * as Commands from "./Commands.ts";
-import { GotProfileMessage, GotSavedMessage } from "./Message.ts";
+import { GotProfileMessage, GotSavedMessage, GotStudioMessage } from "./Message.ts";
 import type { Message } from "./Message.ts";
 import {
   ApplyStageDecided,
@@ -19,6 +19,7 @@ import {
   PageNotFound,
   PageProfile,
   PageSaved,
+  PageStudio,
   type Problem,
   RequestFailed,
   RequestIdle,
@@ -29,6 +30,7 @@ import {
 } from "./Model.ts";
 import * as ProfileSubmodel from "./profile/index.ts";
 import * as SavedSubmodel from "./saved/index.ts";
+import * as StudioSubmodel from "./studio/index.ts";
 import * as Route from "./Route.ts";
 import { settle } from "./Settle.ts";
 
@@ -56,6 +58,23 @@ const loadSavedIfNeeded = (model: Model): UpdateReturn => {
     evo(model, { saved: () => nextSaved }),
     Command.mapMessages(savedCommands, (childMessage) =>
       GotSavedMessage({ sessionEpoch: model.sessionEpoch, message: childMessage }),
+    ),
+  ];
+};
+
+/** Same entry discipline for Studio: one load, guarded by the epoch. */
+const loadStudioIfNeeded = (model: Model): UpdateReturn => {
+  if (model.session._tag === "Anonymous" || !AsyncData.isIdle(model.studio.documents)) {
+    return [model, []];
+  }
+  const [nextStudio, studioCommands] = StudioSubmodel.update(
+    model.studio,
+    StudioSubmodel.Requested(),
+  );
+  return [
+    evo(model, { studio: () => nextStudio }),
+    Command.mapMessages(studioCommands, (childMessage) =>
+      GotStudioMessage({ sessionEpoch: model.sessionEpoch, message: childMessage }),
     ),
   ];
 };
@@ -152,6 +171,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
               ];
             },
             Saved: () => loadSavedIfNeeded(evo(model, { page: () => PageSaved() })),
+            Studio: () => loadStudioIfNeeded(evo(model, { page: () => PageStudio() })),
             NotFound: ({ path }) => [evo(model, { page: () => PageNotFound({ path }) }), []],
           }),
         ),
@@ -342,6 +362,17 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           evo(model, { saved: () => nextSaved }),
           Command.mapMessages(savedCommands, (childMessage) =>
             GotSavedMessage({ sessionEpoch: model.sessionEpoch, message: childMessage }),
+          ),
+        ];
+      },
+
+      GotStudioMessage: ({ sessionEpoch, message: studioMessage }) => {
+        if (sessionEpoch !== model.sessionEpoch) return [model, []];
+        const [nextStudio, studioCommands] = StudioSubmodel.update(model.studio, studioMessage);
+        return [
+          evo(model, { studio: () => nextStudio }),
+          Command.mapMessages(studioCommands, (childMessage) =>
+            GotStudioMessage({ sessionEpoch: model.sessionEpoch, message: childMessage }),
           ),
         ];
       },

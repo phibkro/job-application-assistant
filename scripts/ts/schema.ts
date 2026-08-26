@@ -43,6 +43,7 @@ import { Session } from "../../packages/domain/src/Access.ts";
 import { Principal } from "../../packages/domain/src/Principal.ts";
 import { ProfileRecord } from "../../packages/domain/src/Profile.ts";
 import { Proposal } from "../../packages/domain/src/Proposals.ts";
+import { StudioDocument } from "../../packages/domain/src/Documents.ts";
 import { CatalogRecord } from "../../packages/domain/src/Source.ts";
 import { Subscription } from "../../packages/domain/src/Subscription.ts";
 
@@ -157,6 +158,11 @@ const columnTypes: Record<string, string> = {
   failureTag: "TEXT NOT NULL",
   // Lazy-ingestion freshness gate (WS-0017).
   lastAttemptAt: "TEXT NOT NULL",
+  // Studio documents (WS-0018). `kind`/`engine` are per-table overrides on
+  // `documents` (their CHECK domains differ from other tables' columns of
+  // the same names); the nullable vacancy pair is declared in that table's
+  // columnOverrides too.
+  content: "TEXT NOT NULL",
   publishedAt: "TEXT NOT NULL",
   firstSeenAt: "TEXT NOT NULL",
   lastSeenAt: "TEXT NOT NULL",
@@ -388,6 +394,25 @@ const tables: Record<string, TableSpec> = {
     // writes one platform's row by that key alone.
     primaryKey: ["platformId"],
   },
+  documents: {
+    model: StudioDocument,
+    primaryKey: ["id"],
+    // Owner-drafted studio documents (WS-0018): one document per row, the
+    // vacancy frozen onto targeted rows via jobSnapshot. Ownership is
+    // enforced by profileId predicates on every read/write; the unique pair
+    // is belt-and-braces for those owner-scoped UPDATE/DELETE predicates.
+    // `jobId`/`jobSnapshot` are nullable here while other tables' columns of
+    // the same names are NOT NULL — the per-table override mechanism exists
+    // for exactly this.
+    columnOverrides: {
+      kind: "TEXT NOT NULL CHECK (kind IN ('cv', 'letter'))",
+      engine: "TEXT NOT NULL CHECK (engine IN ('template', 'model'))",
+      jobId: "TEXT",
+      jobSnapshot: "TEXT",
+    },
+    unique: [["profileId", "id"]],
+    indexes: [["profileId", "createdAt"]],
+  },
 };
 
 const fieldsOf = (model: unknown): ReadonlyArray<string> => {
@@ -409,6 +434,7 @@ const checkColumns = (
     }
   }
 };
+
 const migrations = [
   {
     name: "0001_saved-workspace.sql",
@@ -422,6 +448,11 @@ const migrations = [
     name: "0003_ingestion-gate.sql",
     currentWhen:
       "EXISTS (SELECT 1 FROM pragma_table_info('ingestion_gate') WHERE name = 'lastAttemptAt')",
+  },
+  {
+    name: "0004_documents.sql",
+    currentWhen:
+      "EXISTS (SELECT 1 FROM pragma_table_info('documents') WHERE name = 'jobSnapshot')",
   },
 ] as const;
 

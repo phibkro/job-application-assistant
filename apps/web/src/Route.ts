@@ -50,6 +50,7 @@ export const RouteJobDetail = RouteKit.r("JobDetail", { jobId: S.String });
 export const RouteFeed = RouteKit.r("Feed", {});
 export const RouteProfile = RouteKit.r("Profile", {});
 export const RouteSaved = RouteKit.r("Saved", {});
+export const RouteStudio = RouteKit.r("Studio", {});
 /** What an unmatched path parses to — the counterpart to `Model.ts`'s
  *  `PageNotFound`, reached when a link is stale, mistyped, or points at a
  *  route this build no longer serves. */
@@ -61,6 +62,7 @@ export const Route = S.Union([
   RouteFeed,
   RouteProfile,
   RouteSaved,
+  RouteStudio,
   RouteNotFound,
 ]);
 export type Route = typeof Route.Type;
@@ -74,6 +76,7 @@ const jobDetailRouter = pipe(
 const feedRouter = pipe(RouteKit.literal("feed"), RouteKit.mapTo(RouteFeed));
 const profileRouter = pipe(RouteKit.literal("profile"), RouteKit.mapTo(RouteProfile));
 const savedRouter = pipe(RouteKit.literal("saved"), RouteKit.mapTo(RouteSaved));
+const studioRouter = pipe(RouteKit.literal("studio"), RouteKit.mapTo(RouteStudio));
 
 const router = RouteKit.oneOf(
   browseRouter,
@@ -81,6 +84,7 @@ const router = RouteKit.oneOf(
   feedRouter,
   profileRouter,
   savedRouter,
+  studioRouter,
 );
 
 /** Parses a URL into a `Route`, falling back to `RouteNotFound` rather than
@@ -100,6 +104,7 @@ export const href = (route: Route): string =>
       Feed: () => feedRouter.build(),
       Profile: () => profileRouter.build(),
       Saved: () => savedRouter.build(),
+      Studio: () => studioRouter.build(),
       NotFound: ({ path }) => path,
     }),
   );

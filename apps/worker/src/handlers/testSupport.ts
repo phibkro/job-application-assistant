@@ -18,6 +18,7 @@ import { Hydration } from "../services/Hydration.ts";
 import { Judgements } from "../services/Judgements.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
 import { SavedJobs } from "../services/SavedJobs.ts";
+import { ModelStudioComposer, TemplateStudioComposer } from "../services/Studio.ts";
 import { Database } from "../services/Database.ts";
 import { Ids } from "../services/Ids.ts";
 import { Extraction } from "../services/Extraction.ts";
@@ -26,9 +27,10 @@ import { layer as authLayer } from "./auth.ts";
 import { layer as corpusLayer } from "./corpus.ts";
 import { layer as feedLayer } from "./feed.ts";
 import { layer as profileLayer } from "./profile.ts";
-import { layer as applicationsLayer } from "./applications.ts";
-import { layer as ingestionLayer } from "./status.ts";
 import { layer as proposalsLayer } from "./proposals.ts";
+import { layer as ingestionLayer } from "./status.ts";
+import { layer as applicationsLayer } from "./applications.ts";
+import { layer as documentsLayer } from "./documents.ts";
 
 /**
  * A fake that dies with the caller's name when hit, rather than returning a
@@ -124,6 +126,14 @@ const defaultModelInference = Layer.succeed(ModelInference, {
   propose: unstubbed("ModelInference", "propose"),
 });
 
+const defaultTemplateStudio = Layer.succeed(TemplateStudioComposer, {
+  compose: unstubbed("TemplateStudioComposer", "compose"),
+});
+
+const defaultModelStudio = Layer.succeed(ModelStudioComposer, {
+  compose: unstubbed("ModelStudioComposer", "compose"),
+});
+
 const defaultSourceCatalog = Layer.succeed(SourceCatalog, {
   list: unstubbed("SourceCatalog", "list"),
 });
@@ -146,14 +156,16 @@ export interface Fakes {
   readonly applications?: Layer.Layer<Applications>;
   readonly entitlements?: Layer.Layer<Entitlements>;
   readonly hydration?: Layer.Layer<Hydration>;
-  readonly savedJobs?: Layer.Layer<SavedJobs>;
-  readonly saved?: Layer.Layer<Saved>;
   readonly judgements?: Layer.Layer<Judgements>;
   readonly database?: Layer.Layer<Database>;
   readonly sourceCatalog?: Layer.Layer<SourceCatalog>;
+  readonly savedJobs?: Layer.Layer<SavedJobs>;
+  readonly saved?: Layer.Layer<Saved>;
   readonly extraction?: Layer.Layer<Extraction>;
   readonly heuristicInference?: Layer.Layer<HeuristicInference>;
   readonly modelInference?: Layer.Layer<ModelInference>;
+  readonly templateStudioComposer?: Layer.Layer<TemplateStudioComposer>;
+  readonly modelStudioComposer?: Layer.Layer<ModelStudioComposer>;
   readonly ids?: Layer.Layer<Ids>;
 }
 
@@ -174,12 +186,14 @@ export const buildHandler = (fakes: Fakes = {}) => {
     fakes.hydration ?? defaultHydration,
     fakes.savedJobs ?? defaultSavedJobs,
     fakes.saved ?? defaultSaved,
-    fakes.judgements ?? defaultJudgements,
-    fakes.sourceCatalog ?? defaultSourceCatalog,
     fakes.database ?? defaultDatabase,
     fakes.extraction ?? defaultExtraction,
+    fakes.judgements ?? defaultJudgements,
+    fakes.sourceCatalog ?? defaultSourceCatalog,
     fakes.heuristicInference ?? defaultHeuristicInference,
     fakes.modelInference ?? defaultModelInference,
+    fakes.templateStudioComposer ?? defaultTemplateStudio,
+    fakes.modelStudioComposer ?? defaultModelStudio,
     fakes.ids ?? defaultIds,
   );
   const appLayer = HttpApiBuilder.layer(api).pipe(
@@ -189,6 +203,7 @@ export const buildHandler = (fakes: Fakes = {}) => {
     Layer.provide(proposalsLayer),
     Layer.provide(profileLayer),
     Layer.provide(applicationsLayer),
+    Layer.provide(documentsLayer),
     Layer.provide(authLayer),
     Layer.provide(serviceLayers),
     Layer.provide(Etag.layer),

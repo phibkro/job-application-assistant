@@ -9,6 +9,7 @@ import {
 } from "../../worker/src/Api.ts";
 import * as ProfileSubmodel from "./profile/Model.ts";
 import * as SavedSubmodel from "./saved/Model.ts";
+import * as StudioSubmodel from "./studio/Model.ts";
 // `Problem` and the request tri-state live below every cluster (see
 // `RequestStatus.ts`'s own docstring for why); re-exported from here too so
 // every existing call site that reached them through `Model.ts` keeps
@@ -52,6 +53,7 @@ export const PageJobDetail = ts("JobDetail", { jobId: S.String });
 export const PageFeed = ts("Feed", {});
 export const PageProfile = ts("Profile", {});
 export const PageSaved = ts("Saved", {});
+export const PageStudio = ts("Studio", {});
 // Not named `NotFound` — that tag is already `RequestStatus.ts`'s Problem
 // variant, re-exported from this module; a second binding of the same name
 // would collide at the import site even though the two unions never mix.
@@ -62,6 +64,7 @@ export const Page = S.Union([
   PageFeed,
   PageProfile,
   PageSaved,
+  PageStudio,
   PageNotFound,
 ]);
 export type Page = typeof Page.Type;
@@ -143,9 +146,9 @@ export const Model = S.Struct({
   matchDetail: MatchDetailAsyncData.schema,
 
   feedResults: FeedAsyncData.schema,
-
   profile: ProfileSubmodel.Model,
   saved: SavedSubmodel.Model,
+  studio: StudioSubmodel.Model,
 
   applications: S.Array(ApplyRecord),
 });
@@ -167,6 +170,7 @@ export const initialModel: Model = {
 
   profile: ProfileSubmodel.init(),
   saved: SavedSubmodel.init(),
+  studio: StudioSubmodel.init(),
 
   applications: [],
 };

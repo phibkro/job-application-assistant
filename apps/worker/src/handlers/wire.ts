@@ -3,6 +3,7 @@ import {
   ApplicationId,
   CanonicalJobId,
   CustomLabelId,
+  DocumentId,
   ProfileId,
   SavedJobId,
   Sequence,
@@ -21,6 +22,7 @@ export const decodeCanonicalJobId = Schema.decodeUnknownSync(CanonicalJobId);
 export const decodeProfileId = Schema.decodeUnknownSync(ProfileId);
 export const decodeSavedJobId = Schema.decodeUnknownSync(SavedJobId);
 export const decodeCustomLabelId = Schema.decodeUnknownSync(CustomLabelId);
+export const decodeDocumentId = Schema.decodeUnknownSync(DocumentId);
 export const decodeApplicationId = Schema.decodeUnknownSync(ApplicationId);
 
 const decodeSequence = Schema.decodeUnknownSync(Sequence);

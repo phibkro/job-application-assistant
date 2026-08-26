@@ -7,14 +7,15 @@ import sqlite3
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = (ROOT / "db/schema.sql").read_text()
 MIGRATION_NAME = "0001_saved-workspace.sql"
-# Later additive migrations (0002 WS-0016, 0003 WS-0017): a fresh snapshot
-# pre-marks each via its currentWhen pragma probe, so the names must appear
-# in d1_migrations the moment the snapshot runs. Each entry is
+# Later additive migrations (0002 WS-0016, 0003 WS-0017, 0004 WS-0018): a
+# fresh snapshot pre-marks each via its currentWhen pragma probe, so the names
+# must appear in d1_migrations the moment the snapshot runs. Each entry is
 # (migration name, table whose presence the probe keys on) so this test can
 # prove the probe actually matches the shape the migration file creates.
 LATER_MIGRATIONS = (
     ("0002_profile-proposals.sql", "proposals"),
     ("0003_ingestion-gate.sql", "ingestion_gate"),
+    ("0004_documents.sql", "documents"),
 )
 MIGRATION = (ROOT / "db/migrations" / MIGRATION_NAME).read_text()
 
@@ -55,8 +56,8 @@ assert migration_names(new_database) == [MIGRATION_NAME] + [
 existing_database = sqlite3.connect(":memory:")
 existing_database.executescript(OLD_TABLES)
 existing_database.executescript(SCHEMA)
-# An old-shape database gains the *later* additive relations (0002, 0003)
-# from the snapshot itself, so their probes match and those names are
+# An old-shape database gains the *later* additive relations (0002, 0003,
+# 0004) from the snapshot itself, so their probes match and those names are
 # pre-marked; only the 0001 upgrade remains for Wrangler's ordered run.
 assert migration_names(existing_database) == [name for name, _ in LATER_MIGRATIONS]
 existing_database.executescript(MIGRATION)

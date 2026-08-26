@@ -32,6 +32,7 @@ describe("layerSqlite", () => {
       "canonical_jobs",
       "custom_labels",
       "delivery_platforms",
+      "documents",
       "freshness",
       "ingestion_failures",
       "ingestion_gate",

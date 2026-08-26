@@ -748,3 +748,130 @@ export const FocusProposalReview = Command.define("FocusProposalReview", {
       return ProfileMessage.ProposalFocusSettled();
     }).pipe(Effect.catch(() => Effect.succeed(ProfileMessage.ProposalFocusSettled()))),
 });
+
+// --- WS-0018: the document studio --------------------------------------------
+
+import * as StudioMessage from "./studio/Message.ts";
+
+export const FetchDocuments = Command.define("FetchDocuments", {
+  args: {},
+  messages: [StudioMessage.DocumentsReceived, StudioMessage.DocumentsFetchFailed],
+  execute: () =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const page = yield* client.documents.list({ query: {} });
+        return StudioMessage.DocumentsReceived({ page });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(StudioMessage.DocumentsFetchFailed({ problem: toProblem(error) })),
+        ),
+      ),
+    ),
+});
+
+export const CreateDocument = Command.define("CreateDocument", {
+  args: {
+    kind: S.Literals(["cv", "letter"]),
+    engine: S.Literals(["template", "model"]),
+    jobId: S.NullOr(S.String),
+  },
+  messages: [StudioMessage.GenerateSucceeded, StudioMessage.GenerateFailed],
+  execute: ({ kind, engine, jobId }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.documents.create({
+          payload: { kind, engine, jobId: jobId ?? undefined },
+        });
+        return StudioMessage.GenerateSucceeded({ response });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(StudioMessage.GenerateFailed({ problem: toProblem(error) })),
+        ),
+      ),
+    ),
+});
+
+export const SaveDocumentContent = Command.define("SaveDocumentContent", {
+  args: { id: S.String, content: S.String },
+  messages: [StudioMessage.SaveSucceeded, StudioMessage.SaveFailed],
+  execute: ({ id, content }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const document = yield* client.documents.updateContent({
+          params: { id },
+          payload: { content },
+        });
+        return StudioMessage.SaveSucceeded({ document });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(StudioMessage.SaveFailed({ id, problem: toProblem(error) })),
+        ),
+      ),
+    ),
+});
+
+export const DeleteDocument = Command.define("DeleteDocument", {
+  args: { id: S.String },
+  messages: [StudioMessage.DeleteSucceeded, StudioMessage.DeleteFailed],
+  execute: ({ id }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        yield* client.documents.remove({ params: { id } });
+        return StudioMessage.DeleteSucceeded({ id });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(StudioMessage.DeleteFailed({ problem: toProblem(error) })),
+        ),
+      ),
+    ),
+});
+
+/** Clipboard copy is a local effect of the person moving their own text. */
+export const CopyDocumentText = Command.define("CopyDocumentText", {
+  args: { id: S.String, content: S.String },
+  messages: [StudioMessage.CopySucceeded, StudioMessage.CopyFailed],
+  execute: ({ id, content }) =>
+    Effect.gen(function* () {
+      yield* Effect.tryPromise({
+        try: () => navigator.clipboard.writeText(content),
+        catch: (error) => toProblem(error),
+      });
+      return StudioMessage.CopySucceeded({ id });
+    }).pipe(
+      Effect.catch((problem) =>
+        Effect.succeed(StudioMessage.CopyFailed({ problem: problem as Problem })),
+      ),
+    ),
+});
+
+/**
+ * The target picker's options: the Saved list read through its public
+ * endpoint and projected to `{savedJobId, title}` here — no server change,
+ * and no reaching into the Saved cluster's cache across submodel boundaries.
+ */
+export const FetchDocumentTargets = Command.define("FetchDocumentTargets", {
+  args: {},
+  messages: [StudioMessage.TargetsFetchSucceeded],
+  execute: () =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const page = yield* client.applications.listSaved({
+          query: { sort: "recently-saved", view: "all" },
+        });
+        const targets = page.data.map((item) => ({
+          savedJobId: item.savedJobId,
+          title: item.snapshot.title,
+        }));
+        return StudioMessage.TargetsFetchSucceeded({ targets });
+      }).pipe(
+        // A failed targets fetch only empties the picker; the studio works
+        // for general documents regardless.
+        Effect.catch(() => Effect.succeed(StudioMessage.TargetsFetchSucceeded({ targets: [] }))),
+      ),
+    ),
+});

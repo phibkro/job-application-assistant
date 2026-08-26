@@ -324,6 +324,22 @@ CREATE TABLE IF NOT EXISTS ingestion_gate (
   PRIMARY KEY (platformId)
 );
 
+CREATE TABLE IF NOT EXISTS documents (
+  id TEXT NOT NULL,
+  profileId TEXT NOT NULL,
+  jobId TEXT,
+  jobSnapshot TEXT,
+  kind TEXT NOT NULL CHECK (kind IN ('cv', 'letter')),
+  engine TEXT NOT NULL CHECK (engine IN ('template', 'model')),
+  content TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE (profileId, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_profileId_createdAt ON documents (profileId, createdAt);
+
 -- Wrangler records ordered D1 migrations in this table. A generated
 -- snapshot already has each migration's target shape, so it records the
 -- migration only when that shape is present. Existing databases without
@@ -342,3 +358,6 @@ SELECT '0002_profile-proposals.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_inf
 
 INSERT OR IGNORE INTO d1_migrations (name)
 SELECT '0003_ingestion-gate.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('ingestion_gate') WHERE name = 'lastAttemptAt');
+
+INSERT OR IGNORE INTO d1_migrations (name)
+SELECT '0004_documents.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('documents') WHERE name = 'jobSnapshot');

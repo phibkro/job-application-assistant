@@ -9,6 +9,7 @@ export * as Access from "./Access.ts";
 export * as Answer from "./Answer.ts";
 export * as Applications from "./Applications.ts";
 export * as Delivery from "./Delivery.ts";
+export * as Documents from "./Documents.ts";
 export * as Saved from "./Saved.ts";
 export * as SetExpression from "./SetExpression.ts";
 export * as TransitionSystem from "./TransitionSystem.ts";

@@ -55,6 +55,10 @@ export type CustomLabelId = typeof CustomLabelId.Type;
 export const ProposalId = Schema.String.pipe(Schema.brand("ProposalId"));
 export type ProposalId = typeof ProposalId.Type;
 
+/** A drafted, stored document in the owner's studio (WS-0018). */
+export const DocumentId = Schema.String.pipe(Schema.brand("DocumentId"));
+export type DocumentId = typeof DocumentId.Type;
+
 export const SavedSearchId = Schema.String.pipe(Schema.brand("SavedSearchId"));
 export type SavedSearchId = typeof SavedSearchId.Type;
 

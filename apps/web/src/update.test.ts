@@ -16,6 +16,7 @@ import {
   FeedDismissSucceeded,
   FeedSucceeded,
   GotSavedMessage,
+  GotStudioMessage,
   PrepareSucceeded,
   SaveJobClicked,
   SaveJobSucceeded,
@@ -26,7 +27,8 @@ import {
   UrlChanged,
   UrlRequested,
 } from "./Message.ts";
-import { NotFound, initialModel, PageNotFound, PageSaved } from "./Model.ts";
+import * as StudioMessage from "./studio/Message.ts";
+import { NotFound, initialModel, PageNotFound, PageSaved, PageStudio } from "./Model.ts";
 import type { Model } from "./Model.ts";
 import {
   RouteBrowse,
@@ -330,6 +332,36 @@ describe("session", () => {
 
     expect(afterLateResponse).toBe(ownerBLoading);
     expect(afterLateResponse.saved.saved._tag).toBe("Loading");
+    expect(commands).toEqual([]);
+  });
+
+  it("ignores a Studio response from an earlier authenticated owner", () => {
+    const [ownerA] = update(
+      { ...initialModel, page: PageStudio(), sessionTokenInput: "owner-a" },
+      SessionTokenSubmitted(),
+    );
+    const [ownerALoading] = update(ownerA, StorageSynced({ sessionEpoch: ownerA.sessionEpoch }));
+    const [signedOut] = update(ownerALoading, SessionCleared());
+    const [ownerB] = update(
+      { ...signedOut, sessionTokenInput: "owner-b" },
+      SessionTokenSubmitted(),
+    );
+    const [ownerBLoading] = update(ownerB, StorageSynced({ sessionEpoch: ownerB.sessionEpoch }));
+
+    const [afterLateResponse, commands] = update(
+      ownerBLoading,
+      GotStudioMessage({
+        sessionEpoch: ownerA.sessionEpoch,
+        message: StudioMessage.DocumentsFetchFailed({
+          problem: new NotFound({ message: "owner A response" }),
+        }),
+      }),
+    );
+
+    expect(afterLateResponse).toBe(ownerBLoading);
+    // Owner B never opened Studio, so the slot was Idle and must stay so —
+    // the late response touched nothing either way.
+    expect(afterLateResponse.studio.documents._tag).toBe("Idle");
     expect(commands).toEqual([]);
   });
 

@@ -14,6 +14,7 @@ import type { Applications } from "../services/Applications.ts";
 import type { Corpus } from "../services/Corpus.ts";
 import type { Database } from "../services/Database.ts";
 import type { Drafting } from "../services/Drafting.ts";
+import type { ModelStudioComposer, TemplateStudioComposer } from "../services/Studio.ts";
 import type { Entitlements } from "../services/Entitlements.ts";
 import type { Hydration } from "../services/Hydration.ts";
 import type { Ids } from "../services/Ids.ts";
@@ -38,6 +39,8 @@ import { layer as corpusLayer } from "../corpus/index.ts";
 import { layer as applicationsLayer } from "../applications/index.ts";
 import { layer as catalogLayer } from "../catalog/index.ts";
 import { layer as draftingLayer } from "../drafting/index.ts";
+import { layer as templateStudioLayer } from "../drafting/studio/index.ts";
+import { layer as modelStudioComposerLayer } from "../drafting/studio/model.ts";
 import { layer as hydrationLayer } from "../hydration/index.ts";
 import { layer as ingestionLayer } from "../ingestion/index.ts";
 import { layer as extractionLayer } from "../extraction/index.ts";
@@ -95,11 +98,13 @@ const navCredentialFor = (token: string | undefined): NavCredential => {
  */
 export type Services =
   | Database
+  | Accounts
   | Corpus
   | Judgements
-  | Accounts
-  | Profiles
   | Drafting
+  | TemplateStudioComposer
+  | ModelStudioComposer
+  | Profiles
   | Applications
   | Entitlements
   | Hydration
@@ -146,6 +151,8 @@ export const services = (env: Env): Layer.Layer<Services> => {
     corpusLayer,
     accountsLayer,
     draftingLayer,
+    templateStudioLayer,
+    modelStudioComposerLayer(env.AI),
     extractionLayer,
     heuristicEngineLayer,
     modelEngineLayer(env.AI),

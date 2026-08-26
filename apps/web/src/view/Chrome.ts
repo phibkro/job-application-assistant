@@ -24,12 +24,12 @@ import { icon } from "./icons.ts";
 // This file remains root-only: it is the one place whose components dispatch
 // concrete root Messages (`SessionCleared`, ...) — see `Shared.ts`'s header.
 
-/** One destination. All four product surfaces are live in this build, so —
- *  unlike the source app — there are no disabled "planned" items. */
+// All five product surfaces are live in this build, so — unlike the source
+// app — there are no disabled "planned" items.
 interface NavigationItem {
   readonly id: string;
   readonly label: string;
-  readonly icon: "browse" | "feed" | "bookmark" | "person";
+  readonly icon: "browse" | "feed" | "bookmark" | "person" | "studio";
   readonly href: string;
 }
 
@@ -42,6 +42,7 @@ const navigationItems = (model: Model): ReadonlyArray<NavigationItem> => [
   },
   { id: "Feed", label: "Fresh feed", icon: "feed", href: Route.href(Route.RouteFeed()) },
   { id: "Saved", label: "Saved", icon: "bookmark", href: Route.href(Route.RouteSaved()) },
+  { id: "Studio", label: "Studio", icon: "studio", href: Route.href(Route.RouteStudio()) },
   { id: "Profile", label: "Profile", icon: "person", href: Route.href(Route.RouteProfile()) },
 ];
 

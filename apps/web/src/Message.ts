@@ -6,6 +6,7 @@ import { MatchedJob } from "../../worker/src/Api.ts";
 import { JobPageSchema, MatchPageSchema, Problem } from "./Model.ts";
 import * as ProfileMessage from "./profile/Message.ts";
 import * as SavedMessage from "./saved/Message.ts";
+import * as StudioMessage from "./studio/Message.ts";
 import { Route } from "./Route.ts";
 
 /**
@@ -96,6 +97,10 @@ export const GotSavedMessage = m("GotSavedMessage", {
   sessionEpoch: S.Number,
   message: SavedMessage.Message,
 });
+export const GotStudioMessage = m("GotStudioMessage", {
+  sessionEpoch: S.Number,
+  message: StudioMessage.Message,
+});
 
 // Apply loop
 export const SaveJobClicked = m("SaveJobClicked", { jobId: S.String });
@@ -169,6 +174,7 @@ export const Message = S.Union([
   FeedDismissFailed,
   GotProfileMessage,
   GotSavedMessage,
+  GotStudioMessage,
   SaveJobClicked,
   SaveJobSucceeded,
   SaveJobFailed,

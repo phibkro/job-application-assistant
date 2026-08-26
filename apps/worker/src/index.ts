@@ -99,6 +99,7 @@ export const appLayer = (
           Handlers.proposals,
           Handlers.profile,
           Handlers.applications,
+          Handlers.documents,
         ),
       ),
       Layer.provide(Handlers.auth),

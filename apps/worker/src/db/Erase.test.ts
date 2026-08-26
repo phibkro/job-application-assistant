@@ -14,7 +14,9 @@ import {
 import { Submission } from "@job-index/domain/Delivery";
 import { Freshness, Judgement } from "@job-index/domain/Freshness";
 import { Proposal } from "@job-index/domain/Proposals";
+import { StudioDocument } from "@job-index/domain/Documents";
 import * as ProposalsRepo from "./repositories/Proposals.ts";
+import * as DocumentsRepo from "./repositories/Documents.ts";
 import { Subscription } from "@job-index/domain/Subscription";
 import type { JobSnapshot } from "@job-index/domain/Job";
 import { Database } from "../services/Database.ts";
@@ -204,6 +206,19 @@ const seedAccount = (profileId: string) =>
         status: "pending",
         createdAt: now,
         decidedAt: OptionMod.none(),
+      }),
+    );
+    yield* DocumentsRepo.insert(
+      new StudioDocument({
+        id: `${profileId}-document` as never,
+        profileId: profileId as never,
+        jobId: OptionMod.none(),
+        jobSnapshot: OptionMod.none(),
+        kind: "cv",
+        engine: "template",
+        content: "General CV body",
+        createdAt: now,
+        updatedAt: now,
       }),
     );
   });

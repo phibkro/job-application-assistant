@@ -27,6 +27,10 @@ import { CatalogEntry } from "@job-index/domain/Source";
 import { AnswerShape } from "@job-index/domain/Answer";
 import { Profile } from "@job-index/domain/Profile";
 import {
+  CompositionEngine as DomainCompositionEngine,
+  DocumentKind as DomainDocumentKind,
+} from "@job-index/domain/Documents";
+import {
   Confidence as DomainConfidence,
   Engine as DomainEngine,
   ProposalStatus as DomainProposalStatus,
@@ -153,6 +157,13 @@ export class ReservedLabelMutation extends Schema.TaggedError<ReservedLabelMutat
 export class UnsupportedDocument extends Schema.TaggedError<UnsupportedDocument>()(
   "UnsupportedDocument",
   { message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
+/** A studio document body over the stored-content bound (WS-0018). */
+export class DocumentTooLarge extends Schema.TaggedError<DocumentTooLarge>()(
+  "DocumentTooLarge",
+  { limit: Schema.Number },
   { httpApiStatus: 400 },
 ) {}
 
@@ -663,6 +674,97 @@ const proposals = HttpApiGroup.make("proposals")
   )
   .middleware(Authenticated);
 
+/**
+ * One stored studio document (WS-0018). Declared once here for the same
+ * reason `ProposalView` is: the web client decodes these shapes, and a
+ * second hand-written copy is exactly the drift one declaration prevents.
+ * The list view never carries content — a summary is what a picker needs.
+ */
+export const DocumentSummary = Schema.Struct({
+  id: Schema.String,
+  kind: DomainDocumentKind,
+  engine: DomainCompositionEngine,
+  jobId: Schema.NullOr(Schema.String),
+  jobTitle: Schema.NullOr(Schema.String),
+  createdAt: Schema.String,
+  updatedAt: Schema.String,
+});
+export type DocumentSummary = typeof DocumentSummary.Type;
+
+export const DocumentView = Schema.Struct({
+  ...DocumentSummary.fields,
+  content: Schema.String,
+});
+export type DocumentView = typeof DocumentView.Type;
+
+/**
+ * Create and update answers carry the full view; create may carry a
+ * `downgradeReason` when the requested model engine could not run and the
+ * template composer served instead — a success with a reason, not a failure
+ * (the proposals create precedent).
+ */
+export const DocumentCreateResponse = Schema.Struct({
+  data: DocumentView,
+  downgradeReason: Schema.NullOr(Schema.String),
+});
+export type DocumentCreateResponse = typeof DocumentCreateResponse.Type;
+
+export const DocumentsPage = Schema.Struct({
+  data: Schema.Array(DocumentSummary),
+  meta: PageMeta,
+});
+export type DocumentsPage = typeof DocumentsPage.Type;
+
+/** Bound on one document's stored body — aligned with the paste-input bound. */
+export const MAX_DOCUMENT_CHARS = 200_000;
+
+/**
+ * The studio's CRUD surface (WS-0018). Authenticated throughout; every
+ * `:id` route answers another principal's id with a 404, never a leak.
+ *
+ * The template tier is free for every principal — the default request never
+ * consults entitlements. The model tier rides the existing `model-drafting`
+ * capability: `engine: "model"` without it fails 402; with it but no
+ * provisioned binding, the request degrades to the template composer with a
+ * `downgradeReason` (never a 5xx for a premium feature that can degrade).
+ * Job-specific documents ground on the saved vacancy's frozen snapshot via
+ * `SavedJobs.resolve` — never a live corpus read.
+ */
+const documents = HttpApiGroup.make("documents")
+  .add(
+    HttpApiEndpoint.post("create", "/api/v1/me/documents", {
+      payload: Schema.Struct({
+        kind: DomainDocumentKind,
+        engine: Schema.optional(DomainCompositionEngine),
+        jobId: Schema.optional(Schema.String),
+      }),
+      success: DocumentCreateResponse,
+      error: [Unauthorized, NotFound, UpgradeRequired],
+    }),
+    HttpApiEndpoint.get("list", "/api/v1/me/documents", {
+      query: { cursor: Schema.optional(Schema.String) },
+      success: DocumentsPage,
+      error: Unauthorized,
+    }),
+    HttpApiEndpoint.get("get", "/api/v1/me/documents/:id", {
+      params: { id: Schema.String },
+      success: DocumentView,
+      error: [Unauthorized, NotFound],
+    }),
+    HttpApiEndpoint.put("updateContent", "/api/v1/me/documents/:id/content", {
+      params: { id: Schema.String },
+      payload: Schema.Struct({ content: Schema.String }),
+      success: DocumentView,
+      error: [Unauthorized, NotFound, DocumentTooLarge],
+    }),
+    HttpApiEndpoint.delete("remove", "/api/v1/me/documents/:id", {
+      params: { id: Schema.String },
+      success: Schema.Struct({ deleted: Schema.String }),
+      error: [Unauthorized, NotFound],
+    }),
+  )
+  .middleware(Authenticated);
+
 export const api = HttpApi.make("job-index").add(
   ingestion,
   corpus,
@@ -670,4 +772,5 @@ export const api = HttpApi.make("job-index").add(
   profile,
   applications,
   proposals,
+  documents,
 );

@@ -19,7 +19,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        // The Playwright-bundled headless shell cannot resolve its shared
+        // libraries on this machine; the Nix-provided Chromium can.
+        launchOptions: {
+          executablePath: "/etc/profiles/per-user/nori/bin/chromium",
+        },
+      },
     },
   ],
 });

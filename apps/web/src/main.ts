@@ -1,11 +1,18 @@
 import * as Match from "effect/Match";
 import type { Runtime } from "foldkit";
 import type { Document, Html, HtmlBuilder } from "foldkit/html";
-import { GotProfileMessage, GotSavedMessage, UrlChanged, UrlRequested } from "./Message.ts";
+import {
+  GotProfileMessage,
+  GotSavedMessage,
+  GotStudioMessage,
+  UrlChanged,
+  UrlRequested,
+} from "./Message.ts";
 import type { Message } from "./Message.ts";
 import { initialModel, Model, SessionAnonymous, SessionAuthenticated } from "./Model.ts";
 import * as ProfileSubmodel from "./profile/index.ts";
 import * as SavedSubmodel from "./saved/index.ts";
+import * as StudioSubmodel from "./studio/index.ts";
 import * as Route from "./Route.ts";
 import * as Session from "./Session.ts";
 import { update } from "./update.ts";
@@ -104,6 +111,15 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                   viewInputs: { isAuthenticated: model.session._tag === "Authenticated" },
                   toParentMessage: (message) =>
                     GotSavedMessage({ sessionEpoch: model.sessionEpoch, message }),
+                }),
+              Studio: () =>
+                h.submodel({
+                  slotId: "studio",
+                  model: model.studio,
+                  view: StudioSubmodel.view,
+                  viewInputs: { isAuthenticated: model.session._tag === "Authenticated" },
+                  toParentMessage: (message) =>
+                    GotStudioMessage({ sessionEpoch: model.sessionEpoch, message }),
                 }),
             }),
           ),
