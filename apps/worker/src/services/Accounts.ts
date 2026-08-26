@@ -76,5 +76,12 @@ export class Profiles extends Context.Service<
       profile: ProfileId,
       asked: ReadonlyArray<QuestionKey>,
     ) => Effect.Effect<ReadonlyArray<QuestionKey>>;
+    /**
+     * The AI-consent dimension (WS-0019). Read at the moment a model-path
+     * request asks, never cached — a toggle must bind the very next request.
+     */
+    readonly aiConsent: (profile: ProfileId) => Effect.Effect<boolean>;
+    /** Flips the consent flag; every other row field is preserved. */
+    readonly setAiConsent: (profile: ProfileId, enabled: boolean) => Effect.Effect<void>;
   }
 >()("@job-index/Profiles") {}

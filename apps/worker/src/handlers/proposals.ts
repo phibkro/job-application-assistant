@@ -10,6 +10,8 @@ import { ProposalId } from "@job-index/domain/Ids";
 import type { EntitlementRequired } from "@job-index/domain/Failure";
 import {
   api,
+  CONSENT_OFF_MESSAGE,
+  ConsentRequired,
   CurrentPrincipal,
   InvalidProposalValue,
   ProfileDecisionConflict,
@@ -91,10 +93,17 @@ export const layer = HttpApiBuilder.group(api, "proposals", (handlers) =>
         const extraction = yield* Extraction;
         const model = yield* ModelInference;
         const heuristics = yield* HeuristicInference;
+        const profiles = yield* Profiles;
 
         let downgradeReason: string | undefined;
         let effectiveEngine: "heuristic" | "model" = payload.engine ?? "heuristic";
         if (payload.engine === "model") {
+          // Consent first (WS-0019): the privacy answer precedes the
+          // commercial one, and no model call is even attempted without it.
+          const aiConsent = yield* profiles.aiConsent(principal.profileId);
+          if (!aiConsent) {
+            return yield* Effect.fail(new ConsentRequired({ message: CONSENT_OFF_MESSAGE }));
+          }
           const entitlements = yield* Entitlements;
           yield* entitlements
             .require(principal.profileId, "model-inference")
@@ -104,7 +113,6 @@ export const layer = HttpApiBuilder.group(api, "proposals", (handlers) =>
               ),
             );
         }
-
         const extracted = yield* Effect.catchTag(
           extraction.extract({ content: payload.content, mimeType: payload.mimeType }),
           "UnsupportedDocument",

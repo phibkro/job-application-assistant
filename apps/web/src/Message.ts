@@ -39,6 +39,7 @@ export const UrlPushed = m("UrlPushed");
 export const SessionTokenInputChanged = m("SessionTokenInputChanged", { value: S.String });
 export const SessionTokenSubmitted = m("SessionTokenSubmitted");
 export const SessionCleared = m("SessionCleared");
+export const DeletionNoticeDismissed = m("DeletionNoticeDismissed");
 /** Completion for `PersistSessionToken` and `ClearSessionToken`. The epoch
  *  identifies the session transition that scheduled the storage write, so a
  *  late completion from an earlier owner cannot start the current owner's
@@ -153,6 +154,7 @@ export const Message = S.Union([
   SessionTokenInputChanged,
   SessionTokenSubmitted,
   SessionCleared,
+  DeletionNoticeDismissed,
   StorageSynced,
   BrowseTermChanged,
   BrowseLocationChanged,

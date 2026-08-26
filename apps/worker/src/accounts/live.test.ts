@@ -13,8 +13,14 @@ import { Accounts, Profiles } from "../services/Accounts.ts";
 import { layer as accountsLayer } from "./index.ts";
 import { sha256Hex } from "./hash.ts";
 import { PRINCIPAL_FIELDS } from "./sql.ts";
-import { profileWriteForPendingProposal, readProfileRow, toDomainProfile } from "./profileRow.ts";
-import { acceptProposal } from "./profiles.ts";
+import {
+  emptyProfile,
+  profileWriteForPendingProposal,
+  readProfileRow,
+  tombstoneWrite,
+  toDomainProfile,
+} from "./profileRow.ts";
+import { acceptProposal, aiConsentWrite } from "./profiles.ts";
 import * as Proposals from "../db/repositories/Proposals.ts";
 
 /**
@@ -118,6 +124,102 @@ describe("accounts on a real SQLite engine", () => {
     );
     expect(current.read).toEqual(current.second);
     expect(current.read.profile).toEqual(updated);
+  });
+
+  it("consent changes only aiAssist without changing CV, erasure, or profile updatedAt", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const profiles = yield* Profiles;
+        yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+        const before = yield* readProfileRow(db, profileId);
+        yield* profiles.setAiConsent(profileId, true);
+        return { before, after: yield* readProfileRow(db, profileId) };
+      }),
+    );
+    expect(result.after).toEqual({ ...result.before, aiAssist: 1 });
+  });
+
+  it("a prepared consent write executed after deletion affects zero rows and cannot resurrect the tombstone", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const profiles = yield* Profiles;
+        yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+        const prepared = aiConsentWrite(profileId, true);
+        yield* db.atomic([tombstoneWrite(profileId, "2026-08-26T12:00:00.000Z")]);
+        const affected = yield* db.runAffected(prepared.sql, prepared.bindings);
+        return { affected, row: yield* readProfileRow(db, profileId) };
+      }),
+    );
+    expect(result.affected).toBe(0);
+    expect(result.row).toMatchObject({
+      cv: JSON.stringify(emptyProfile),
+      aiAssist: 0,
+      updatedAt: "2026-08-26T12:00:00.000Z",
+    });
+    expect(JSON.parse(result.row!.erasure)).toEqual({
+      _tag: "Purged",
+      at: "2026-08-26T12:00:00.000Z",
+    });
+  });
+  it("whole-profile CAS cannot write through a matching deletion-state revision", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const accounts = yield* Accounts;
+        const profiles = yield* Profiles;
+        yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+        yield* accounts.requestErasure(profileId);
+        const requested = yield* readProfileRow(db, profileId);
+        const attempted = yield* Effect.exit(
+          profiles.setVersioned(
+            profileId,
+            { ...sample, headline: "Must not land" },
+            requested?.updatedAt ?? null,
+          ),
+        );
+        return { attempted, row: yield* readProfileRow(db, profileId) };
+      }),
+    );
+    expect(result.attempted._tag).toBe("Failure");
+    expect(toDomainProfile(result.row!)).toEqual(sample);
+    expect(JSON.parse(result.row!.erasure)).toMatchObject({ _tag: "Requested" });
+  });
+
+  it("consent and CV update interleavings preserve both independently owned values", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        const profiles = yield* Profiles;
+        const initial = yield* profiles.setVersioned(profileId, sample, null).pipe(Effect.orDie);
+
+        yield* profiles.setAiConsent(profileId, true);
+        const cvAfterConsent = { ...sample, headline: "CV after consent" };
+        const first = yield* profiles
+          .setVersioned(profileId, cvAfterConsent, initial.profileUpdatedAt)
+          .pipe(Effect.orDie);
+        const afterConsentThenCv = yield* readProfileRow(db, profileId);
+
+        const cvPreparedBeforeConsent = { ...sample, headline: "CV prepared before consent" };
+        yield* profiles.setAiConsent(profileId, false);
+        yield* profiles
+          .setVersioned(profileId, cvPreparedBeforeConsent, first.profileUpdatedAt)
+          .pipe(Effect.orDie);
+        return {
+          afterConsentThenCv,
+          afterCvInterleaving: yield* readProfileRow(db, profileId),
+        };
+      }),
+    );
+    expect(toDomainProfile(result.afterConsentThenCv!)).toMatchObject({
+      headline: "CV after consent",
+    });
+    expect(result.afterConsentThenCv?.aiAssist).toBe(1);
+    expect(toDomainProfile(result.afterCvInterleaving!)).toMatchObject({
+      headline: "CV prepared before consent",
+    });
+    expect(result.afterCvInterleaving?.aiAssist).toBe(0);
   });
 
   it("authenticates a principal by its api key hash", async () => {

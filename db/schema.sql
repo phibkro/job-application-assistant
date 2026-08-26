@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   profileId TEXT NOT NULL,
   cv TEXT NOT NULL,
   erasure TEXT NOT NULL,
+  aiAssist INTEGER NOT NULL DEFAULT 0 CHECK (aiAssist IN (0,1)),
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
   PRIMARY KEY (profileId)
@@ -361,3 +362,6 @@ SELECT '0003_ingestion-gate.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('
 
 INSERT OR IGNORE INTO d1_migrations (name)
 SELECT '0004_documents.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('documents') WHERE name = 'jobSnapshot');
+
+INSERT OR IGNORE INTO d1_migrations (name)
+SELECT '0005_profile-consent.sql' WHERE EXISTS (SELECT 1 FROM pragma_table_info('profiles') WHERE name = 'aiAssist');

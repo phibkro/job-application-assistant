@@ -81,6 +81,8 @@ const profilesStub = Layer.succeed(Profiles, {
   answers: () => Effect.succeed([]),
   answer: () => Effect.void,
   unanswered: () => Effect.succeed([]),
+  aiConsent: () => Effect.succeed(false),
+  setAiConsent: () => Effect.die("Profiles.setAiConsent"),
 });
 
 // The real generator, not a fixed stub: this file's assertions are on

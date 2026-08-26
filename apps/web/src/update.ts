@@ -87,6 +87,29 @@ const invalidateSaved = (model: Model): Model => {
   return evo(model, { saved: () => saved });
 };
 
+/** One root-owned boundary for sign-out and confirmed account deletion. */
+const clearOwnerState = (model: Model, deletionNotice: boolean = false): UpdateReturn => {
+  const sessionEpoch = model.sessionEpoch + 1;
+  const expectedToken = model.session._tag === "Authenticated" ? model.session.token : undefined;
+  return [
+    evo(model, {
+      session: () => SessionAnonymous(),
+      sessionEpoch: () => sessionEpoch,
+      sessionTokenInput: () => "",
+      deletionNotice: () => deletionNotice,
+      profile: () => ProfileSubmodel.init(),
+      saved: () => SavedSubmodel.init(),
+      studio: () => StudioSubmodel.init(),
+      feedResults: () => AsyncData.Idle(),
+      matchDetail: () => AsyncData.Idle(),
+      applications: () => [],
+    }),
+    expectedToken === undefined
+      ? []
+      : [Commands.ClearSessionToken({ expectedToken, sessionEpoch })],
+  ];
+};
+
 export const update = (model: Model, message: Message): UpdateReturn =>
   Match.value(message).pipe(
     withReturnType,
@@ -190,34 +213,16 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           evo(model, {
             session: () => SessionAuthenticated({ token }),
             sessionEpoch: () => sessionEpoch,
+            deletionNotice: () => false,
           }),
           [Commands.PersistSessionToken({ token, sessionEpoch })],
         ];
       },
 
-      // Signing out drops every cache that could hold the previous
-      // identity's data — an Anonymous session showing someone else's
-      // profile from cache is exactly the bad state this union should not
-      // allow to linger. `profile` resets via the Submodel's own `init`,
-      // not by reaching into its fields: the root has no business knowing
-      // what "empty" looks like inside another Model's shape, only that
-      // its own `init` is the definition of empty.
-      SessionCleared: () => {
-        const sessionEpoch = model.sessionEpoch + 1;
-        return [
-          evo(model, {
-            session: () => SessionAnonymous(),
-            sessionEpoch: () => sessionEpoch,
-            sessionTokenInput: () => "",
-            profile: () => ProfileSubmodel.init(),
-            saved: () => SavedSubmodel.init(),
-            feedResults: () => AsyncData.Idle(),
-            matchDetail: () => AsyncData.Idle(),
-            applications: () => [],
-          }),
-          [Commands.ClearSessionToken({ sessionEpoch })],
-        ];
-      },
+      // Signing out drops every cache that could hold the previous identity.
+      SessionCleared: () => clearOwnerState(model),
+
+      DeletionNoticeDismissed: () => [evo(model, { deletionNotice: () => false }), []],
 
       // A storage completion belongs only to the session transition that
       // scheduled it. An older owner's late completion cannot start a fetch
@@ -343,6 +348,10 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       // Message universe.
       GotProfileMessage: ({ sessionEpoch, message: profileMessage }) => {
         if (sessionEpoch !== model.sessionEpoch) return [model, []];
+        // Deletion completed under this exact owner epoch. Storage clearing
+        // belongs here, never inside the child command, so a late completion
+        // from an old owner cannot sign out a newer session.
+        if (profileMessage._tag === "DeleteSucceeded") return clearOwnerState(model, true);
         const [nextProfile, profileCommands] = ProfileSubmodel.update(
           model.profile,
           profileMessage,
@@ -396,6 +405,11 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                   pending: () => RequestIdle(),
                 }),
               ),
+            // A saved vacancy becomes a Studio target. Mark the Studio read
+            // boundary idle so the next visit refreshes targets instead of
+            // retaining the snapshot fetched before this save completed.
+            studio: (studio) =>
+              evo(studio, { documents: () => StudioSubmodel.DocumentsAsyncData.Idle() }),
           }),
         ),
         [],

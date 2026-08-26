@@ -127,26 +127,28 @@ const runQuery = (
 const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknown>): number => {
   switch (op) {
     case "insertProfile": {
-      const [profileId, cv, erasure, createdAt, updatedAt] = bindings as [
+      const [profileId, cv, erasure, aiAssist, createdAt, updatedAt] = bindings as [
         string,
         string,
         string,
+        0 | 1,
         string,
         string,
       ];
-      state.profiles.push({ profileId, cv, erasure, createdAt, updatedAt });
+      state.profiles.push({ profileId, cv, erasure, aiAssist, createdAt, updatedAt });
       return 1;
     }
     case "insertProfileIfMissing": {
-      const [profileId, cv, erasure, createdAt, updatedAt] = bindings as [
+      const [profileId, cv, erasure, aiAssist, createdAt, updatedAt] = bindings as [
         string,
         string,
         string,
+        0 | 1,
         string,
         string,
       ];
       if (state.profiles.some((profile) => profile.profileId === profileId)) return 0;
-      state.profiles.push({ profileId, cv, erasure, createdAt, updatedAt });
+      state.profiles.push({ profileId, cv, erasure, aiAssist, createdAt, updatedAt });
       return 1;
     }
     case "updateProfile": {
@@ -160,7 +162,7 @@ const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknow
       return 1;
     }
     case "updateProfileIfVersion": {
-      const [cv, erasure, updatedAt, profileId, expectedUpdatedAt] = bindings as [
+      const [cv, updatedAt, profileId, expectedUpdatedAt, activeErasure] = bindings as [
         string,
         string,
         string,
@@ -168,12 +170,26 @@ const runCommand = (state: FakeState, op: string, bindings: ReadonlyArray<unknow
         string,
       ];
       const index = state.profiles.findIndex(
-        (profile) => profile.profileId === profileId && profile.updatedAt === expectedUpdatedAt,
+        (profile) =>
+          profile.profileId === profileId &&
+          profile.updatedAt === expectedUpdatedAt &&
+          profile.erasure === activeErasure,
       );
       if (index === -1) return 0;
       const existing = state.profiles[index];
       if (existing === undefined) throw new Error("unreachable: index came from findIndex");
-      state.profiles[index] = { ...existing, cv, erasure, updatedAt };
+      state.profiles[index] = { ...existing, cv, updatedAt };
+      return 1;
+    }
+    case "updateAiConsent": {
+      const [aiAssist, profileId, activeErasure] = bindings as [0 | 1, string, string];
+      const index = state.profiles.findIndex(
+        (profile) => profile.profileId === profileId && profile.erasure === activeErasure,
+      );
+      if (index === -1) return 0;
+      const existing = state.profiles[index];
+      if (existing === undefined) throw new Error("unreachable: index came from findIndex");
+      state.profiles[index] = { ...existing, aiAssist };
       return 1;
     }
     case "insertAnswer": {

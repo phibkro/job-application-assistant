@@ -1,8 +1,12 @@
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import { describe, expect, it } from "vitest";
+import { clearExpectedSessionToken } from "./Commands.ts";
 import * as SavedMessage from "./saved/Message.ts";
-import { Navigation, Url } from "foldkit";
+import * as Session from "./Session.ts";
+import * as ProfileMessage from "./profile/Message.ts";
+import type { MeResponse } from "./profile/Model.ts";
+import { AsyncData, Navigation, Url } from "foldkit";
 import { CanonicalJob } from "@job-index/domain/Job";
 import {
   BrowseJobsFailed,
@@ -15,7 +19,9 @@ import {
   DraftSucceeded,
   FeedDismissSucceeded,
   FeedSucceeded,
+  DeletionNoticeDismissed,
   GotSavedMessage,
+  GotProfileMessage,
   GotStudioMessage,
   PrepareSucceeded,
   SaveJobClicked,
@@ -39,6 +45,33 @@ import {
   RouteSaved,
 } from "./Route.ts";
 import { update } from "./update.ts";
+class MemoryStorage implements Storage {
+  readonly #values = new Map<string, string>();
+
+  get length(): number {
+    return this.#values.size;
+  }
+
+  clear(): void {
+    this.#values.clear();
+  }
+
+  getItem(key: string): string | null {
+    return this.#values.get(key) ?? null;
+  }
+
+  key(index: number): string | null {
+    return [...this.#values.keys()][index] ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.#values.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.#values.set(key, value);
+  }
+}
 
 /**
  * `update` is a pure function: a Message in, a Model out, and the Commands
@@ -377,6 +410,7 @@ describe("session", () => {
             profile: { headline: "x" } as never,
             capabilities: [],
             profileUpdatedAt: null,
+            aiConsent: false,
           },
         },
       },
@@ -410,6 +444,7 @@ describe("apply loop", () => {
     const pending: Model = {
       ...initialModel,
       applications: [{ jobId: "job-1", stage: Option.none(), pending: { _tag: "Pending" } }],
+      studio: { ...initialModel.studio, documents: AsyncData.Loading() },
     };
     const [model] = update(pending, SaveJobSucceeded({ jobId: "job-1", savedJobId: "saved-1" }));
     expect(model.applications).toEqual([
@@ -419,6 +454,7 @@ describe("apply loop", () => {
         pending: { _tag: "Idle" },
       },
     ]);
+    expect(model.studio.documents._tag).toBe("Idle");
   });
 
   it("carries a Prepared application's identity forward into Decided, keyed by the decision made", () => {
@@ -584,5 +620,164 @@ describe("feed", () => {
   it("FeedSucceeded on first load populates the feed", () => {
     const [model] = update(initialModel, FeedSucceeded({ page: matchPage }));
     expect(model.feedResults).toEqual({ _tag: "Success", data: matchPage });
+  });
+});
+
+describe("WS-0019 root account-deletion boundary", () => {
+  const ownerModel: Model = {
+    ...initialModel,
+    session: { _tag: "Authenticated", token: "owner-token" },
+    sessionEpoch: 4,
+    profile: { ...initialModel.profile, importText: "private profile cache" },
+    saved: {
+      ...initialModel.saved,
+      saved: AsyncData.Loading(),
+      labels: AsyncData.Loading(),
+    },
+    studio: { ...initialModel.studio, documents: AsyncData.Loading() },
+    feedResults: AsyncData.Loading(),
+    matchDetail: AsyncData.Loading(),
+    applications: [{ jobId: "job-private", stage: Option.none(), pending: { _tag: "Pending" } }],
+  };
+  const oldSessionMeResponse: MeResponse = {
+    profile: {
+      headline: "Old owner",
+      summary: "Must not cross the epoch boundary",
+      location: "Oslo",
+      languages: "English",
+      skills: [],
+      experience: [],
+      education: [],
+    },
+    capabilities: [],
+    profileUpdatedAt: null,
+    aiConsent: true,
+  };
+
+  it("current-epoch deletion atomically signs out and resets every owner cache", () => {
+    const [cleared, commands] = update(
+      ownerModel,
+      GotProfileMessage({
+        sessionEpoch: ownerModel.sessionEpoch,
+        message: ProfileMessage.DeleteSucceeded({ at: "2026-08-26T12:00:00.000Z" }),
+      }),
+    );
+    expect(cleared.session._tag).toBe("Anonymous");
+    expect(cleared.sessionEpoch).toBe(5);
+    expect(cleared.profile).toEqual(initialModel.profile);
+    expect(cleared.saved).toEqual(initialModel.saved);
+    expect(cleared.studio).toEqual(initialModel.studio);
+    expect(cleared.feedResults._tag).toBe("Idle");
+    expect(cleared.matchDetail._tag).toBe("Idle");
+    expect(cleared.applications).toEqual([]);
+    expect(cleared.deletionNotice).toBe(true);
+    expect(commands.map((command) => command.name)).toEqual(["ClearSessionToken"]);
+    expect(commands[0]?.args).toEqual({ expectedToken: "owner-token", sessionEpoch: 5 });
+  });
+
+  it("ignores a late deletion completion from an older epoch", () => {
+    const [unchanged, commands] = update(
+      ownerModel,
+      GotProfileMessage({
+        sessionEpoch: 3,
+        message: ProfileMessage.DeleteSucceeded({ at: "2026-08-26T12:00:00.000Z" }),
+      }),
+    );
+    expect(unchanged).toBe(ownerModel);
+    expect(commands).toEqual([]);
+  });
+
+  it("an old owner's deletion cannot clear a newly authenticated session", () => {
+    const newerOwner: Model = {
+      ...ownerModel,
+      session: { _tag: "Authenticated", token: "new-owner-token" },
+      sessionEpoch: 6,
+    };
+    const [unchanged, commands] = update(
+      newerOwner,
+      GotProfileMessage({
+        sessionEpoch: ownerModel.sessionEpoch,
+        message: ProfileMessage.DeleteSucceeded({ at: "2026-08-26T12:00:00.000Z" }),
+      }),
+    );
+    expect(unchanged).toBe(newerOwner);
+    expect(unchanged.session).toEqual({ _tag: "Authenticated", token: "new-owner-token" });
+    expect(commands).toEqual([]);
+  });
+
+  it("ignores an old-session consent GET completion", () => {
+    const [unchanged, commands] = update(
+      ownerModel,
+      GotProfileMessage({
+        sessionEpoch: ownerModel.sessionEpoch - 1,
+        message: ProfileMessage.FetchSucceeded({
+          consentGeneration: 0,
+          response: oldSessionMeResponse,
+        }),
+      }),
+    );
+    expect(unchanged).toBe(ownerModel);
+    expect(commands).toEqual([]);
+  });
+
+  it("ignores an old-session consent PUT completion", () => {
+    const [unchanged, commands] = update(
+      ownerModel,
+      GotProfileMessage({
+        sessionEpoch: ownerModel.sessionEpoch - 1,
+        message: ProfileMessage.ConsentSetSucceeded({ aiConsent: true, generation: 1 }),
+      }),
+    );
+    expect(unchanged).toBe(ownerModel);
+    expect(commands).toEqual([]);
+  });
+
+  it("canonical sign-out also resets Studio", () => {
+    const [cleared] = update(ownerModel, SessionCleared());
+    expect(cleared.studio).toEqual(initialModel.studio);
+  });
+
+  it("dismisses the root-owned deletion notice without restoring former-owner state", () => {
+    const deleted = update(
+      ownerModel,
+      GotProfileMessage({
+        sessionEpoch: ownerModel.sessionEpoch,
+        message: ProfileMessage.DeleteSucceeded({ at: "2026-08-26T12:00:00.000Z" }),
+      }),
+    )[0];
+    const [dismissed] = update(deleted, DeletionNoticeDismissed());
+    expect(dismissed.deletionNotice).toBe(false);
+    expect(dismissed.profile).toEqual(initialModel.profile);
+    expect(dismissed.session._tag).toBe("Anonymous");
+  });
+
+  it("clears the deletion notice when a new session starts", () => {
+    const deleted: Model = {
+      ...initialModel,
+      deletionNotice: true,
+      sessionTokenInput: "new-owner-token",
+    };
+    const [authenticated] = update(deleted, SessionTokenSubmitted());
+    expect(authenticated.deletionNotice).toBe(false);
+    expect(authenticated.session).toEqual({
+      _tag: "Authenticated",
+      token: "new-owner-token",
+    });
+  });
+  it("preserves a newer stored token when the old clear command effect executes late", () => {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { sessionStorage: new MemoryStorage() },
+    });
+    try {
+      Session.writeToken("owner-token");
+      Session.writeToken("new-owner-token");
+      clearExpectedSessionToken("owner-token");
+      expect(Session.readToken()).toBe("new-owner-token");
+    } finally {
+      if (originalWindow === undefined) Reflect.deleteProperty(globalThis, "window");
+      else Object.defineProperty(globalThis, "window", originalWindow);
+    }
   });
 });

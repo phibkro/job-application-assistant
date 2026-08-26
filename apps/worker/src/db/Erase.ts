@@ -99,6 +99,15 @@ const purges: ReadonlyArray<{
 export const ERASED_TABLES: ReadonlyArray<string> = purges.map((purge) => purge.table);
 
 /**
+ * The purge batch as statements, not an execution — WS-0019's self-service
+ * deletion composes it with principal revocation and the profile tombstone
+ * into one atomic batch, so the sweep and the access cut commit together.
+ * `eraseProfile` below is this list run on its own, unchanged in behaviour.
+ */
+export const purgeWritesFor = (profileId: ProfileId): ReadonlyArray<Write> =>
+  purges.map((purge) => purge.write(profileId));
+
+/**
  * The `profileId`-bearing tables this sweep deliberately does not purge, and
  * why — see this file's own docstring above for each. Exported, not
  * restated in `Erase.test.ts`: that test's coverage check compares
@@ -111,5 +120,5 @@ export const RETAINED_TABLES_WITH_PROFILE_ID: ReadonlyArray<string> = ["profiles
 export const eraseProfile = (profileId: ProfileId): Effect.Effect<void, never, Database> =>
   Effect.gen(function* () {
     const db = yield* Database;
-    yield* db.atomic(purges.map((purge) => purge.write(profileId)));
+    yield* db.atomic(purgeWritesFor(profileId));
   });

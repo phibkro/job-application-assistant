@@ -16,6 +16,8 @@ export const MeResponse = S.Struct({
   profile: Profile,
   capabilities: S.Array(S.String),
   profileUpdatedAt: S.NullOr(S.String),
+  /** WS-0019: whether model processors may receive this account's data. */
+  aiConsent: S.Boolean,
 });
 export type MeResponse = typeof MeResponse.Type;
 export const ProfileAsyncData = AsyncData.Schema(MeResponse, Problem);
@@ -102,6 +104,19 @@ export const Model = S.Struct({
   editedProposalValues: S.Option(S.Record(S.String, S.String)),
   proposalDecisions: S.Array(ProposalDecisionRequest),
   proposalAnnouncement: S.NullOr(S.String),
+  // WS-0019: the Privacy section. Consent flips optimistically and rolls
+  // back on failure; deletion needs an explicit two-step confirm; export is
+  // a plain download request.
+  aiConsentPending: S.Boolean,
+  /** The value to restore if the optimistic consent flip fails. */
+  aiConsentRollbackValue: S.Boolean,
+  consentGeneration: S.Number,
+  deleteConfirmRevealed: S.Boolean,
+  deleteConfirmed: S.Boolean,
+  deleteRequest: RequestStatus,
+  consentRequest: RequestStatus,
+  exportRequest: RequestStatus,
+  accountDeleted: S.Boolean,
 });
 export type Model = typeof Model.Type;
 
@@ -128,6 +143,15 @@ export const init = (): Model => ({
   editedProposalValues: Option.none(),
   proposalDecisions: [],
   proposalAnnouncement: null,
+  aiConsentPending: false,
+  aiConsentRollbackValue: false,
+  consentGeneration: 0,
+  deleteConfirmRevealed: false,
+  deleteConfirmed: false,
+  deleteRequest: RequestIdle(),
+  consentRequest: RequestIdle(),
+  exportRequest: RequestIdle(),
+  accountDeleted: false,
 });
 
 // Re-exported for the Message/update modules so they need not reach into

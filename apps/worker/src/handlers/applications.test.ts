@@ -227,6 +227,8 @@ describe("applications.draft", () => {
         answers: () => Effect.die("unused"),
         answer: () => Effect.die("unused"),
         unanswered: () => Effect.die("unused"),
+        aiConsent: () => Effect.succeed(false),
+        setAiConsent: () => Effect.die("Profiles.setAiConsent"),
       }),
       drafting: Layer.succeed(Drafting, {
         compose: () => Effect.fail(new ProfileIncomplete({ missing: "headline or experience" })),
@@ -248,6 +250,8 @@ describe("applications.draft", () => {
         answers: () => Effect.die("unused"),
         answer: () => Effect.die("unused"),
         unanswered: () => Effect.die("unused"),
+        aiConsent: () => Effect.succeed(false),
+        setAiConsent: () => Effect.die("Profiles.setAiConsent"),
       }),
       drafting: Layer.succeed(Drafting, {
         compose: () =>

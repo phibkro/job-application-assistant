@@ -2,6 +2,7 @@ import * as Match from "effect/Match";
 import type { Runtime } from "foldkit";
 import type { Document, Html, HtmlBuilder } from "foldkit/html";
 import {
+  DeletionNoticeDismissed,
   GotProfileMessage,
   GotSavedMessage,
   GotStudioMessage,
@@ -20,7 +21,7 @@ import { browseView } from "./view/Browse.ts";
 import { desktopNavigation, mobileNavigation, sessionPanel } from "./view/Chrome.ts";
 import { feedView } from "./view/Feed.ts";
 import { jobDetailView } from "./view/JobDetail.ts";
-import { notFoundView } from "./view/Shared.ts";
+import { button, notFoundView } from "./view/Shared.ts";
 
 // The Foldkit-idiomatic split: this module defines the program (Model,
 // init, update, view) and stays importable — by `update.test.ts`, by any
@@ -87,6 +88,35 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
       h.main(
         [h.Class(contentOffset)],
         [
+          ...(model.deletionNotice
+            ? [
+                h.div(
+                  [
+                    h.Role("status"),
+                    h.AriaLive("polite"),
+                    h.Class(
+                      "mb-4 rounded-m3-large border border-primary bg-primary-container p-4 text-on-primary-container",
+                    ),
+                  ],
+                  [
+                    h.p([h.Class("font-semibold")], ["Your account has been deleted."]),
+                    h.p(
+                      [h.Class("mt-1 text-sm")],
+                      ["You are signed out, and this browser no longer holds the deleted account."],
+                    ),
+                    button(
+                      {
+                        label: "Dismiss deletion notice",
+                        variant: "secondary",
+                        onClick: DeletionNoticeDismissed(),
+                        className: "mt-3",
+                      },
+                      h,
+                    ),
+                  ],
+                ),
+              ]
+            : []),
           Match.value(model.page).pipe(
             Match.withReturnType<Html>(),
             Match.tagsExhaustive({

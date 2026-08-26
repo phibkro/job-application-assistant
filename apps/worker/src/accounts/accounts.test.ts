@@ -214,6 +214,7 @@ describe("profileOf", () => {
         at: "2026-01-01T00:00:00.000Z",
         purgeAfter: "2026-01-31T00:00:00.000Z",
       }),
+      aiAssist: 0,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });

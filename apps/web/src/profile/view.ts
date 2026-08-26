@@ -8,6 +8,7 @@ import type { Model, ProfileForm } from "./Model.ts";
 import {
   button,
   card,
+  checkboxField,
   inputField,
   pageClass,
   renderProblem,
@@ -196,6 +197,131 @@ const profileForm = (
 
 // ---- APPEARANCE (WS-0013-r1) ---------------------------------------------
 // The local preference editor: six named presets (swatch cards), an explicit
+// --- WS-0019: Privacy section ------------------------------------------------
+//
+// Three controls, one honest posture: the toggle says exactly what enabling
+// sends and to whom; export hands the person everything the erasure sweep
+// would remove; deletion demands a revealed, checkbox-confirmed intent before
+// the command carrying `confirm: "DELETE"` is even sent.
+
+const CONSENT_DESCRIPTION =
+  "When enabled, model-powered features (document drafting with the Model engine, and document " +
+  "import with Model extraction) send your content to Cloudflare Workers AI for processing under " +
+  "Cloudflare's processor terms. Drafting sends fact keys, not your actual profile values; import " +
+  "sends the document you submit. Responses are processed in your account. When disabled, these " +
+  "features run without any model service.";
+
+const DELETE_WARNING =
+  "This removes everything registered to your account and revokes your access immediately. It " +
+  "cannot be undone. Download an export first if you want to keep your data.";
+
+const privacySection = (model: Model, h: HtmlBuilder<Message.Message>): Html => {
+  const loadedConsent = AsyncData.matchDataSplitEmpty(model.profile, {
+    onIdle: () => undefined,
+    onLoading: () => undefined,
+    onFailure: () => undefined,
+    onData: (response) => response.aiConsent,
+  });
+  const aiConsent = loadedConsent ?? false;
+  return h.section(
+    [
+      h.Id("privacy"),
+      h.AriaLabel("Privacy"),
+      h.Class("space-y-4 border-t border-outline-variant pt-4"),
+    ],
+    [
+      h.h3([h.Class("text-base font-semibold text-on-surface")], ["Privacy"]),
+      h.div(
+        [h.Class("space-y-3")],
+        [
+          checkboxField(
+            {
+              id: "ai-consent-toggle",
+              label: "Enable AI processing of my data",
+              isChecked: aiConsent,
+              onToggle: (isChecked) => Message.ConsentToggled({ enabled: isChecked }),
+              isDisabled: loadedConsent === undefined || model.aiConsentPending,
+              description: CONSENT_DESCRIPTION,
+              descriptionClassName: "text-sm text-on-surface-variant",
+            },
+            h,
+          ),
+        ],
+      ),
+      h.div(
+        [h.Class("space-y-2")],
+        [
+          button(
+            {
+              label:
+                model.exportRequest._tag === "Pending"
+                  ? "Preparing export…"
+                  : "Download workspace export (JSON)",
+              onClick: Message.ExportWorkspaceClicked(),
+              isDisabled: model.exportRequest._tag === "Pending",
+            },
+            h,
+          ),
+          model.exportRequest._tag === "Failed"
+            ? renderProblem(model.exportRequest.problem, h)
+            : h.empty,
+        ],
+      ),
+      h.div(
+        [h.Class("space-y-2 rounded-m3-small border border-error/40 p-4")],
+        model.accountDeleted
+          ? [
+              h.p(
+                [h.Class("text-sm font-medium text-on-surface")],
+                ["Your account has been deleted."],
+              ),
+            ]
+          : [
+              h.p([h.Class("text-sm font-medium text-on-surface")], ["Danger zone"]),
+              button(
+                {
+                  label: model.deleteConfirmRevealed ? "Cancel" : "Delete account…",
+                  onClick: Message.DeleteRevealToggled({ revealed: !model.deleteConfirmRevealed }),
+                },
+                h,
+              ),
+              ...(model.deleteConfirmRevealed
+                ? [
+                    h.p([h.Class("text-sm text-on-surface-variant")], [DELETE_WARNING]),
+                    checkboxField(
+                      {
+                        id: "delete-confirm-checkbox",
+                        label:
+                          "I understand this permanently deletes my profile, answers, saved jobs, applications, documents, and history, and cannot be undone",
+                        isChecked: model.deleteConfirmed,
+                        onToggle: (isChecked) =>
+                          Message.DeleteConfirmChanged({ confirmed: isChecked }),
+                      },
+                      h,
+                    ),
+                    button(
+                      {
+                        label:
+                          model.deleteRequest._tag === "Pending"
+                            ? "Deleting…"
+                            : "Permanently delete account",
+                        onClick: Message.DeleteClicked(),
+                        isDisabled:
+                          !model.deleteConfirmed || model.deleteRequest._tag === "Pending",
+                      },
+                      h,
+                    ),
+                  ]
+                : []),
+              model.deleteRequest._tag === "Failed"
+                ? renderProblem(model.deleteRequest.problem, h)
+                : h.empty,
+            ],
+      ),
+    ],
+  );
+};
+
 // three-way mode group, and a reset to the default. Rendered for signed-out
 // visitors too — appearance is per-device, not per-account, and never
 // touches the server.
@@ -581,6 +707,7 @@ export const view = defineView<Model, Message.Message, ViewInputs>(
       [
         sectionHeading("Profile", h),
         appearanceSection(model, h),
+        isAuthenticated ? privacySection(model, h) : h.empty,
         isAuthenticated ? importCard(model, h) : h.empty,
         isAuthenticated ? proposalQueue(model, h) : h.empty,
         !isAuthenticated

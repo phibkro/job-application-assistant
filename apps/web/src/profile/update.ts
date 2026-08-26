@@ -119,23 +119,42 @@ export const update = (model: Model, message: Message.Message): UpdateReturn =>
   Match.value(message).pipe(
     withReturnType,
     Match.tagsExhaustive({
-      Requested: () => [
-        evo(model, { profile: () => AsyncData.Loading() }),
-        [Commands.FetchProfile()],
-      ],
+      Requested: () => {
+        const current = AsyncData.getData(model.profile);
+        return [
+          evo(model, {
+            profile: () =>
+              Option.match(current, {
+                onNone: () => AsyncData.Loading(),
+                onSome: (data) => AsyncData.Refreshing({ data }),
+              }),
+          }),
+          [Commands.FetchProfile({ consentGeneration: model.consentGeneration })],
+        ];
+      },
 
-      FetchSucceeded: ({ response }) => {
+      FetchSucceeded: ({ consentGeneration, response }) => {
+        const current = AsyncData.getData(model.profile);
+        const mayApplyConsent =
+          !model.aiConsentPending && consentGeneration === model.consentGeneration;
+        if (!mayApplyConsent && Option.isNone(current)) return [model, []];
+        const acceptedResponse = mayApplyConsent
+          ? response
+          : { ...response, aiConsent: Option.getOrThrow(current).aiConsent };
         const persistedForm = ProfileFormCodec.fromProfile(response.profile);
         return beginProposalFetch(
           evo(model, {
-            profile: () => AsyncData.Success({ data: response }),
+            profile: () => AsyncData.Success({ data: acceptedResponse }),
             profileForm: () => Option.some(persistedForm),
             persistedProfileForm: () => Option.some(persistedForm),
             profileUpdatedAt: () => response.profileUpdatedAt,
           }),
         );
       },
-      FetchFailed: ({ problem }) => [evo(model, { profile: (r) => settle(r, problem) }), []],
+      FetchFailed: ({ consentGeneration, problem }) =>
+        consentGeneration !== model.consentGeneration || model.aiConsentPending
+          ? [model, []]
+          : [evo(model, { profile: (r) => settle(r, problem) }), []],
 
       HeadlineChanged: ({ value }) => [
         editProfileForm(model, (f) => evo(f, { headline: () => value })),
@@ -229,6 +248,10 @@ export const update = (model: Model, message: Message.Message): UpdateReturn =>
                   capabilities: Option.match(AsyncData.getData(model.profile), {
                     onNone: () => [],
                     onSome: (response) => response.capabilities,
+                  }),
+                  aiConsent: Option.match(AsyncData.getData(model.profile), {
+                    onNone: () => false,
+                    onSome: (response) => response.aiConsent,
                   }),
                   expectedUpdatedAt: model.profileUpdatedAt,
                   generation,
@@ -528,5 +551,84 @@ export const update = (model: Model, message: Message.Message): UpdateReturn =>
             ];
       },
       ProposalFocusSettled: () => [model, []],
+
+      // --- WS-0019: Privacy section -------------------------------------
+      ConsentToggled: ({ enabled }) => {
+        const loaded = AsyncData.getData(model.profile);
+        if (model.aiConsentPending || Option.isNone(loaded)) return [model, []];
+        const generation = model.consentGeneration + 1;
+        return [
+          evo(model, {
+            profile: () =>
+              AsyncData.map(model.profile, (response) => ({ ...response, aiConsent: enabled })),
+            aiConsentPending: () => true,
+            aiConsentRollbackValue: () => loaded.value.aiConsent,
+            consentGeneration: () => generation,
+            consentRequest: () => RequestPending(),
+          }),
+          [Commands.SetAiConsent({ enabled, generation })],
+        ];
+      },
+      ConsentSetSucceeded: ({ aiConsent, generation }) =>
+        generation !== model.consentGeneration || !model.aiConsentPending
+          ? [model, []]
+          : [
+              evo(model, {
+                aiConsentPending: () => false,
+                consentGeneration: () => generation + 1,
+                consentRequest: () => RequestIdle(),
+                profile: () =>
+                  AsyncData.map(model.profile, (response) => ({ ...response, aiConsent })),
+              }),
+              [],
+            ],
+      ConsentSetFailed: ({ generation, problem }) =>
+        generation !== model.consentGeneration || !model.aiConsentPending
+          ? [model, []]
+          : [
+              evo(model, {
+                aiConsentPending: () => false,
+                consentGeneration: () => generation + 1,
+                consentRequest: () => RequestFailed({ problem }),
+                profile: () =>
+                  AsyncData.map(model.profile, (response) => ({
+                    ...response,
+                    aiConsent: model.aiConsentRollbackValue,
+                  })),
+              }),
+              [],
+            ],
+      DeleteRevealToggled: ({ revealed }) => [
+        evo(model, { deleteConfirmRevealed: () => revealed, deleteConfirmed: () => false }),
+        [],
+      ],
+      DeleteConfirmChanged: ({ confirmed }) => [
+        evo(model, { deleteConfirmed: () => confirmed }),
+        [],
+      ],
+      DeleteClicked: () =>
+        !model.deleteConfirmed || model.deleteRequest._tag === "Pending"
+          ? [model, []]
+          : [evo(model, { deleteRequest: () => RequestPending() }), [Commands.DeleteAccount({})]],
+      DeleteSucceeded: () => [
+        evo(model, {
+          deleteRequest: () => RequestIdle(),
+          accountDeleted: () => true,
+        }),
+        [],
+      ],
+      DeleteFailed: ({ problem }) => [
+        evo(model, { deleteRequest: () => RequestFailed({ problem }) }),
+        [],
+      ],
+      ExportWorkspaceClicked: () =>
+        model.exportRequest._tag === "Pending"
+          ? [model, []]
+          : [evo(model, { exportRequest: () => RequestPending() }), [Commands.ExportWorkspace({})]],
+      ExportSucceeded: () => [evo(model, { exportRequest: () => RequestIdle() }), []],
+      ExportFailed: ({ problem }) => [
+        evo(model, { exportRequest: () => RequestFailed({ problem }) }),
+        [],
+      ],
     }),
   );

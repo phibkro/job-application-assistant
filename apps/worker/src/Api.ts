@@ -117,6 +117,14 @@ export class ForbiddenByPlatform extends Schema.TaggedError<ForbiddenByPlatform>
   { httpApiStatus: 403 },
 ) {}
 
+/** WS-0019: the owner's AI-consent switch is OFF. Distinct from 402 — no payment changes it, only consent. */
+export const CONSENT_OFF_MESSAGE = "ai assistance is switched off for this account";
+export class ConsentRequired extends Schema.TaggedError<ConsentRequired>()(
+  "ConsentRequired",
+  { message: Schema.String },
+  { httpApiStatus: 403 },
+) {}
+
 /**
  * Returned when an imported profile's JSON fails to decode.
  *
@@ -406,6 +414,36 @@ const feed = HttpApiGroup.make("feed")
   )
   .middleware(Authenticated);
 
+/**
+ * WS-0019 workspace export. The nine aggregate sections are named here while
+ * their domain shapes remain single-sourced in their owning modules.
+ *
+ * `Schema.Any` is deliberate: Effect's HTTP API JSON encoder treats
+ * `Schema.Unknown` as an opaque empty object in this nested response position,
+ * while `Any` is the pinned v4 escape hatch that preserves already-typed
+ * aggregate values byte-for-byte.
+ */
+export const WORKSPACE_EXPORT_SCHEMA = "job-index.workspace-export";
+export const WORKSPACE_EXPORT_VERSION = 1;
+export const WorkspaceExportData = Schema.Struct({
+  profile: Schema.Any,
+  answers: Schema.Array(Schema.Any),
+  savedJobs: Schema.Array(Schema.Any),
+  applications: Schema.Array(Schema.Any),
+  applicationEvents: Schema.Array(Schema.Any),
+  documents: Schema.Array(Schema.Any),
+  proposals: Schema.Array(Schema.Any),
+  labels: Schema.Array(Schema.Any),
+  labelAssignments: Schema.Array(Schema.Any),
+});
+export const WorkspaceExport = Schema.Struct({
+  schema: Schema.Literal(WORKSPACE_EXPORT_SCHEMA),
+  version: Schema.Literal(WORKSPACE_EXPORT_VERSION),
+  exportedAt: Schema.String,
+  data: WorkspaceExportData,
+});
+export type WorkspaceExport = typeof WorkspaceExport.Type;
+
 /** The profile and its answers: everything an application is enriched from. */
 const profile = HttpApiGroup.make("profile")
   .add(
@@ -414,7 +452,14 @@ const profile = HttpApiGroup.make("profile")
         profile: Profile,
         capabilities: Schema.Array(Schema.String),
         profileUpdatedAt: Schema.NullOr(Schema.String),
+        /** The AI-consent dimension (WS-0019): whether model processors may receive this account's data. */
+        aiConsent: Schema.Boolean,
       }),
+      error: Unauthorized,
+    }),
+    HttpApiEndpoint.put("setAiConsent", "/api/v1/me/privacy/ai-consent", {
+      payload: Schema.Struct({ enabled: Schema.Boolean }),
+      success: Schema.Struct({ aiConsent: Schema.Boolean }),
       error: Unauthorized,
     }),
     HttpApiEndpoint.put("setProfile", "/api/v1/me/profile", {
@@ -461,6 +506,18 @@ const profile = HttpApiGroup.make("profile")
         markdown: Schema.String,
         history: Schema.Struct({ json: Schema.String, markdown: Schema.String }),
       }),
+      error: Unauthorized,
+    }),
+    /**
+     * WS-0019: the whole workspace in one schema-versioned JSON document —
+     * every account-registered artifact the erasure sweep removes, so
+     * portability and erasure cover the same set. Embedded aggregates are
+     * typed `Unknown` here (restating nine domain models in the wire layer
+     * would be a second declaration of each); the completeness test asserts
+     * the real shapes against a seeded fixture.
+     */
+    HttpApiEndpoint.get("workspaceExport", "/api/v1/me/workspace/export", {
+      success: WorkspaceExport,
       error: Unauthorized,
     }),
     /**
@@ -646,7 +703,7 @@ const proposals = HttpApiGroup.make("proposals")
         engine: Schema.optional(DomainEngine),
       }),
       success: ProposalCreateResponse,
-      error: [Unauthorized, UpgradeRequired, UnsupportedDocument],
+      error: [Unauthorized, UpgradeRequired, UnsupportedDocument, ConsentRequired],
     }),
     HttpApiEndpoint.get("list", "/api/v1/me/profile/proposals", {
       success: ProposalsResponse,
@@ -739,7 +796,7 @@ const documents = HttpApiGroup.make("documents")
         jobId: Schema.optional(Schema.String),
       }),
       success: DocumentCreateResponse,
-      error: [Unauthorized, NotFound, UpgradeRequired],
+      error: [Unauthorized, NotFound, UpgradeRequired, ConsentRequired],
     }),
     HttpApiEndpoint.get("list", "/api/v1/me/documents", {
       query: { cursor: Schema.optional(Schema.String) },
@@ -765,6 +822,25 @@ const documents = HttpApiGroup.make("documents")
   )
   .middleware(Authenticated);
 
+/**
+ * WS-0019 self-service deletion. The typed payload is the whole
+ * confirmation: the server cannot verify a download happened or a warning
+ * was read, so it carries exactly what the server enforces — an
+ * unambiguous, schema-checked statement of intent. Success revokes every
+ * principal and session of the profile and purges every personal row in one
+ * atomic batch; the credential that made the request dies with the account,
+ * so a repeat call answers 401 — there is no second-delete state to design.
+ */
+const account = HttpApiGroup.make("account")
+  .add(
+    HttpApiEndpoint.delete("deleteAccount", "/api/v1/me/account", {
+      payload: Schema.Struct({ confirm: Schema.Literals(["DELETE"]) }),
+      success: Schema.Struct({ erased: Schema.Boolean, at: Schema.String }),
+      error: Unauthorized,
+    }),
+  )
+  .middleware(Authenticated);
+
 export const api = HttpApi.make("job-index").add(
   ingestion,
   corpus,
@@ -773,4 +849,5 @@ export const api = HttpApi.make("job-index").add(
   applications,
   proposals,
   documents,
+  account,
 );

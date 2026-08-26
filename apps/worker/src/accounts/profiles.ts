@@ -7,9 +7,11 @@ import type { AnswerShape } from "@job-index/domain/Answer";
 import type { Profile } from "@job-index/domain/Profile";
 import type { ProfileId, ProposalId } from "@job-index/domain/Ids";
 import { Profiles, StaleProfileWrite, type VersionedProfile } from "../services/Accounts.ts";
-import { Database } from "../services/Database.ts";
+import { Database, type Write } from "../services/Database.ts";
 import {
+  ACTIVE_ERASURE,
   emptyProfile,
+  encodeErasureRow,
   profileWriteForPendingProposal,
   readProfileRow,
   toDomainProfile,
@@ -17,6 +19,7 @@ import {
   writeProfile,
   writeProfileIfVersion,
 } from "./profileRow.ts";
+import { UPDATE_AI_CONSENT } from "./sql.ts";
 import { markAcceptedAfterProfileWrite } from "../db/repositories/Proposals.ts";
 
 /**
@@ -138,6 +141,12 @@ if (import.meta.vitest) {
   });
 }
 
+/** A field-only write that cannot create a row or revive a non-active one. */
+export const aiConsentWrite = (profile: ProfileId, enabled: boolean): Write => ({
+  sql: UPDATE_AI_CONSENT,
+  bindings: [enabled ? 1 : 0, profile, encodeErasureRow(ACTIVE_ERASURE)],
+});
+
 export const layer = Layer.effect(
   Profiles,
   Effect.gen(function* () {
@@ -199,6 +208,24 @@ export const layer = Layer.effect(
         )
         .pipe(Effect.map((rows) => unansweredOf(asked, new Set(rows.map((row) => row.question)))));
 
-    return { get, set, getVersioned, setVersioned, answers, answer, unanswered };
+    const aiConsent = (profile: ProfileId): Effect.Effect<boolean> =>
+      readProfileRow(db, profile).pipe(Effect.map((row) => row?.aiAssist === 1));
+
+    const setAiConsent = (profile: ProfileId, enabled: boolean): Effect.Effect<void> => {
+      const write = aiConsentWrite(profile, enabled);
+      return db.run(write.sql, write.bindings);
+    };
+
+    return {
+      get,
+      set,
+      getVersioned,
+      setVersioned,
+      answers,
+      answer,
+      unanswered,
+      aiConsent,
+      setAiConsent,
+    };
   }),
 );

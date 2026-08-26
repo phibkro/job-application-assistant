@@ -153,6 +153,7 @@ describe("toDomainErasure", () => {
       profileId,
       cv: JSON.stringify(emptyProfile),
       erasure: JSON.stringify({ _tag: "NotARealTag" }),
+      aiAssist: 0,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });

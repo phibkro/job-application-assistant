@@ -4,6 +4,8 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import {
+  CONSENT_OFF_MESSAGE,
+  ConsentRequired,
   CurrentPrincipal,
   DocumentTooLarge,
   MAX_DOCUMENT_CHARS,
@@ -81,6 +83,12 @@ export const layer = HttpApiBuilder.group(api, "documents", (handlers) =>
             }
           | undefined;
         if (payload.engine === "model") {
+          // Consent first (WS-0019): the privacy answer precedes the
+          // commercial one, and no model call is even attempted without it.
+          const aiConsent = yield* profiles.aiConsent(principal.profileId);
+          if (!aiConsent) {
+            return yield* Effect.fail(new ConsentRequired({ message: CONSENT_OFF_MESSAGE }));
+          }
           const entitlements = yield* Entitlements;
           yield* entitlements
             .require(principal.profileId, "model-drafting")

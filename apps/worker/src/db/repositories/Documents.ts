@@ -112,3 +112,17 @@ export const deleteByIdForProfile = (
  */
 export const deleteByProfileWrite = (profileId: ProfileId): Write =>
   deleteStatement(TABLE, { profileId });
+
+/** WS-0019 workspace export: every document of the profile, newest first, uncursored — the export is one complete document. */
+export const findByProfile = (
+  profileId: ProfileId,
+): Effect.Effect<ReadonlyArray<StudioDocument>, never, Database> =>
+  Effect.gen(function* () {
+    const db = yield* Database;
+    return yield* decodeRows<StudioDocument>(StudioDocument)(
+      yield* db.query<unknown>(
+        `SELECT * FROM ${TABLE} WHERE profileId = ? ORDER BY createdAt DESC, id ASC`,
+        [profileId],
+      ),
+    );
+  });

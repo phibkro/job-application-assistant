@@ -31,6 +31,7 @@ import { layer as proposalsLayer } from "./proposals.ts";
 import { layer as ingestionLayer } from "./status.ts";
 import { layer as applicationsLayer } from "./applications.ts";
 import { layer as documentsLayer } from "./documents.ts";
+import { layer as accountLayer } from "./account.ts";
 
 /**
  * A fake that dies with the caller's name when hit, rather than returning a
@@ -72,6 +73,8 @@ const defaultProfiles = Layer.succeed(Profiles, {
   answers: unstubbed("Profiles", "answers"),
   answer: unstubbed("Profiles", "answer"),
   unanswered: unstubbed("Profiles", "unanswered"),
+  aiConsent: unstubbed("Profiles", "aiConsent"),
+  setAiConsent: unstubbed("Profiles", "setAiConsent"),
 });
 
 const defaultDrafting = Layer.succeed(Drafting, {
@@ -204,6 +207,7 @@ export const buildHandler = (fakes: Fakes = {}) => {
     Layer.provide(profileLayer),
     Layer.provide(applicationsLayer),
     Layer.provide(documentsLayer),
+    Layer.provide(accountLayer),
     Layer.provide(authLayer),
     Layer.provide(serviceLayers),
     Layer.provide(Etag.layer),
@@ -211,7 +215,10 @@ export const buildHandler = (fakes: Fakes = {}) => {
     Layer.provide(platform),
   );
 
-  const built = HttpRouter.toWebHandler(appLayer, { disableLogger: true });
+  const built = HttpRouter.toWebHandler(appLayer, {
+    disableLogger: true,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   // Every requirement above is discharged by a fake or a platform layer, so
   // the router's own `ReqR` is `never` — but merging nine service layers in

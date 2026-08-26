@@ -30,9 +30,11 @@ import {
  */
 export type ProfileRow = typeof ProfileRecord.select.Encoded;
 
-const encodeCv = Schema.encodeSync(ProfileRecord.select.fields.cv);
+export const encodeCv = Schema.encodeSync(ProfileRecord.select.fields.cv);
 const decodeCv = Schema.decodeUnknownSync(ProfileRecord.select.fields.cv);
-const encodeErasure = Schema.encodeSync(ProfileRecord.select.fields.erasure);
+
+/** Exported for the consent writer beside this file's other row writers. */
+export const encodeErasureRow = Schema.encodeSync(ProfileRecord.select.fields.erasure);
 const decodeErasure = Schema.decodeUnknownSync(ProfileRecord.select.fields.erasure);
 
 export const emptyProfile: Profile = {
@@ -45,7 +47,7 @@ export const emptyProfile: Profile = {
   education: [],
 };
 
-const ACTIVE_ERASURE: Erasure = { _tag: "Active" };
+export const ACTIVE_ERASURE: Erasure = { _tag: "Active" };
 
 export const toDomainProfile = (row: ProfileRow): Profile => decodeCv(row.cv);
 
@@ -78,7 +80,8 @@ export const readProfileRow = (
 ): Effect.Effect<ProfileRow | undefined> =>
   db.query<ProfileRow>(FIND_PROFILE_ROW, [profileId]).pipe(Effect.map((rows) => rows[0]));
 
-const writeProfileRow = (db: DatabaseService, row: ProfileRow): Effect.Effect<void> =>
+/** Updates an existing row while preserving independently owned consent. */
+export const writeProfileRow = (db: DatabaseService, row: ProfileRow): Effect.Effect<void> =>
   Effect.gen(function* () {
     const existing = yield* readProfileRow(db, row.profileId as ProfileId);
     if (existing === undefined) {
@@ -103,7 +106,8 @@ export const writeProfile = (
     yield* writeProfileRow(db, {
       profileId,
       cv: encodeCv(profile),
-      erasure: existing?.erasure ?? encodeErasure(ACTIVE_ERASURE),
+      erasure: existing?.erasure ?? encodeErasureRow(ACTIVE_ERASURE),
+      aiAssist: existing?.aiAssist ?? 0,
       createdAt: existing?.createdAt ?? now,
       updatedAt: nextProfileUpdatedAt(existing?.updatedAt ?? null, now),
     });
@@ -130,7 +134,8 @@ export const writeProfileIfVersion = (
     const row: ProfileRow = {
       profileId,
       cv: encodeCv(profile),
-      erasure: existing?.erasure ?? encodeErasure(ACTIVE_ERASURE),
+      erasure: existing?.erasure ?? encodeErasureRow(ACTIVE_ERASURE),
+      aiAssist: existing?.aiAssist ?? 0,
       createdAt: existing?.createdAt ?? now,
       updatedAt,
     };
@@ -142,10 +147,10 @@ export const writeProfileIfVersion = (
           ])
         : yield* db.runAffected(UPDATE_PROFILE_IF_VERSION, [
             row.cv,
-            row.erasure,
             row.updatedAt,
             row.profileId,
             expectedUpdatedAt,
+            encodeErasureRow(ACTIVE_ERASURE),
           ]);
     return affected === 1 ? { profile, profileUpdatedAt: updatedAt } : undefined;
   });
@@ -171,7 +176,8 @@ export const profileWriteForPendingProposal = (
   const row: ProfileRow = {
     profileId,
     cv: encodeCv(profile),
-    erasure: existing?.erasure ?? encodeErasure(ACTIVE_ERASURE),
+    erasure: existing?.erasure ?? encodeErasureRow(ACTIVE_ERASURE),
+    aiAssist: existing?.aiAssist ?? 0,
     createdAt: existing?.createdAt ?? now,
     updatedAt,
   };
@@ -196,6 +202,7 @@ export const profileWriteForPendingProposal = (
               profileId,
               existing.cv,
               existing.updatedAt,
+              encodeErasureRow(ACTIVE_ERASURE),
               proposalId,
               profileId,
             ],
@@ -216,8 +223,21 @@ export const writeErasureRequested = (
     yield* writeProfileRow(db, {
       profileId,
       cv: existing?.cv ?? encodeCv(emptyProfile),
-      erasure: encodeErasure({ _tag: "Requested", at: requestedAt, purgeAfter }),
+      erasure: encodeErasureRow({ _tag: "Requested", at: requestedAt, purgeAfter }),
+      aiAssist: existing?.aiAssist ?? 0,
       createdAt: existing?.createdAt ?? now,
       updatedAt: nextProfileUpdatedAt(existing?.updatedAt ?? null, now),
     });
   });
+
+/**
+ * The deletion tombstone (WS-0019): the owner's own confirmed request has
+ * just purged every personal row in the same atomic batch. The `profiles`
+ * row survives in `Purged` state — its existence is the record that erasure
+ * happened — with the CV emptied and the consent flag zeroed, so the
+ * tombstone is uniform regardless of what the account had enabled.
+ */
+export const tombstoneWrite = (profileId: ProfileId, at: string): Write => ({
+  sql: "-- profiles:tombstone\nUPDATE profiles SET cv = ?, erasure = ?, aiAssist = 0, updatedAt = ? WHERE profileId = ?",
+  bindings: [encodeCv(emptyProfile), encodeErasureRow({ _tag: "Purged", at }), at, profileId],
+});

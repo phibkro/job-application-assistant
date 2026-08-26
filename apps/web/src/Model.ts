@@ -138,6 +138,7 @@ export const Model = S.Struct({
   session: SessionState,
   sessionEpoch: S.Number,
   sessionTokenInput: S.String,
+  deletionNotice: S.Boolean,
 
   browseQuery: BrowseQuery,
   browseResults: BrowseAsyncData.schema,
@@ -159,6 +160,7 @@ export const initialModel: Model = {
   session: SessionAnonymous(),
   sessionEpoch: 0,
   sessionTokenInput: "",
+  deletionNotice: false,
 
   browseQuery: { term: "", location: "", status: "" },
   browseResults: BrowseAsyncData.Idle(),

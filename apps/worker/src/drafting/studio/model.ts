@@ -9,7 +9,7 @@ import {
   type ComposedDocument,
   type StudioModelUnavailable,
 } from "../../services/Studio.ts";
-import { renderCvBody } from "../sections.ts";
+import { finalize, keyFacts, type FinalizeResult, type KeyedFact } from "./keys.ts";
 
 /** The narrow part of Cloudflare's `Ai` binding this service owns. */
 export interface WorkersAi {
@@ -26,12 +26,8 @@ export interface WorkersAi {
  */
 const STUDIO_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
-/**
- * Truncation bound before send, matching the inference engine: a profile
- * plus snapshot is far below it in practice, but the cap guarantees the
- * request can never grow unbounded with a pathological profile.
- */
-const MAX_MODEL_INPUT_CHARS = 120_000;
+/** Hard bound applied while adding whole inventory lines, never by slicing. */
+export const MAX_MODEL_INPUT_CHARS = 120_000;
 
 /**
  * Upper bound on the returned document body — MAX_DOCUMENT_CHARS from the
@@ -49,43 +45,78 @@ const unavailable = (reason: string): StudioModelUnavailable => ({
 });
 
 /**
- * The model prompt, one place so its quality can be reviewed (and later
- * provisioned) as a unit. It names the grounding exhaustively — profile
- * fields, stored answers, and, when targeted, the frozen vacancy — and
- * forbids invented facts: the warranted-facts principle (`vision.md`) means
- * the model may reorganize and phrase the owner's own material, never
- * fabricate credentials or experience.
+ * The keyed prompt (WS-0019 D2). The model's entire view of the applicant is
+ * the placeholder inventory: it may reorganize and phrase fact REFERENCES,
+ * never see or echo the facts themselves. Substitution happens locally in
+ * `finalize`, after the model session has terminated.
  */
-const promptFor = (
+interface Grounding {
+  readonly prompt: string;
+  readonly facts: ReadonlyArray<KeyedFact>;
+  readonly finalize: (modelText: string) => FinalizeResult;
+}
+
+export const promptFor = (
   profile: Profile,
   answers: ReadonlyArray<Answer>,
   kind: DocumentKind,
   job: JobSnapshot | undefined,
-): string => {
+): Grounding | undefined => {
+  const allFacts = keyFacts(profile, answers, job);
+  // Target keys are referenced by the fixed instruction, so they must be
+  // admitted before optional profile/answer keys.
+  const candidates =
+    job === undefined
+      ? allFacts
+      : [
+          ...allFacts.filter((fact) => fact.key.startsWith("job.")),
+          ...allFacts.filter((fact) => !fact.key.startsWith("job.")),
+        ];
+  const hasAnswers = allFacts.some((fact) => fact.key.startsWith("answer."));
   const target =
     job === undefined
       ? "This document is GENERAL: no specific vacancy exists. Do not address any employer."
-      : `This document targets this vacancy:\nTitle: ${job.title}\nEmployer: ${job.employerName}\nLocation: ${job.location}\nAdvert: ${job.description}`;
-  const additional =
-    answers.length === 0
-      ? ""
-      : `\nAdditional information to include under an "ADDITIONAL INFORMATION" heading:\n${answers
-          .map((answer) => `- ${answer.label}: ${answer.value}`)
-          .join("\n")}`;
+      : "This document targets the vacancy {{job.title}} at {{job.employerName}}, located {{job.location}}. The full advert text is available as {{job.description}}.";
+  const additionalNote = hasAnswers
+    ? 'Facts under answer.* belong under an "ADDITIONAL INFORMATION" heading.'
+    : "";
   const ask =
     kind === "cv"
-      ? `Write the CV as plain text using these section headings where content exists: PROFILE, EXPERIENCE, SKILLS, EDUCATION, LANGUAGES${answers.length > 0 ? ", ADDITIONAL INFORMATION" : ""}.`
+      ? `Write the CV as plain text using these section headings where content exists: PROFILE, EXPERIENCE, SKILLS, EDUCATION, LANGUAGES${hasAnswers ? ", ADDITIONAL INFORMATION" : ""}.`
       : 'Write a covering letter of at most five short paragraphs, ending with "Kind regards,".';
-  return `You are drafting ONE ${kind === "cv" ? "CV" : "covering letter"} for a job applicant.
-Use ONLY the facts below. Never invent employers, dates, skills, or claims; if a section has no supporting facts, omit that section.
+  const prefix = `You are drafting ONE ${kind === "cv" ? "CV" : "covering letter"} for a job applicant.
+Use ONLY the fact keys listed below. Never invent employers, dates, skills, or claims; if a section has no supporting keys, omit that section.
+CRITICAL: every fact appears ONLY as a double-brace placeholder such as {{profile.headline}}.
+Copy placeholders VERBATIM into your text wherever that fact belongs. NEVER write out what a placeholder stands for — you do not know the values, and you must not guess them. Placeholders are replaced with the real values locally after you finish; anything you invent instead would be wrong.
+Never output double braces for any other purpose.
 ${ask}
 ${target}
-${additional}
+${additionalNote}
 
-PROFILE:
-${renderCvBody(profile, profile.experience)}
+FACT KEYS:
+`;
+  const suffix = "\n\nReturn only the document text.";
+  if (prefix.length + suffix.length > MAX_MODEL_INPUT_CHARS) return undefined;
 
-Return only the document text.`;
+  const sent: Array<KeyedFact> = [];
+  const lines: Array<string> = [];
+  for (const fact of candidates) {
+    const line = `{{${fact.key}}}`;
+    const inventory = lines.length === 0 ? line : `${lines.join("\n")}\n${line}`;
+    if (prefix.length + inventory.length + suffix.length > MAX_MODEL_INPUT_CHARS) break;
+    sent.push(fact);
+    lines.push(line);
+  }
+  if (
+    job !== undefined &&
+    ["job.title", "job.employerName", "job.location", "job.description"].some(
+      (key) => !sent.some((fact) => fact.key === key),
+    )
+  ) {
+    return undefined;
+  }
+  const prompt = `${prefix}${lines.join("\n")}${suffix}`;
+  return { prompt, facts: sent, finalize: (modelText) => finalize(modelText, sent) };
 };
 
 /**
@@ -115,10 +146,18 @@ export const layer = (ai: WorkersAi | undefined): Layer.Layer<ModelStudioCompose
           ),
         );
       }
+      const grounding = promptFor(profile, answers, kind, job);
+      if (grounding === undefined) {
+        return Effect.fail(
+          unavailable(
+            "the keyed prompt could not fit safely within the model input bound; the template composer served instead",
+          ),
+        );
+      }
       return Effect.tryPromise({
         try: () =>
           ai.run(STUDIO_MODEL, {
-            prompt: promptFor(profile, answers, kind, job).slice(0, MAX_MODEL_INPUT_CHARS),
+            prompt: grounding.prompt,
             max_tokens: 4096,
             temperature: 0,
           }),
@@ -130,16 +169,39 @@ export const layer = (ai: WorkersAi | undefined): Layer.Layer<ModelStudioCompose
             catch: (error) => unavailable(`Workers AI response was invalid: ${describe(error)}`),
           }),
         ),
-        Effect.map((content): ComposedDocument => ({ kind, content, engine: "model" as const })),
-        // An oversized response is not a document this system can store —
-        // degrade to the template tier rather than persisting it.
-        Effect.filterOrFail(
-          (composed) => composed.content.length <= MAX_MODEL_OUTPUT_CHARS,
-          () =>
-            unavailable(
-              `Workers AI response exceeded the ${MAX_MODEL_OUTPUT_CHARS}-character document bound; the template composer served instead`,
-            ),
-        ),
+        Effect.map((modelText) => grounding.finalize(modelText)),
+        // Substitution happened inside `finalize`, after the model session
+        // terminated and before anything reaches storage. A model that echoed
+        // raw values or invented tokens is a misbehaving engine like any
+        // other: every case below degrades to the template tier.
+        Effect.flatMap((finalized) => {
+          if (finalized._tag === "RawValueLeak") {
+            return Effect.fail(
+              unavailable(
+                `the model echoed raw values for ${finalized.keys.length} fact(s); the template composer served instead`,
+              ),
+            );
+          }
+          if (finalized._tag === "UnresolvedPlaceholder") {
+            return Effect.fail(
+              unavailable(
+                "the model returned placeholders outside the fact inventory; the template composer served instead",
+              ),
+            );
+          }
+          if (finalized.content.length > MAX_MODEL_OUTPUT_CHARS) {
+            return Effect.fail(
+              unavailable(
+                `Workers AI response exceeded the ${MAX_MODEL_OUTPUT_CHARS}-character document bound; the template composer served instead`,
+              ),
+            );
+          }
+          return Effect.succeed<ComposedDocument>({
+            kind,
+            content: finalized.content,
+            engine: "model" as const,
+          });
+        }),
       );
     },
   });

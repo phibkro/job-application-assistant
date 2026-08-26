@@ -91,6 +91,8 @@ describe("feed (authenticated)", () => {
         answers: () => Effect.die("unused"),
         answer: () => Effect.die("unused"),
         unanswered: () => Effect.die("unused"),
+        aiConsent: () => Effect.succeed(false),
+        setAiConsent: () => Effect.die("Profiles.setAiConsent"),
       }),
     });
     const res = await handler(
@@ -151,6 +153,8 @@ describe("getMatch (authenticated)", () => {
     answers: () => Effect.die("unused"),
     answer: () => Effect.die("unused"),
     unanswered: () => Effect.die("unused"),
+    aiConsent: () => Effect.succeed(false),
+    setAiConsent: () => Effect.die("Profiles.setAiConsent"),
   });
 
   it("a match that hydration learned has closed upstream fails with Gone, not NotFound", async () => {

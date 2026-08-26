@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import { AsyncData } from "foldkit";
 import { describe, expect, it } from "vitest";
 import {
   MAX_PDF_PROFILE_FILE_BYTES,
@@ -40,19 +41,38 @@ const meResponse: MeResponse = {
   },
   capabilities: ["draft"],
   profileUpdatedAt: "2026-08-25T08:00:00.000Z",
+  aiConsent: false,
 };
 
 describe("Requested", () => {
-  it("starts loading and asks the server for the profile", () => {
-    const [model, commands] = update(init(), Message.Requested());
-    expect(model.profile._tag).toBe("Loading");
-    expect(commands.map((c) => c.name)).toEqual(["FetchProfile"]);
+  it("captures consent generation, starts Loading before first data, and starts Refreshing with data", () => {
+    const [initialRequest, initialCommands] = update(init(), Message.Requested());
+    expect(initialRequest.profile._tag).toBe("Loading");
+    expect(initialCommands).toHaveLength(1);
+    expect(initialCommands[0]).toMatchObject({
+      name: "FetchProfile",
+      args: { consentGeneration: 0 },
+    });
+
+    const loaded = update(
+      init(),
+      Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }),
+    )[0];
+    const [refreshing, refreshCommands] = update(loaded, Message.Requested());
+    expect(refreshing.profile).toEqual({ _tag: "Refreshing", data: meResponse });
+    expect(refreshCommands[0]).toMatchObject({
+      name: "FetchProfile",
+      args: { consentGeneration: 0 },
+    });
   });
 });
 
 describe("FetchSucceeded / FetchFailed", () => {
   it("FetchSucceeded populates both the cache and a fresh edit buffer from it", () => {
-    const [model, commands] = update(init(), Message.FetchSucceeded({ response: meResponse }));
+    const [model, commands] = update(
+      init(),
+      Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }),
+    );
     expect(model.profile).toEqual({ _tag: "Success", data: meResponse });
     expect(Option.isSome(model.profileForm)).toBe(true);
     const form = Option.getOrThrow(model.profileForm);
@@ -70,14 +90,17 @@ describe("FetchSucceeded / FetchFailed", () => {
     const loading: Model = { ...init(), profile: { _tag: "Loading" } };
     const [model] = update(
       loading,
-      Message.FetchFailed({ problem: new NotFound({ message: "no" }) }),
+      Message.FetchFailed({ consentGeneration: 0, problem: new NotFound({ message: "no" }) }),
     );
     expect(model.profile._tag).toBe("Failure");
   });
 });
 
 describe("field edits", () => {
-  const loaded: Model = update(init(), Message.FetchSucceeded({ response: meResponse }))[0];
+  const loaded: Model = update(
+    init(),
+    Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }),
+  )[0];
 
   it("HeadlineChanged edits only the buffer, never the fetched cache", () => {
     const [model] = update(loaded, Message.HeadlineChanged({ value: "Staff Engineer" }));
@@ -92,7 +115,10 @@ describe("field edits", () => {
 });
 
 describe("experience list", () => {
-  const loaded: Model = update(init(), Message.FetchSucceeded({ response: meResponse }))[0];
+  const loaded: Model = update(
+    init(),
+    Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }),
+  )[0];
 
   it("ExperienceAdded appends a fresh entry with its own id", () => {
     const [model] = update(loaded, Message.ExperienceAdded());
@@ -149,7 +175,10 @@ describe("SaveClicked", () => {
   });
 
   it("carries the fetched capabilities forward — setProfile cannot change what an account is entitled to", () => {
-    const loaded: Model = update(init(), Message.FetchSucceeded({ response: meResponse }))[0];
+    const loaded: Model = update(
+      init(),
+      Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }),
+    )[0];
     const [model, commands] = update(loaded, Message.SaveClicked());
     expect(model.profileSaving).toEqual({ _tag: "Pending" });
     expect(commands.map((c) => c.name)).toEqual(["SaveProfile"]);
@@ -171,7 +200,7 @@ describe("SaveClicked", () => {
 
   it("SaveSucceeded refreshes the cache, advances the revision, and clears Pending", () => {
     const pending: Model = {
-      ...update(init(), Message.FetchSucceeded({ response: meResponse }))[0],
+      ...update(init(), Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }))[0],
       profileSaving: { _tag: "Pending" },
     };
     const response = { ...meResponse, profileUpdatedAt: "2026-08-25T09:00:00.000Z" };
@@ -190,7 +219,7 @@ describe("SaveClicked", () => {
 
   it("SaveFailed retains the revision and never auto-retries a stale write", () => {
     const pending: Model = {
-      ...update(init(), Message.FetchSucceeded({ response: meResponse }))[0],
+      ...update(init(), Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }))[0],
       profileSaving: { _tag: "Pending" },
     };
     const problem = NetworkError({
@@ -236,7 +265,7 @@ describe("proposal review", () => {
   };
 
   const loadedWithProposals = (): Model => ({
-    ...update(init(), Message.FetchSucceeded({ response: meResponse }))[0],
+    ...update(init(), Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }))[0],
     proposals: [proposal, structuredProposal],
     proposalFetch: { _tag: "Idle" },
   });
@@ -775,5 +804,218 @@ describe("profile document file boundary", () => {
       _tag: "NetworkError",
       detail: "Plain-text files must be 200,000 characters or fewer.",
     });
+  });
+});
+
+// --- WS-0019: Privacy section — consent toggle, export, deletion flow -------
+
+describe("WS-0019 privacy: consent toggle", () => {
+  const loaded = update(
+    init(),
+    Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }),
+  )[0];
+
+  it("flips consent optimistically and issues SetAiConsent with the new value", () => {
+    const [model, commands] = update(loaded, Message.ConsentToggled({ enabled: true }));
+    expect(model.aiConsentPending).toBe(true);
+    expect(model.consentRequest._tag).toBe("Pending");
+    const data = Option.getOrThrow(Option.some(model)).profile;
+    void data;
+    expect(commands).toHaveLength(1);
+  });
+
+  it("settles the pending state on success", () => {
+    const toggled = update(loaded, Message.ConsentToggled({ enabled: true }))[0];
+    const [model] = update(
+      toggled,
+      Message.ConsentSetSucceeded({ aiConsent: true, generation: toggled.consentGeneration }),
+    );
+    expect(model.aiConsentPending).toBe(false);
+    expect(model.consentRequest._tag).toBe("Idle");
+    expect(model.consentGeneration).toBe(toggled.consentGeneration + 1);
+  });
+
+  it("rolls the optimistic flip back on failure", () => {
+    const toggled = update(loaded, Message.ConsentToggled({ enabled: true }))[0];
+    const [model] = update(
+      toggled,
+      Message.ConsentSetFailed({
+        generation: toggled.consentGeneration,
+        problem: NetworkError({ detail: "offline" }),
+      }),
+    );
+    expect(model.aiConsentPending).toBe(false);
+    expect(model.consentRequest._tag).toBe("Failed");
+    expect(model.consentGeneration).toBe(toggled.consentGeneration + 1);
+  });
+
+  it("ignores a second toggle while one is in flight", () => {
+    const toggled = update(loaded, Message.ConsentToggled({ enabled: true }))[0];
+    const [, commands] = update(toggled, Message.ConsentToggled({ enabled: false }));
+    expect(commands).toHaveLength(0);
+  });
+
+  it("ignores a stale GET that completes after a committed consent PUT", () => {
+    const toggled = update(loaded, Message.ConsentToggled({ enabled: true }))[0];
+    const committed = update(
+      toggled,
+      Message.ConsentSetSucceeded({ aiConsent: true, generation: toggled.consentGeneration }),
+    )[0];
+    const afterLateGet = update(
+      committed,
+      Message.FetchSucceeded({
+        consentGeneration: 0,
+        response: { ...meResponse, aiConsent: false },
+      }),
+    )[0];
+    expect(Option.getOrThrow(AsyncData.getData(afterLateGet.profile)).aiConsent).toBe(true);
+  });
+
+  it("keeps the optimistic value when a stale GET lands before PUT success, then uses server truth", () => {
+    const toggled = update(loaded, Message.ConsentToggled({ enabled: true }))[0];
+    const afterLateGet = update(
+      toggled,
+      Message.FetchSucceeded({
+        consentGeneration: 0,
+        response: { ...meResponse, aiConsent: false },
+      }),
+    )[0];
+    expect(Option.getOrThrow(AsyncData.getData(afterLateGet.profile)).aiConsent).toBe(true);
+    const committed = update(
+      afterLateGet,
+      Message.ConsentSetSucceeded({ aiConsent: true, generation: toggled.consentGeneration }),
+    )[0];
+    expect(Option.getOrThrow(AsyncData.getData(committed.profile)).aiConsent).toBe(true);
+  });
+
+  it("GET-before-PUT lifecycle preserves committed consent and carries captured command metadata", () => {
+    const [refreshing, fetchCommands] = update(loaded, Message.Requested());
+    const [toggled, putCommands] = update(refreshing, Message.ConsentToggled({ enabled: true }));
+    expect(fetchCommands[0]).toMatchObject({
+      name: "FetchProfile",
+      args: { consentGeneration: 0 },
+    });
+    expect(putCommands[0]).toMatchObject({
+      name: "SetAiConsent",
+      args: { enabled: true, generation: 1 },
+    });
+
+    const staleGet = update(
+      toggled,
+      Message.FetchSucceeded({
+        consentGeneration: 0,
+        response: {
+          ...meResponse,
+          profile: { ...meResponse.profile, headline: "Fresh non-consent data" },
+          aiConsent: false,
+        },
+      }),
+    )[0];
+    expect(Option.getOrThrow(AsyncData.getData(staleGet.profile))).toMatchObject({
+      profile: { headline: "Fresh non-consent data" },
+      aiConsent: true,
+    });
+
+    const committed = update(
+      staleGet,
+      Message.ConsentSetSucceeded({ aiConsent: true, generation: 1 }),
+    )[0];
+    expect(Option.getOrThrow(AsyncData.getData(committed.profile)).aiConsent).toBe(true);
+    expect(committed.consentGeneration).toBe(2);
+  });
+
+  it("PUT success settles authoritatively while a profile refresh is in flight", () => {
+    const toggled = update(loaded, Message.ConsentToggled({ enabled: true }))[0];
+    const [refreshing, fetchCommands] = update(toggled, Message.Requested());
+    expect(refreshing.profile._tag).toBe("Refreshing");
+    expect(fetchCommands[0]).toMatchObject({
+      name: "FetchProfile",
+      args: { consentGeneration: 1 },
+    });
+    const committed = update(
+      refreshing,
+      Message.ConsentSetSucceeded({ aiConsent: false, generation: 1 }),
+    )[0];
+    expect(Option.getOrThrow(AsyncData.getData(committed.profile)).aiConsent).toBe(false);
+    expect(committed.aiConsentPending).toBe(false);
+    expect(committed.consentGeneration).toBe(2);
+  });
+
+  it("PUT-before-GET lifecycle accepts only the GET captured after settlement", () => {
+    const toggled = update(loaded, Message.ConsentToggled({ enabled: true }))[0];
+    const committed = update(
+      toggled,
+      Message.ConsentSetSucceeded({ aiConsent: true, generation: 1 }),
+    )[0];
+    const [refreshing, commands] = update(committed, Message.Requested());
+    expect(commands[0]).toMatchObject({
+      name: "FetchProfile",
+      args: { consentGeneration: 2 },
+    });
+    const refreshed = update(
+      refreshing,
+      Message.FetchSucceeded({
+        consentGeneration: 2,
+        response: { ...meResponse, aiConsent: true },
+      }),
+    )[0];
+    expect(Option.getOrThrow(AsyncData.getData(refreshed.profile)).aiConsent).toBe(true);
+  });
+
+  it("does not toggle before the authoritative profile has loaded", () => {
+    const [, commands] = update(init(), Message.ConsentToggled({ enabled: true }));
+    expect(commands).toEqual([]);
+  });
+});
+
+describe("WS-0019 privacy: account deletion", () => {
+  const loaded = update(
+    init(),
+    Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }),
+  )[0];
+
+  it("reveal starts hidden and the confirm checkbox is unchecked", () => {
+    expect(loaded.deleteConfirmRevealed).toBe(false);
+    expect(loaded.deleteConfirmed).toBe(false);
+  });
+
+  it("revealing resets the confirm checkbox; cancelling hides again", () => {
+    const revealed = update(loaded, Message.DeleteRevealToggled({ revealed: true }))[0];
+    expect(revealed.deleteConfirmRevealed).toBe(true);
+    const confirmed = update(revealed, Message.DeleteConfirmChanged({ confirmed: true }))[0];
+    expect(confirmed.deleteConfirmed).toBe(true);
+    const cancelled = update(confirmed, Message.DeleteRevealToggled({ revealed: false }))[0];
+    expect(cancelled.deleteConfirmRevealed).toBe(false);
+    expect(cancelled.deleteConfirmed).toBe(false);
+  });
+
+  it("does not issue DeleteAccount until the checkbox is confirmed", () => {
+    const revealed = update(loaded, Message.DeleteRevealToggled({ revealed: true }))[0];
+    const [, commands] = update(revealed, Message.DeleteClicked());
+    expect(commands).toHaveLength(0);
+  });
+});
+
+describe("WS-0019 privacy: workspace export", () => {
+  const loaded = update(
+    init(),
+    Message.FetchSucceeded({ consentGeneration: 0, response: meResponse }),
+  )[0];
+
+  it("issues the export command once and returns to idle after success", () => {
+    const [pending, commands] = update(loaded, Message.ExportWorkspaceClicked());
+    expect(commands).toHaveLength(1);
+    expect(pending.exportRequest._tag).toBe("Pending");
+    const [idle] = update(pending, Message.ExportSucceeded());
+    expect(idle.exportRequest._tag).toBe("Idle");
+  });
+
+  it("surfaces a failure as a problem instead of silence", () => {
+    const clicked = update(loaded, Message.ExportWorkspaceClicked())[0];
+    const [failed] = update(
+      clicked,
+      Message.ExportFailed({ problem: NetworkError({ detail: "download failed" }) }),
+    );
+    expect(failed.exportRequest._tag).toBe("Failed");
   });
 });

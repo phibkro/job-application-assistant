@@ -105,3 +105,20 @@ export const markDiscarded = (
  */
 export const deleteByProfileWrite = (profileId: ProfileId): Write =>
   deleteStatement(TABLE, { profileId });
+
+/**
+ * WS-0019 workspace export: every proposal of the profile regardless of
+ * status — decided rows are audit trail no *route* serves, but they are
+ * account-registered personal data, so export covers them.
+ */
+export const findByProfile = (
+  profileId: ProfileId,
+): Effect.Effect<ReadonlyArray<Proposal>, never, Database> =>
+  Effect.gen(function* () {
+    const db = yield* Database;
+    const rows = yield* db.query<unknown>(
+      `SELECT * FROM ${TABLE} WHERE profileId = ? ORDER BY createdAt DESC, id ASC`,
+      [profileId],
+    );
+    return yield* decodeRows<Proposal>(Proposal)(rows);
+  });

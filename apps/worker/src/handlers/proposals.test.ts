@@ -237,8 +237,25 @@ const databaseFake = (
               forcedConflicts.remaining -= 1;
               previousChanges = 0;
             } else {
-              const [cv, updatedAt, profileId, priorCv, priorUpdatedAt, proposalId, owner] =
-                write.bindings as [string, string, string, string, string, string, string];
+              const [
+                cv,
+                updatedAt,
+                profileId,
+                priorCv,
+                priorUpdatedAt,
+                _activeErasure,
+                proposalId,
+                owner,
+              ] = write.bindings as [
+                string,
+                string,
+                string,
+                string,
+                string,
+                string,
+                string,
+                string,
+              ];
               const pending = store.some(
                 (row) =>
                   row.id === proposalId && row.profileId === owner && row.status === "pending",
@@ -262,8 +279,27 @@ const databaseFake = (
               forcedConflicts.remaining -= 1;
               previousChanges = 0;
             } else {
-              const [profileId, cv, _erasure, _createdAt, updatedAt, _missing, proposalId, owner] =
-                write.bindings as [string, string, string, string, string, string, string, string];
+              const [
+                profileId,
+                cv,
+                _erasure,
+                _aiAssist,
+                _createdAt,
+                updatedAt,
+                _missing,
+                proposalId,
+                owner,
+              ] = write.bindings as [
+                string,
+                string,
+                string,
+                number,
+                string,
+                string,
+                string,
+                string,
+                string,
+              ];
               const pending = store.some(
                 (row) =>
                   row.id === proposalId && row.profileId === owner && row.status === "pending",
@@ -306,7 +342,11 @@ const databaseFake = (
       }),
   });
 
-const profilesFake = (current: Profile) => {
+const profilesFake = (
+  current: Profile,
+  consent: boolean = true,
+  onConsent: () => void = () => undefined,
+) => {
   const state: ProfileState = {
     value: current,
     updatedAt: "2026-08-24T09:00:00.000Z",
@@ -341,6 +381,12 @@ const profilesFake = (current: Profile) => {
     answers: () => Effect.die("unused"),
     answer: () => Effect.die("unused"),
     unanswered: () => Effect.die("unused"),
+    aiConsent: () =>
+      Effect.sync(() => {
+        onConsent();
+        return consent;
+      }),
+    setAiConsent: () => Effect.die("Profiles.setAiConsent"),
   });
   return { layer, state };
 };
@@ -436,6 +482,29 @@ describe("POST /api/v1/me/profile/proposals", () => {
     expect(store.some((r) => r.fieldPath === "summary")).toBe(true);
     // No raw content column/table anywhere: only conclusions persisted.
     expect(JSON.stringify(store)).not.toContain("Some pasted CV text");
+  });
+
+  it("default heuristic invokes neither consent nor entitlements", async () => {
+    const profileFixture = profilesFake({ ...emptyProfile }, true, () => {
+      throw new Error("consent must not be consulted");
+    });
+    const handler = await buildWith({
+      profiles: profileFixture,
+      entitlements: Layer.succeed(Entitlements, {
+        has: () => Effect.die("entitlements must not be consulted"),
+        require: () => Effect.die("entitlements must not be consulted"),
+      } as never),
+    });
+    expect(
+      (
+        await handler(
+          post("/api/v1/me/profile/proposals", {
+            content: "Some pasted CV text",
+            mimeType: "text/plain",
+          }),
+        )
+      ).status,
+    ).toBe(200);
   });
 
   it("persists only drafts that satisfy the frozen field-path grammar and target schema", async () => {
@@ -628,6 +697,24 @@ describe("POST /api/v1/me/profile/proposals", () => {
       capability: "model-inference",
     });
   });
+
+  for (const entitled of [true, false]) {
+    it(`consent OFF returns 403 before capability when entitled=${entitled}`, async () => {
+      const handler = await buildWith({
+        profiles: profilesFake({ ...emptyProfile }, false),
+        entitlements: entitlementsFake(entitled),
+      });
+      const res = await handler(
+        post("/api/v1/me/profile/proposals", {
+          content: "x",
+          mimeType: "text/plain",
+          engine: "model",
+        }),
+      );
+      expect(res.status).toBe(403);
+      await expect(res.json()).resolves.toMatchObject({ _tag: "ConsentRequired" });
+    });
+  }
 
   it("uses the model engine exactly once when entitled", async () => {
     let calls = 0;

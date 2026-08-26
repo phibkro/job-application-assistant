@@ -73,6 +73,19 @@ export class ProfileRecord extends Model.Class<ProfileRecord>("ProfileRecord")({
    */
   cv: Model.JsonFromString(Profile),
   erasure: Model.JsonFromString(Erasure),
+  /**
+   * The AI-consent dimension (WS-0019): whether this account allows any
+   * outbound owner-data path to model processors. Deliberately a column on
+   * the account row, not inside `cv` — it is configuration, not CV content,
+   * so it must not travel through whole-profile compare-and-swap or appear
+   * in exports as if the person had authored it. Default OFF: absence of an
+   * explicit act means model processing is disallowed. Zeroed at tombstone.
+   *
+   * Declared before the timestamps so the derived column order matches the
+   * migration's `ADD COLUMN` position (last) on existing databases and the
+   * snapshot's declared order on fresh ones.
+   */
+  aiAssist: Model.BooleanSqlite,
   createdAt: Model.DateTimeInsert,
   updatedAt: Model.DateTimeUpdate,
 }) {}

@@ -122,6 +122,9 @@ const columnTypes: Record<string, string> = {
   automationProhibited: "INTEGER NOT NULL DEFAULT 0 CHECK (automationProhibited IN (0,1))",
   humanIntervened: "INTEGER NOT NULL DEFAULT 0 CHECK (humanIntervened IN (0,1))",
   active: "INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1))",
+  // AI-consent flag on profiles (WS-0019). Default 0 is the D1 default-OFF
+  // rollout: every existing account starts with model processing disallowed.
+  aiAssist: "INTEGER NOT NULL DEFAULT 0 CHECK (aiAssist IN (0,1))",
   // Numbers.
   seenThrough: "INTEGER NOT NULL DEFAULT 0",
   sequence: "INTEGER NOT NULL",
@@ -453,6 +456,10 @@ const migrations = [
     name: "0004_documents.sql",
     currentWhen:
       "EXISTS (SELECT 1 FROM pragma_table_info('documents') WHERE name = 'jobSnapshot')",
+  },
+  {
+    name: "0005_profile-consent.sql",
+    currentWhen: "EXISTS (SELECT 1 FROM pragma_table_info('profiles') WHERE name = 'aiAssist')",
   },
 ] as const;
 

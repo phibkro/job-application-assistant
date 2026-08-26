@@ -5,9 +5,9 @@ import { expect, test, type Page } from "@playwright/test";
  * WS-0018 acceptance (i): the document studio journey. Sign in, open Studio,
  * generate a general CV from the seeded profile, edit inline and save (the
  * edit survives a reload), copy, then draft a letter targeted at a vacancy
- * shortlisted in-test — the card shows the frozen job title. Regenerate
- * yields a second row; delete with confirmation removes it. The model engine
- * path answers 402 with an upgrade notice naming `model-drafting`.
+ * shortlisted in-test — the card shows the frozen job title. Regeneration
+ * yields a second row; delete confirmation removes it. With AI processing
+ * disabled, the model path shows the consent-required privacy notice first.
  * Axe-clean at every checkpoint.
  */
 
@@ -58,18 +58,21 @@ test("drafts, edits, targets, regenerates, copies, and deletes studio documents"
   );
   await page.getByRole("button", { name: "Generate CV" }).click();
   await created;
-  const cvCard = page.locator("div.document-card", { has: page.locator('[data-document-kind="cv-general"]') }).first();
+  const cvCard = page
+    .locator("div.document-card", { has: page.locator('[data-document-kind="cv-general"]') })
+    .first();
   await expect(cvCard).toBeVisible({ timeout: 10_000 });
   const cvEditor = cvCard.getByRole("textbox");
   const original = await cvEditor.inputValue();
   expect(original.length).toBeGreaterThan(0);
   await cvEditor.fill(`${original}\nADDITIONAL NOTE`);
-  await cvCard.getByRole("button", { name: "Save changes" }).click();
-  await page.waitForResponse(
+  await expect(cvCard.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  const saved = page.waitForResponse(
     (response) =>
-      response.request().method() === "PUT" &&
-      response.url().includes("/api/v1/me/documents/"),
+      response.request().method() === "PUT" && response.url().includes("/api/v1/me/documents/"),
   );
+  await cvCard.getByRole("button", { name: "Save changes" }).click();
+  await saved;
   await expect(cvCard.getByRole("button", { name: "Save changes" })).toBeDisabled();
 
   // The saved edit persists server-side. The list carries summaries only,
@@ -109,13 +112,26 @@ test("drafts, edits, targets, regenerates, copies, and deletes studio documents"
   await page.getByRole("button", { name: "Shortlist this job" }).click();
   await expect(page.getByText("Shortlisted.")).toBeVisible();
 
+  // Saving a job invalidates Studio's target snapshot. Wait for the refreshed
+  // saved-job option before selecting it; this proves the SPA journey rather
+  // than relying on request timing.
   await page.getByRole("link", { name: "Studio" }).click();
   await expect(page.getByRole("heading", { name: "Studio" })).toBeVisible();
   await page.getByLabel("Document kind").selectOption("letter");
-  await page
-    .getByLabel("Target vacancy (optional)")
-    .selectOption({ label: "Frontendutvikler" });
+  const target = page.getByLabel("Target vacancy (optional)");
+  const targetOption = target.locator("option", { hasText: "Frontendutvikler" });
+  await expect(targetOption).toHaveCount(1);
+  const targetValue = await targetOption.getAttribute("value");
+  expect(targetValue).not.toBeNull();
+  await target.selectOption(targetValue!);
+  const firstLetterCreated = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/v1/me/documents" &&
+      response.ok(),
+  );
   await page.getByRole("button", { name: "Generate letter" }).click();
+  await firstLetterCreated;
   const letterCard = page
     .locator("div.document-card", { hasText: /Covering letter — Frontendutvikler/ })
     .first();
@@ -124,8 +140,14 @@ test("drafts, edits, targets, regenerates, copies, and deletes studio documents"
   await expect(letterCard).toContainText(/Frontendutvikler|Nordic Tech/i);
   await assertAccessible(page);
 
-  // ---- Regenerate: a second row appears ------------------------------------
+  const secondLetterCreated = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/v1/me/documents" &&
+      response.ok(),
+  );
   await page.getByRole("button", { name: "Generate letter" }).click();
+  await secondLetterCreated;
   await expect(page.locator('.document-card [data-document-kind="letter-targeted"]')).toHaveCount(
     2,
     { timeout: 10_000 },
@@ -136,7 +158,9 @@ test("drafts, edits, targets, regenerates, copies, and deletes studio documents"
   const letterId = await letterCard
     .locator('[data-document-kind="letter-targeted"]')
     .first()
-    .evaluate((el) => el.closest(".document-card")!.querySelector("textarea")!.id.replace("studio-editor-", ""));
+    .evaluate((el) =>
+      el.closest(".document-card")!.querySelector("textarea")!.id.replace("studio-editor-", ""),
+    );
   await letterCard.getByRole("button", { name: "Delete", exact: true }).click();
   await letterCard.getByRole("button", { name: "Confirm delete" }).click();
   await expect(page.locator(".document-card")).toHaveCount(beforeDelete - 1, {
@@ -145,13 +169,13 @@ test("drafts, edits, targets, regenerates, copies, and deletes studio documents"
   void letterId;
   await assertAccessible(page);
 
-  // ---- Model engine without entitlement: upgrade notice ----------------------
+  // ---- Model engine without consent: privacy notice precedes entitlement ----
   await page.getByLabel("Engine").selectOption("model");
   await page.getByLabel("Document kind").selectOption("cv");
   await page.getByLabel("Target vacancy (optional)").selectOption({ label: "General document" });
   await page.getByRole("button", { name: "Generate CV" }).click();
   await expect(
-    page.getByText(/model-drafting|Premium required|upgrade/i).first(),
+    page.getByText("AI processing is disabled in your privacy settings.").first(),
   ).toBeVisible({ timeout: 10_000 });
   await assertAccessible(page);
 });

@@ -18,9 +18,9 @@ export const PROFILE_FIELDS = Object.keys(ProfileRecord.select.fields) as Readon
 
 export const PRINCIPAL_FIELDS = Object.keys(Principal.select.fields) as ReadonlyArray<string>;
 
-/** `createdAt` is set once at insert; a profile update never touches it. */
+/** `createdAt` and consent are set independently; a profile update never touches either. */
 const PROFILE_UPDATE_FIELDS = PROFILE_FIELDS.filter(
-  (field) => field !== "profileId" && field !== "createdAt",
+  (field) => field !== "profileId" && field !== "createdAt" && field !== "aiAssist",
 );
 
 const columns = (fields: ReadonlyArray<string>): string => fields.join(", ");
@@ -33,18 +33,21 @@ export const INSERT_PROFILE = `-- accounts:insertProfile\nINSERT INTO profiles (
 
 export const UPDATE_PROFILE = `-- accounts:updateProfile\nUPDATE profiles SET ${PROFILE_UPDATE_FIELDS.map((field) => `${field} = ?`).join(", ")} WHERE profileId = ?`;
 
+/** Consent is independent from the CV revision and applies only to a live profile. */
+export const UPDATE_AI_CONSENT = `-- accounts:updateAiConsent\nUPDATE profiles SET aiAssist = ? WHERE profileId = ? AND erasure = ?`;
+
 /** Whole-profile optimistic replacement when the caller observed no row. */
 export const INSERT_PROFILE_IF_MISSING = `-- accounts:insertProfileIfMissing\nINSERT INTO profiles (${columns(PROFILE_FIELDS)}) SELECT ${placeholders(PROFILE_FIELDS)} WHERE NOT EXISTS (SELECT 1 FROM profiles WHERE profileId = ?)`;
 
 /** Whole-profile optimistic replacement when the caller observed this version. */
-export const UPDATE_PROFILE_IF_VERSION = `-- accounts:updateProfileIfVersion\nUPDATE profiles SET ${PROFILE_UPDATE_FIELDS.map((field) => `${field} = ?`).join(", ")} WHERE profileId = ? AND updatedAt = ?`;
+export const UPDATE_PROFILE_IF_VERSION = `-- accounts:updateProfileIfVersion\nUPDATE profiles SET cv = ?, updatedAt = ? WHERE profileId = ? AND updatedAt = ? AND erasure = ?`;
 
 /**
  * Profile-first proposal acceptance. The prior CV and version are both part
  * of the compare-and-swap, and the owner-scoped pending proposal must still
  * exist at the same transaction snapshot.
  */
-export const UPDATE_PROFILE_FOR_PENDING_PROPOSAL = `-- accounts:updateProfileForPendingProposal\nUPDATE profiles SET cv = ?, updatedAt = ? WHERE profileId = ? AND cv = ? AND updatedAt = ? AND EXISTS (SELECT 1 FROM proposals WHERE id = ? AND profileId = ? AND status = 'pending')`;
+export const UPDATE_PROFILE_FOR_PENDING_PROPOSAL = `-- accounts:updateProfileForPendingProposal\nUPDATE profiles SET cv = ?, updatedAt = ? WHERE profileId = ? AND cv = ? AND updatedAt = ? AND erasure = ? AND EXISTS (SELECT 1 FROM proposals WHERE id = ? AND profileId = ? AND status = 'pending')`;
 
 /** Missing profiles merge from `emptyProfile` and insert only while the same owner-scoped proposal is pending. */
 export const INSERT_PROFILE_FOR_PENDING_PROPOSAL = `-- accounts:insertProfileForPendingProposal\nINSERT INTO profiles (${columns(PROFILE_FIELDS)}) SELECT ${placeholders(PROFILE_FIELDS)} WHERE NOT EXISTS (SELECT 1 FROM profiles WHERE profileId = ?) AND EXISTS (SELECT 1 FROM proposals WHERE id = ? AND profileId = ? AND status = 'pending')`;

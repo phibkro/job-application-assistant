@@ -100,6 +100,7 @@ export const appLayer = (
           Handlers.profile,
           Handlers.applications,
           Handlers.documents,
+          Handlers.account,
         ),
       ),
       Layer.provide(Handlers.auth),

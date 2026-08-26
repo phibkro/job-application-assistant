@@ -78,6 +78,7 @@ export default defineConfig({
       // that specific claim, not a workaround for one this pool lacks.
       "apps/worker/src/db/repositories/*.test.ts",
       "apps/worker/src/db/Erase.test.ts",
+      "apps/worker/src/db/Erase.sweep.test.ts",
       "apps/worker/src/db/transactionSemantics.live.test.ts",
       "apps/worker/src/ingestion/live.test.ts",
       "apps/worker/src/ingestion/lazy.live.test.ts",

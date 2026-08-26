@@ -171,18 +171,22 @@ export const DismissFeedItem = Command.define("DismissFeedItem", {
 });
 
 export const FetchProfile = Command.define("FetchProfile", {
+  args: { consentGeneration: S.Number },
   messages: [ProfileMessage.FetchSucceeded, ProfileMessage.FetchFailed],
-  execute: withHttp(
-    Effect.gen(function* () {
-      const client = yield* makeClient(currentToken());
-      const response = yield* client.profile.me();
-      return ProfileMessage.FetchSucceeded({ response });
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.succeed(ProfileMessage.FetchFailed({ problem: toProblem(error) })),
+  execute: ({ consentGeneration }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.profile.me();
+        return ProfileMessage.FetchSucceeded({ consentGeneration, response });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            ProfileMessage.FetchFailed({ consentGeneration, problem: toProblem(error) }),
+          ),
+        ),
       ),
     ),
-  ),
 });
 
 export const SaveProfile = Command.define("SaveProfile", {
@@ -194,11 +198,12 @@ export const SaveProfile = Command.define("SaveProfile", {
   args: {
     profile: Profile,
     capabilities: S.Array(S.String),
+    aiConsent: S.Boolean,
     expectedUpdatedAt: S.NullOr(S.String),
     generation: S.Number,
   },
   messages: [ProfileMessage.SaveSucceeded, ProfileMessage.SaveFailed],
-  execute: ({ profile, capabilities, expectedUpdatedAt, generation }) =>
+  execute: ({ profile, capabilities, aiConsent, expectedUpdatedAt, generation }) =>
     withHttp(
       Effect.gen(function* () {
         const client = yield* makeClient(currentToken());
@@ -206,7 +211,9 @@ export const SaveProfile = Command.define("SaveProfile", {
           payload: { profile, expectedUpdatedAt },
         });
         return ProfileMessage.SaveSucceeded({
-          response: { ...saved, capabilities },
+          // `setProfile` does not carry consent; the current value travels
+          // from the model so the response never lies about it.
+          response: { ...saved, capabilities, aiConsent },
           generation,
           baseProfileUpdatedAt: expectedUpdatedAt,
         });
@@ -536,12 +543,16 @@ export const PersistSessionToken = Command.define("PersistSessionToken", {
     }),
 });
 
+export const clearExpectedSessionToken = (expectedToken: string): void => {
+  if (Session.readToken() === expectedToken) Session.clearToken();
+};
+
 export const ClearSessionToken = Command.define("ClearSessionToken", {
-  args: { sessionEpoch: S.Number },
+  args: { expectedToken: S.String, sessionEpoch: S.Number },
   messages: [Msg.StorageSynced],
-  execute: ({ sessionEpoch }) =>
+  execute: ({ expectedToken, sessionEpoch }) =>
     Effect.sync(() => {
-      Session.clearToken();
+      clearExpectedSessionToken(expectedToken);
       return Msg.StorageSynced({ sessionEpoch });
     }),
 });
@@ -872,6 +883,78 @@ export const FetchDocumentTargets = Command.define("FetchDocumentTargets", {
         // A failed targets fetch only empties the picker; the studio works
         // for general documents regardless.
         Effect.catch(() => Effect.succeed(StudioMessage.TargetsFetchSucceeded({ targets: [] }))),
+      ),
+    ),
+});
+
+// --- WS-0019: Privacy section — consent toggle, export, account deletion ----
+
+export const SetAiConsent = Command.define("SetAiConsent", {
+  args: { enabled: S.Boolean, generation: S.Number },
+  messages: [ProfileMessage.ConsentSetSucceeded, ProfileMessage.ConsentSetFailed],
+  execute: ({ enabled, generation }) =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        return yield* client.profile.setAiConsent({ payload: { enabled } }).pipe(
+          Effect.map(({ aiConsent }) =>
+            ProfileMessage.ConsentSetSucceeded({ aiConsent, generation }),
+          ),
+          Effect.catch((error) =>
+            Effect.succeed(
+              ProfileMessage.ConsentSetFailed({ generation, problem: toProblem(error) }),
+            ),
+          ),
+        );
+      }),
+    ),
+});
+
+/** Downloads the whole-workspace export as a dated JSON file, client-side. */
+export const ExportWorkspace = Command.define("ExportWorkspace", {
+  args: {},
+  messages: [ProfileMessage.ExportSucceeded, ProfileMessage.ExportFailed],
+  execute: () =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        const response = yield* client.profile.workspaceExport();
+        // The endpoint is already one complete JSON document. Pretty-print it
+        // without introducing a second JSON encoding inside `data`.
+        const blob = new Blob([JSON.stringify(response, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `workspace-export-${new Date().toISOString().slice(0, 10)}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        yield* Effect.logDebug("workspace export downloaded");
+        return ProfileMessage.ExportSucceeded();
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(ProfileMessage.ExportFailed({ problem: toProblem(error) })),
+        ),
+      ),
+    ),
+});
+
+export const DeleteAccount = Command.define("DeleteAccount", {
+  args: {},
+  messages: [ProfileMessage.DeleteSucceeded, ProfileMessage.DeleteFailed],
+  // The typed `confirm: "DELETE"` payload is the server's whole confirmation;
+  // the checkbox in the view is what produces the authority to send it.
+  execute: () =>
+    withHttp(
+      Effect.gen(function* () {
+        const client = yield* makeClient(currentToken());
+        yield* client.account.deleteAccount({ payload: { confirm: "DELETE" } });
+        return ProfileMessage.DeleteSucceeded({ at: new Date().toISOString() });
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(ProfileMessage.DeleteFailed({ problem: toProblem(error) })),
+        ),
       ),
     ),
 });

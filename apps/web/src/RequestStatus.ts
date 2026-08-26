@@ -6,6 +6,7 @@ import { ts } from "foldkit/schema";
 // server encoded it with, so there is one definition of what those failures
 // look like, not a client-side guess that can drift from the server's.
 import {
+  ConsentRequired,
   ForbiddenByPlatform,
   Gone,
   InvalidApplicationTransition,
@@ -20,6 +21,7 @@ import {
 // — the one place that assembles the union — instead of reaching past it
 // to the worker contract directly.
 export {
+  ConsentRequired,
   ForbiddenByPlatform,
   Gone,
   InvalidApplicationTransition,
@@ -37,6 +39,7 @@ export {
 export const NetworkError = ts("NetworkError", { detail: S.String });
 export const Problem = S.Union([
   Unauthorized,
+  ConsentRequired,
   NotFound,
   Gone,
   UpgradeRequired,

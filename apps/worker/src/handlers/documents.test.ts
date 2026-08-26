@@ -78,7 +78,26 @@ const profilesFake = Layer.succeed(Profiles, {
   answers: () => Effect.succeed([]),
   answer: () => Effect.die("unused"),
   unanswered: () => Effect.die("unused"),
+  aiConsent: () => Effect.succeed(true),
+  setAiConsent: () => Effect.die("Profiles.setAiConsent"),
 });
+
+const profilesWithConsent = (enabled: boolean, onRead: () => void = () => undefined) =>
+  Layer.succeed(Profiles, {
+    get: () => Effect.succeed(profile),
+    set: () => Effect.die("unused"),
+    getVersioned: () => Effect.die("unused"),
+    setVersioned: () => Effect.die("unused"),
+    answers: () => Effect.succeed([]),
+    answer: () => Effect.die("unused"),
+    unanswered: () => Effect.die("unused"),
+    aiConsent: () =>
+      Effect.sync(() => {
+        onRead();
+        return enabled;
+      }),
+    setAiConsent: () => Effect.die("unused"),
+  });
 
 const blankProfile = { ...profile, headline: "", experience: [] };
 
@@ -174,6 +193,45 @@ describe("documents.create — entitlement matrix (WS-0018 b)", () => {
     expect(entitlements.consulted).toEqual([]);
   });
 
+  it("default template invokes neither consent nor entitlements", async () => {
+    const { handler } = buildHandler({
+      accounts: authedAs(alice),
+      profiles: Layer.succeed(Profiles, {
+        get: () => Effect.succeed(profile),
+        set: () => Effect.die("unused"),
+        getVersioned: () => Effect.die("unused"),
+        setVersioned: () => Effect.die("unused"),
+        answers: () => Effect.succeed([]),
+        answer: () => Effect.die("unused"),
+        unanswered: () => Effect.die("unused"),
+        aiConsent: () => Effect.die("consent must not be consulted"),
+        setAiConsent: () => Effect.die("unused"),
+      }),
+      entitlements: Layer.succeed(Entitlements, {
+        has: () => Effect.die("entitlements must not be consulted"),
+        require: () => Effect.die("entitlements must not be consulted"),
+      }),
+      savedJobs: savedJobsResolve(undefined),
+      templateStudioComposer: templateComposerFake,
+      database: permissiveDatabase(),
+    });
+    expect((await handler(post("/api/v1/me/documents", { kind: "cv" }))).status).toBe(200);
+  });
+
+  for (const entitled of [true, false]) {
+    it(`consent OFF is 403 before capability when entitled=${entitled}`, async () => {
+      const { handler } = buildHandler({
+        accounts: authedAs(alice),
+        profiles: profilesWithConsent(false),
+        savedJobs: savedJobsResolve(undefined),
+        entitlements: entitlementsFake(entitled).layer,
+      });
+      const response = await handler(post("/api/v1/me/documents", { kind: "cv", engine: "model" }));
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ _tag: "ConsentRequired" });
+    });
+  }
+
   it("engine=model without the capability fails 402 with the exact body", async () => {
     const { handler } = buildHandler({
       accounts: authedAs(alice),
@@ -229,6 +287,27 @@ describe("documents.create — entitlement matrix (WS-0018 b)", () => {
     expect(body.data.content).toBe("premium letter prose");
     expect(body.downgradeReason).toBeNull();
   });
+
+  for (const reason of ["echoed raw values", "outside the fact inventory"]) {
+    it(`handler degrades ${reason} to stored template output without placeholders`, async () => {
+      const { handler } = buildHandler({
+        accounts: authedAs(alice),
+        profiles: profilesWithConsent(true),
+        savedJobs: savedJobsResolve(undefined),
+        entitlements: entitlementsFake(true).layer,
+        templateStudioComposer: templateComposerFake,
+        modelStudioComposer: makeUnavailableLayer(reason),
+        database: permissiveDatabase(),
+      });
+      const response = await handler(post("/api/v1/me/documents", { kind: "cv", engine: "model" }));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data.engine).toBe("template");
+      expect(body.data.content).toBe("template cv");
+      expect(body.data.content).not.toContain("{{");
+      expect(body.downgradeReason).toContain(reason);
+    });
+  }
 });
 
 describe("documents.create — grounding (WS-0018 c/g)", () => {

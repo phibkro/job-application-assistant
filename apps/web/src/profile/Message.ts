@@ -27,8 +27,11 @@ const ProposalDecisionResponseType = S.Struct({
 // `MenuOpened`).
 
 export const Requested = m("Requested");
-export const FetchSucceeded = m("FetchSucceeded", { response: MeResponse });
-export const FetchFailed = m("FetchFailed", { problem: Problem });
+export const FetchSucceeded = m("FetchSucceeded", {
+  consentGeneration: S.Number,
+  response: MeResponse,
+});
+export const FetchFailed = m("FetchFailed", { consentGeneration: S.Number, problem: Problem });
 export const HeadlineChanged = m("HeadlineChanged", { value: S.String });
 export const SummaryChanged = m("SummaryChanged", { value: S.String });
 export const LocationChanged = m("LocationChanged", { value: S.String });
@@ -111,6 +114,25 @@ export const ProposalDecisionFailed = m("ProposalDecisionFailed", {
 });
 export const ProposalFocusSettled = m("ProposalFocusSettled");
 
+// --- WS-0019: Privacy section — consent toggle, export, account deletion ----
+export const ConsentToggled = m("ConsentToggled", { enabled: S.Boolean });
+export const ConsentSetSucceeded = m("ConsentSetSucceeded", {
+  aiConsent: S.Boolean,
+  generation: S.Number,
+});
+export const ConsentSetFailed = m("ConsentSetFailed", {
+  generation: S.Number,
+  problem: Problem,
+});
+export const DeleteRevealToggled = m("DeleteRevealToggled", { revealed: S.Boolean });
+export const DeleteConfirmChanged = m("DeleteConfirmChanged", { confirmed: S.Boolean });
+export const DeleteClicked = m("DeleteClicked");
+export const DeleteSucceeded = m("DeleteSucceeded", { at: S.String });
+export const DeleteFailed = m("DeleteFailed", { problem: Problem });
+export const ExportWorkspaceClicked = m("ExportWorkspaceClicked");
+export const ExportSucceeded = m("ExportSucceeded");
+export const ExportFailed = m("ExportFailed", { problem: Problem });
+
 export const Message = S.Union([
   Requested,
   FetchSucceeded,
@@ -145,5 +167,16 @@ export const Message = S.Union([
   ProposalDecisionSucceeded,
   ProposalDecisionFailed,
   ProposalFocusSettled,
+  ConsentToggled,
+  ConsentSetSucceeded,
+  ConsentSetFailed,
+  DeleteRevealToggled,
+  DeleteConfirmChanged,
+  DeleteClicked,
+  DeleteSucceeded,
+  DeleteFailed,
+  ExportWorkspaceClicked,
+  ExportSucceeded,
+  ExportFailed,
 ]);
 export type Message = typeof Message.Type;

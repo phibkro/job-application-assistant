@@ -272,6 +272,7 @@ export const checkboxField = <M>(
     onToggle: (isChecked: boolean) => M;
     isDisabled?: boolean;
     description?: string;
+    descriptionClassName?: string;
   }>,
   h: HtmlBuilder<M>,
 ): Html =>
@@ -321,7 +322,7 @@ export const checkboxField = <M>(
             ),
             h.span([...attributes.label, h.Class("font-medium")], [config.label]),
             h.span(
-              [...attributes.description, h.Class(srOnlyLabelClass)],
+              [...attributes.description, h.Class(config.descriptionClassName ?? srOnlyLabelClass)],
               [config.description ?? `Assign the ${config.label} label`],
             ),
           ],
@@ -412,6 +413,19 @@ const problemCardClass = (tone: "info" | "error"): string =>
       : "border-outline-variant bg-secondary-container text-on-secondary-container",
   );
 
+export const consentRequiredCard = (message: string) => ({
+  title: "AI processing is disabled in your privacy settings.",
+  detail: message,
+  href: "/profile#privacy",
+  action: "Review privacy settings",
+});
+
+export const upgradeRequiredCard = (capability: string) => ({
+  title: `This needs the "${capability}" capability.`,
+  detail:
+    "Your current plan does not include it. Upgrading unlocks it for every job, not just this one.",
+});
+
 /**
  * Renders any `Problem` without a stack trace in sight.
  *
@@ -452,8 +466,32 @@ export const renderProblem = <M>(problem: Problem, h: HtmlBuilder<M>): Html =>
         ],
       ),
     ),
-    Match.tag("UpgradeRequired", ({ capability }) =>
-      h.div(
+    Match.tag("ConsentRequired", ({ message }) => {
+      const presentation = consentRequiredCard(message);
+      return h.div(
+        [
+          h.Role("status"),
+          h.AriaLive("polite"),
+          h.Class("rounded-m3-large border border-tertiary bg-tertiary-container p-4"),
+        ],
+        [
+          h.p([h.Class("text-sm font-semibold text-on-tertiary-container")], [presentation.title]),
+          h.p([h.Class("mt-1 text-sm text-on-tertiary-container")], [presentation.detail]),
+          h.a(
+            [
+              h.Href(presentation.href),
+              h.Class(
+                "mt-3 inline-flex min-h-11 items-center font-semibold text-on-tertiary-container underline underline-offset-4",
+              ),
+            ],
+            [presentation.action],
+          ),
+        ],
+      );
+    }),
+    Match.tag("UpgradeRequired", ({ capability }) => {
+      const presentation = upgradeRequiredCard(capability);
+      return h.div(
         [
           h.Role("status"),
           h.AriaLive("polite"),
@@ -462,17 +500,12 @@ export const renderProblem = <M>(problem: Problem, h: HtmlBuilder<M>): Html =>
         [
           h.p(
             [h.Class("flex items-center gap-2 text-sm font-semibold text-on-secondary-container")],
-            [h.span([h.Class("text-base")], ["✦"]), `This needs the "${capability}" capability.`],
+            [h.span([h.Class("text-base")], ["✦"]), presentation.title],
           ),
-          h.p(
-            [h.Class("mt-1 text-sm text-on-secondary-container")],
-            [
-              "Your current plan does not include it. Upgrading unlocks it for every job, not just this one.",
-            ],
-          ),
+          h.p([h.Class("mt-1 text-sm text-on-secondary-container")], [presentation.detail]),
         ],
-      ),
-    ),
+      );
+    }),
     Match.tag("ForbiddenByPlatform", ({ platform, policy }) =>
       h.div(
         [h.Role("alert"), h.Class(problemCardClass("error"))],

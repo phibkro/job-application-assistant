@@ -7,7 +7,7 @@ import sqlite3
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = (ROOT / "db/schema.sql").read_text()
 MIGRATION_NAME = "0001_saved-workspace.sql"
-# Later additive migrations (0002 WS-0016, 0003 WS-0017, 0004 WS-0018): a
+CONSENT_MIGRATION_NAME = "0005_profile-consent.sql"
 # fresh snapshot pre-marks each via its currentWhen pragma probe, so the names
 # must appear in d1_migrations the moment the snapshot runs. Each entry is
 # (migration name, table whose presence the probe keys on) so this test can
@@ -18,8 +18,18 @@ LATER_MIGRATIONS = (
     ("0004_documents.sql", "documents"),
 )
 MIGRATION = (ROOT / "db/migrations" / MIGRATION_NAME).read_text()
+CONSENT_MIGRATION = (ROOT / "db/migrations" / CONSENT_MIGRATION_NAME).read_text()
 
 OLD_TABLES = """
+CREATE TABLE profiles (
+  profileId TEXT NOT NULL PRIMARY KEY,
+  cv TEXT NOT NULL,
+  erasure TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+INSERT INTO profiles (profileId, cv, erasure, createdAt, updatedAt)
+VALUES ('profile-1', '{}', 'Active', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
 CREATE TABLE saved_jobs (
   id TEXT NOT NULL PRIMARY KEY,
   profileId TEXT NOT NULL,
@@ -51,16 +61,34 @@ new_database = sqlite3.connect(":memory:")
 new_database.executescript(SCHEMA)
 assert migration_names(new_database) == [MIGRATION_NAME] + [
     name for name, _ in LATER_MIGRATIONS
-]
+] + [CONSENT_MIGRATION_NAME]
 
 existing_database = sqlite3.connect(":memory:")
 existing_database.executescript(OLD_TABLES)
 existing_database.executescript(SCHEMA)
 # An old-shape database gains the *later* additive relations (0002, 0003,
 # 0004) from the snapshot itself, so their probes match and those names are
-# pre-marked; only the 0001 upgrade remains for Wrangler's ordered run.
+# pre-marked; the 0001 and 0005 upgrades remain for Wrangler's ordered run.
 assert migration_names(existing_database) == [name for name, _ in LATER_MIGRATIONS]
 existing_database.executescript(MIGRATION)
+existing_database.executescript(CONSENT_MIGRATION)
+profile = existing_database.execute(
+    "SELECT cv, erasure, aiAssist FROM profiles WHERE profileId = 'profile-1'"
+).fetchone()
+assert profile == ("{}", "Active", 0)
+ai_assist_column = existing_database.execute(
+    'SELECT name, "notnull", dflt_value FROM pragma_table_info(\'profiles\') WHERE name = \'aiAssist\''
+).fetchone()
+assert ai_assist_column == ("aiAssist", 1, "0")
+try:
+    existing_database.execute(
+        "INSERT INTO profiles (profileId, cv, erasure, aiAssist, createdAt, updatedAt) "
+        "VALUES ('invalid', '{}', 'Active', 2, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
+    )
+except sqlite3.IntegrityError:
+    pass
+else:
+    raise AssertionError("aiAssist accepted a value outside its checked domain")
 row = existing_database.execute(
     "SELECT createdAt, updatedAt, note FROM saved_jobs WHERE id = 'saved-1'"
 ).fetchone()

@@ -106,6 +106,8 @@ describe("the Authenticated middleware", () => {
         answers: () => Effect.die("unused"),
         answer: () => Effect.die("unused"),
         unanswered: () => Effect.die("unused"),
+        aiConsent: () => Effect.succeed(false),
+        setAiConsent: () => Effect.die("Profiles.setAiConsent"),
       }),
     });
     const res = await handler(
