@@ -179,4 +179,21 @@ assert "/api/health" in production_smoke
 assert "/api/about" in production_smoke
 assert 'about["license"] == "proprietary"' in production_smoke
 
+# Fork safety on a public repository (owner decision 2026-11-01): no
+# `pull_request_target` (it runs with secrets and bypasses fork-approval
+# settings) and GitHub-hosted runners only (fork code must never reach a
+# self-hosted runner). Applies to every workflow, present and future.
+import re as _re
+
+_workflows = sorted((ROOT / ".github/workflows").glob("*.y*ml"))
+assert _workflows, "expected at least one workflow"
+for _workflow in _workflows:
+    _text = _workflow.read_text()
+    assert "pull_request_target" not in _text, f"{_workflow.name}: pull_request_target is forbidden"
+    assert "self-hosted" not in _text, f"{_workflow.name}: self-hosted runners are forbidden"
+    for _runner in _re.findall(r"^\s*runs-on:\s*(.+?)\s*$", _text, _re.MULTILINE):
+        assert _re.fullmatch(r"(ubuntu|windows|macos)-[\w.-]+", _runner), (
+            f"{_workflow.name}: runs-on {_runner!r} must be a GitHub-hosted label"
+        )
+
 print("Environment-safety checks passed: staging/production boundaries are explicit.")
