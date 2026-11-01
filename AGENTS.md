@@ -66,3 +66,7 @@ Use repository commands rather than reproducing their internals manually:
 Inside `nix develop`, the equivalent `just ...` commands are permitted.
 
 A deployment claim is invalid when `./bootstrap verify` did not pass for the same source revision.
+
+## Proposed read-only market-index direction (not approved)
+
+If explicitly assigned the market-index transition, read [RFC 0016](docs/internal/rfcs/0016-read-only-norwegian-market-index.md), [target architecture](docs/internal/architecture/read-only-market-index.md), and [tracer-bullet program](docs/internal/architecture/market-index-tracers.md) after the six standard context files. The proposed first WorkScope is [WS-0020@1](work/WS-0020-r1-market-index-baseline.md). **These are proposals, not authority to change the approved product, delete features, migrate data, or deploy.** Resolve human decisions and approved work scopes before implementation.
