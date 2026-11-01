@@ -7,6 +7,7 @@ The repository uses progressive disclosure: start with the smallest document tha
 - [RFC 0016: read-only Norwegian Job Market Index](internal/rfcs/0016-read-only-norwegian-market-index.md) — proposed scope, non-goals, authority, migration and adoption decisions
 - [Target technical architecture](internal/architecture/read-only-market-index.md) — phase contracts, storage, incremental derivations, query interfaces and prior art
 - [Tracer-bullet implementation program and agent handoff](internal/architecture/market-index-tracers.md) — end-to-end tickets and falsifiable evidence
+- [Ready-to-use coding-agent handoff](../work/HANDOFF-market-index.md) — approved-scope check, read order and first tracer execution protocol
 - [Proposed first WorkScope: WS-0020@1](../work/WS-0020-r1-market-index-baseline.md) and [execution plan](../work/WS-0020-r1-execution-plan.md)
 
 **Status:** review documents only. Existing approved product decisions and working source remain authoritative until explicit owner acceptance and a bounded WorkScope.
