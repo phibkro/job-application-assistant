@@ -2,7 +2,7 @@
 
 - ID: WS-0031
 - Revision: 1
-- Status: **Draft, for the owner's gate.** The owner chose option A on 2026-11-02. Each pass below has its own human gate, and nothing in this draft authorises a deploy.
+- Status: **Approved** (owner, 2026-11-02: "approve all"). The decisions are recorded below. Each pass still has its own human gate, and **every deploy (staging included) is run by the owner**.
 - Owner: Human product owner (phibkro)
 - Risk tier: **R3** (the first production deploy, production credentials, and a new scheduled writer).
 - Roles: an implementer and an independent reviewer, both at the `complex-reasoning` tier. **The owner runs every production deploy and holds every production key.**
@@ -45,7 +45,16 @@
 - No public API contract change beyond what already exists.
 - No deletion before P5's export.
 
-## Owner decisions needed before P1 starts
+## Owner decisions (2026-11-02)
+
+| # | Decision |
+| --- | --- |
+| 1 | A public production launch **proceeds on the NAV-acceptance assumption**. NAV's written answer is still tracked; if NAV declines, P4 is reverted. |
+| 2 | Refresh **every 6 hours**. The hydration cap comes from the first staging measurement. |
+| 3 | A **short gap** on `job-index.phibkro.org` during cutover is acceptable. |
+| 4 | **P2 starts in staging now**, in parallel with P1. |
+
+## Original questions
 
 1. **NAV redistribution.** Planning so far assumed acceptance ("act as if NAV accepted"). Does a public **production** launch also proceed on that assumption, or does it wait for NAV's written answer?
 2. **Refresh schedule and budget.** Proposed: every 6 hours, with the hydration cap N set from the first staging measurement (WS-0022 L4). Alternatives are hourly or daily.
