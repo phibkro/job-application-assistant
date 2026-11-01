@@ -22,7 +22,7 @@ Devenv era (workflow files as at 3a657b1: Cachix + `nix profile add github:cachi
 | 41341703410 | quality | pull_request (PR #23) | 3a657b1 | success | verify job 124952916179 |
 | 41341703440 | pull request preview | pull_request (PR #23) | 3a657b1 | success | deploy job 124952916393; destroy skipped |
 | 41342789799 | pull request preview | pull_request (PR #23 closed/merged) | 3a657b1 | success | destroy job 124956164796 ran (109 s); deploy skipped |
-| 41342789158 | quality | push main (merge 1f53f33) | 1f53f33 | **no conclusion** | still `in_progress` when queried; `updated_at` 19:38:59Z, verify job stuck at step 8 "Tests", steps 1-7 done. Excluded from stats; reported as an anomaly (stale or hung run, not investigated, cannot re-run per rules). |
+| 41342789158 | quality | push main (merge 1f53f33) | 1f53f33 | success | Was `in_progress` when first queried; completed **success** at 19:42:45Z (about 226 s). It is the second devenv-era verify sample (see the correction at the top). |
 
 Pre-devenv (PR #22, `./bootstrap verify` + DeterminateSystems nix action):
 
@@ -159,7 +159,7 @@ Additional structural finding for P3/P2: the deploy job (`pr-preview.yml`) repea
 ## Caveats and gaps
 
 - n=1 per devenv job: one run cannot show variance; pre-devenv n=3 only. The contract wants >= 5 runs; more samples need to come from upcoming PRs (no re-runs permitted in this step).
-- Run 41342789158 (push on 1f53f33) was `in_progress` with no conclusion; it may be stuck. Re-query later; if it completes it adds one verify sample, otherwise report it to the owner.
+- Run 41342789158 (push on 1f53f33) was still running when first queried; it later completed **success** (about 226 s). Resolved; see the correction at the top.
 - Step durations are 1 s granularity and exclude queue time (2-3 s on all jobs).
 - PR #22 and #23 numbers are one workflow-set apart (nix action, bootstrap vs devenv); they are not like-for-like in the tooling and also differ in lockfile/test contents, so the 105 s vs 249 s comparison is indicative only.
 - Log-derived sub-step timings (`vp run verify` phase table) come from task-start timestamps in the single verify-job log and the deploy-job log; no logs were pulled for other runs.
