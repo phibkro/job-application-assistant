@@ -58,3 +58,9 @@ __pycache__/
 
 # Tag-pinned Foldkit source fetched by scripts/setup.sh (WS-0026)
 /repos/
+
+# devenv shell state and per-machine overrides (WS-0027@2), and the Vite+ hook
+# dispatcher that `vp config` generates under .vite-hooks/_.
+.devenv*
+devenv.local.nix
+/.vite-hooks/_/

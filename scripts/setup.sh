@@ -1,21 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-required=(bun wrangler just curl python3 sqlite3 jq shellcheck)
-for command in "${required[@]}"; do
-  command -v "${command}" >/dev/null 2>&1 || {
-    echo "Pinned Nix environment is missing '${command}'." >&2
-    exit 1
-  }
-done
-
+# Run as `vp run setup` inside `devenv shell`, which provides the toolchain
+# (devenv.nix); `vp run setup` then installs the git hook dispatcher.
 bun install --frozen-lockfile
 
 bun install --cwd infra --frozen-lockfile --force
-
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  ./scripts/install-hooks.sh
-fi
 
 
 # Foldkit source for the agent skills in .claude/skills/ (WS-0026). A git-ignored,

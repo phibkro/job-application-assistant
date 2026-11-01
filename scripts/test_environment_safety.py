@@ -98,9 +98,20 @@ assert './scripts/deploy-preview.sh "${{ github.event.pull_request.number }}"' i
 assert './scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"' in preview_workflow
 
 
-justfile = (ROOT / "justfile").read_text()
-for recipe in ["deploy-staging:", "deploy-production:"]:
-    assert recipe in justfile, recipe
+# WS-0027@2: the deploy entry points are Vite+ tasks. Each must run the
+# verify-equivalent gates first (`dependsOn: ["verify"]`), and verify must
+# chain the policy gates, the static checks and the coverage-gated tests.
+vite_config = (ROOT / "vite.config.ts").read_text()
+for task, stage in (("deploy", "staging"), ('"deploy-production"', "production")):
+    line = next(
+        (line for line in vite_config.splitlines() if line.strip().startswith(f"{task}: {{")), None
+    )
+    assert line is not None, f"vite.config.ts must declare the {task} task"
+    assert f'"bash scripts/deploy.sh {stage}"' in line, line
+    assert 'dependsOn: ["verify"]' in line, f"{task} must run verify first"
+verify_block = vite_config.split("verify: {", 1)[1].split("cache: false", 1)[0]
+for gate in ("vp run policy", "vp check", "vp run typecheck", "vp run effect:check", "vp run coverage"):
+    assert gate in verify_block, f"verify must run {gate}"
 
 deploy = (ROOT / "scripts/deploy.sh").read_text()
 # Remote D1 creation is eventually consistent in the account listing. Schema

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Replaces .githooks/pre-commit (which ran scripts/check.sh): the repository policy gates.
+# Installed by `vp run setup` (`vp config`); adapted from phibkro/pg-outbox .vite-hooks/pre-commit.
+# Re-enter the project's shell for editor commits that did not inherit devenv.
+set -eu
+if [ -z "${DEVENV_ROOT:-}" ]; then
+  exec devenv shell -- sh "$0" "$@"
+fi
+vp run policy
