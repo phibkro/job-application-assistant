@@ -4,6 +4,7 @@ The repository uses progressive disclosure: start with the smallest document tha
 
 ## Proposed product and architecture revision (NOT YET APPROVED)
 
+- [**Technical product/project lead handoff and explicit decision register**](internal/product/market-index-lead-handoff.md) — current-vs-target inventory, follow-up threads, migration risks, agent delegation and first development gate
 - [RFC 0016: read-only Norwegian Job Market Index](internal/rfcs/0016-read-only-norwegian-market-index.md) — proposed scope, non-goals, authority, migration and adoption decisions
 - [Target technical architecture](internal/architecture/read-only-market-index.md) — phase contracts, storage, incremental derivations, query interfaces and prior art
 - [Tracer-bullet implementation program and agent handoff](internal/architecture/market-index-tracers.md) — end-to-end tickets and falsifiable evidence
