@@ -84,6 +84,55 @@ Environment limits:
 - The preview used a `wrangler` 4.120.0 PATH shim from the root `node_modules`.
 - There was no staging, production, credentials or deploy.
 
+### Review fixes (attempt 2, after the `f986e35` REQUEST CHANGES review)
+
+This follow-up commit on `f986e35` fixes the review's F1 and F3 only. F2
+(memory bank) belongs to the lead, and F4–F6 are left as they are.
+
+- **F1, a gate assertion changed by authorization.**
+  - `scripts/test_environment_safety.py:125` asserted
+    `"run_logged web-build" in deploy`. It now asserts
+    `"web-build" not in deploy` and `"apps/web" not in deploy`.
+  - The `worker-build` ordering asserts are unchanged.
+  - Lead authorization: this change follows directly from the
+    owner-authorized removal of `apps/web`. It is not a weakened test.
+    It now guards against the web build step coming back.
+  - `f986e35` missed this gate because the evidence ran `bun run check`
+    but not `scripts/check.sh`.
+- **F3, leftover web build output.**
+  - The root `.gitignore` now ignores `/apps/web/`, with the comment
+    "retired in WS-0021@4; leftovers from older checkouts".
+  - `justfile _clean` removes `apps/web`.
+
+Each step of `scripts/check.sh`, run one at a time at the fix commit:
+
+| Step | Result |
+| --- | --- |
+| `python3 scripts/check_repo.py` | exit 0 |
+| `./scripts/test_bootstrap.sh` | exit 0 |
+| `./scripts/test_nav_key.sh` | exit 0 |
+| `./scripts/test_deploy_preflight.sh` | exit 0 |
+| `python3 scripts/test_environment_safety.py` | exit 0 ("Environment-safety checks passed"). The review found exit 1 at `f986e35`. |
+| `python3 scripts/test_d1_migrations.py` | exit 0 |
+| `python3 scripts/test_d1_restore.py` | exit 0 |
+| `shellcheck deploy bootstrap scripts/*.sh`, via `nix shell nixpkgs#shellcheck` | exit 0 |
+| `bash scripts/check.sh` end to end, with that shellcheck on PATH | exit 0 |
+
+F3 proof, using the reviewer's scenario:
+1. Made a real `git clone`, checked out `fcef6be`, ran
+   `bun install --frozen-lockfile`, then `cd apps/web && bun run build`.
+   That leaves `apps/web/dist` and `apps/web/node_modules`.
+2. Checked out the new head (`f986e35` plus these fixes).
+3. Ran the `scripts/setup.sh` install lines: `bun install --frozen-lockfile`
+   and `bun install --cwd infra --frozen-lockfile --force`.
+4. Ran `bun run check` with no manual `rm`. It **passes** with Bun
+   80 / 664 / 4 skipped and workerd 22 / 109. `git status` is clean, and
+   `apps/web/` shows as ignored.
+
+Negative control: with only the `/apps/web/` line removed from `.gitignore`,
+`bun run fmt:check` exits 1 on the `apps/web/dist` files. With the line
+restored it exits 0.
+
 ### Memory-bank facts (for the lead to fold in; this ticket did not edit `memory-bank/`)
 
 - **Pin:**

@@ -2,6 +2,10 @@
 # still has it. Nothing in this repository produces it any more.
 /target/
 
+# The legacy apps/web interface: retired in WS-0021@4; leftovers from older
+# checkouts (dist/, node_modules/).
+/apps/web/
+
 # Local databases and runtime state
 node_modules/
 /.preview/

@@ -110,4 +110,4 @@ _deploy-production: _verify
   ./scripts/deploy.sh production
 
 _clean:
-  rm -rf .wrangler .artifacts .deploy .preview node_modules infra/node_modules infra/.alchemy
+  rm -rf .wrangler .artifacts .deploy .preview node_modules apps/web infra/node_modules infra/.alchemy
