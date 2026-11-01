@@ -2,13 +2,13 @@
 
 Store immutable or versioned work-scope instances here. Do not use ad hoc task notes as substitutes for approved scope revisions.
 
-## Proposed market-index transition (review only)
+## Market-index transition
 
 - [Technical lead handoff and decision register](../docs/internal/product/market-index-lead-handoff.md) — proposal completeness and work readiness.
-- [RFC 0016](../docs/internal/rfcs/0016-read-only-norwegian-market-index.md) is **Proposed**, not accepted.
+- [RFC 0016](../docs/internal/rfcs/0016-read-only-norwegian-market-index.md) is **Accepted with amendments A1–A4** (2026-11-01).
 - [Tracer program](../docs/internal/architecture/market-index-tracers.md) is a roadmap, not bulk implementation authority.
 - [Coding-agent handoff](HANDOFF-market-index.md) provides a scoped, copyable entry point.
-- [WS-0020@1](WS-0020-r1-market-index-baseline.md) and its [execution plan](WS-0020-r1-execution-plan.md) are the proposed first bounded characterization Ticket. No implementation should start before human approval.
+- [WS-0020@1](WS-0020-r1-market-index-baseline.md) and its [execution plan](WS-0020-r1-execution-plan.md) are the **approved** first bounded characterization Ticket (owner gate 2026-11-01, lead amendments L1–L4). Later tracers need their own approved WorkScopes.
 
 ## Current work
 

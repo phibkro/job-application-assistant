@@ -1,6 +1,6 @@
 # Coding-agent handoff: Norwegian Job Market Index
 
-> This handoff contains **proposed** product and architectural direction, not approval to implement it. Before executing code changes, the human owner must accept/authorize the governing RFC and the specific WorkScope. Do not self-approve a gate.
+> RFC 0016 is **accepted with amendments A1–A4** and WS-0020@1 is **approved** with lead amendments L1–L4 (owner gate 2026-11-01). Every later tracer still needs its own approved WorkScope. Do not self-approve a gate.
 
 ## Task brief
 

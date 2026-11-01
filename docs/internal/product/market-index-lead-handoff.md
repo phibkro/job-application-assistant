@@ -1,11 +1,64 @@
 # Norwegian Job Market Index — Technical Product / Project Lead Handoff
 
-- **Status:** Proposed design package; product pivot and implementation WorkScopes **not accepted** as of 2026-11-01.
+- **Status:** RFC 0016 **accepted with amendments A1–A4**; WS-0020@1 **approved** with lead amendments L1–L4 (owner gate 2026-11-01). Later tracers are not yet scoped. See [lead review and gate decisions](#lead-review-and-gate-decisions-2026-11-01).
 - **Audience:** Technical product lead, architecture owner, engineering lead, coding agents, independent reviewers.
 - **Repository:** `phibkro/job-application-assistant` (review branch `proposal/read-only-norwegian-market-index-2026-11`; [draft PR #21](https://github.com/phibkro/job-application-assistant/pull/21)).
 - **Downstream personal client:** `phibkro/job-hunting` ([draft PR #1](https://github.com/phibkro/job-hunting/pull/1)).
 - **Authority:** This brief consolidates the proposal; the accepted product vision, accepted RFCs, repository policies and approved WorkScopes remain binding until the human owner makes new gate decisions.
 - **Scope:** Product/architecture decisions, existing implementation inventory, risks, explicit follow-up threads, and a bounded engineering execution path. It does **not** claim deployment evidence or authorize destructive migration.
+
+## Lead review and gate decisions (2026-11-01)
+
+Reviewed against `main` at `881eb40` and companion `phibkro/job-hunting` PR #1 head `dd2c8fd`. Verdicts are from reading source; executed evidence comes from WS-0020.
+
+### Proposal claims checked against code
+
+| Claim in this packet | Verdict | Evidence |
+| --- | --- | --- |
+| Canonical identity = normalized title + employer + location | **Confirmed**, and stronger than stated: the key has no `sourceId`, so two concurrent same-title requisitions *from NAV alone* collapse into one row | `apps/worker/src/corpus/identity.ts:128–148`; `canonical_jobs UNIQUE (canonicalKey)` |
+| Occurrence identity = `(sourceId, externalId)` | Confirmed | `identity.ts:138`; `occurrences UNIQUE (sourceId, externalId)` |
+| No cron; lazy refresh | Confirmed, with a structural conflict: the gate arms **only on personal reads** (`/api/v1/me/feed`, `/api/v1/me/matches/*`), never on public `/api/v1/jobs` | `infra/alchemy.run.ts:144` (`CRONS = []`); `apps/worker/src/index.ts:193–210` |
+| Replay of identical input is a no-op | Unit-level only so far; end-to-end Worker+D1 replay is WS-0020's job | `corpus/decide.test.ts:53`, `corpus/observe.test.ts:45` |
+| No general saved-search ledger | Confirmed (`subscriptions` exists, no saved-search table) | `db/schema.sql` |
+| Read-only corpus group exists | Confirmed: `listJobs`, `getJob`, `listSources`, `navStatus` carry no `Authenticated` middleware | `apps/worker/src/Api.ts:348–377` |
+| Personal mutations live in the same Worker | Confirmed: 20 authenticated mutating endpoints (POST/PUT/PATCH/DELETE) across feed, profile, applications, proposals, documents and account | `Api.ts:387–842` |
+| Memory bank is current | **Stale.** It says WS-0016 is uncommitted, but `main` has WS-0016 to WS-0019 integrated (`f233d75`, `f33348b`, `3b2862a`, `881eb40`). `techContext.md` pins Effect `beta.104`; `package.json` pins `4.0.0-rc.108` | `git log`; `package.json` |
+| Vision excludes in-app CV/letter writing | **Drifted:** WS-0018 document studio is integrated | `3b2862a` |
+
+### P0 decision status
+
+| ID | Outcome | Binding rule until revisited |
+| --- | --- | --- |
+| D01 | **Accepted with amendments** A1–A4 ([RFC 0016](../rfcs/0016-read-only-norwegian-market-index.md#amendments)) | The current vision governs existing features. TB-05 must pass before any personal route is retired. |
+| D02 | **Interim: freeze** | D1 stays authoritative for existing in-app history; Linear for the job-hunting pipeline. No sync, no migration, and no *new* application-state writers in either repo until a migration WorkScope. |
+| D03 | **In progress** via WS-0020@1 | Implementation facts come from pinned code and executed tests, not the memory bank. |
+| D04 | **Interim: NAV only** | NAV is the only live source for TB-00 to TB-04. Second sources are fixture-only until a per-source review is recorded. FINN is excluded from the shared index. |
+| D05 | **Open.** Risk confirmed; L1 pins current behavior | No canonical-ID change. The identity migration strategy is decided inside the TB-02 WorkScope (R3: stored IDs and saved snapshots). |
+| D06 | **Open.** Specified in the TB-01 WorkScope | Missing workload ≠ 100%, negotiable ≠ 50%, overlap ≠ equality. |
+
+### Ownership
+
+| Role (`policy/authority.json`) | Holder | May | May not |
+| --- | --- | --- | --- |
+| Product owner, source-policy owner (D04), client owner (D12) | phibkro | Approve or revise scope; accept RFCs; integrate | — |
+| Release owner | phibkro | Deploy, waive, roll back | — (no deploy is authorized in this program yet) |
+| Technical lead / supervisor | Lead agent session | Draft WorkScopes, assign, bounded retry, request review | Approve its own gates, deploy, widen scope |
+| Implementing actor | One delegated coding agent per Ticket | Execute within the approved WorkScope | Change behavior or scope outside it |
+| Independent reviewer | Separate agent with fresh context; gets the diff, not the implementer's summary | Review diff and reproduce evidence; recommend | Accept on the owner's behalf |
+
+### Bounded backlog
+
+One Ticket is active at a time. Each later Ticket gets the next free WorkScope ID (starting at WS-0021) only once its prerequisites hold.
+
+| Ticket | Status | Risk | Falsifier | Must hold before scoping |
+| --- | --- | --- | --- | --- |
+| TB-00 · WS-0020@1 | **Approved, delegated** | R1 | Identical replay moves `sequence`; returned record lacks its source | — |
+| TB-01 workload facts | Next; draft after the TB-00 gap report | R2 (additive schema + API field) | An advert with no stated percentage is excluded as full-time, or 40–80% is reported as exactly 50% | D06 field spec; TB-00 evidence |
+| TB-02 second-source identity | Blocked | R3 (canonical IDs, saved snapshots) | Two same-title NAV requisitions stay merged after the change, or a saved job is orphaned | D05 strategy; D04 fixture-only |
+| TB-03 change/retraction | Queued | R2 | A closed vacancy still matches an active query via the changes cursor | Stable identity contract (TB-02) |
+| TB-04 query AST | Queued | R2 (public contract) | Web and API return different IDs/order for the same AST; an unsupported operator compiles | TB-01 |
+| TB-05 independent refresh | Queued; **gates any personal-route retirement** (A2) | R2 + staging release gate | Corpus goes stale with zero personal-feed traffic | D10 design; staging tick evidence (cron dispatch previously failed) |
+| TB-06 job-hunting read client | Queued | R2 in the client repo | One vacancy creates two Linear issues; a refresh overwrites human notes | TB-04 stable; D02 freeze holds |
 
 ## Executive decision and product thesis
 

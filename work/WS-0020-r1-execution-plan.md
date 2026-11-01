@@ -1,6 +1,6 @@
 # Execution plan: WS-0020@1
 
-> **Proposed, not approved.** Do not execute until the owner accepts the governing design/gate and this WorkScope.
+> **Approved 2026-11-01** together with [WS-0020@1](WS-0020-r1-market-index-baseline.md) and its lead amendments L1–L4. Governing RFC 0016 is accepted with amendments A1–A4.
 
 ## Baseline
 

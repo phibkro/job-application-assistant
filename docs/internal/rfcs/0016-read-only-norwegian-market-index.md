@@ -1,10 +1,11 @@
 # RFC 0016: Read-only Norwegian Job Market Index
 
-- Status: Proposed — **not accepted; not implementation authority**
+- Status: Accepted
+- Acceptance scope: Accepted with amendments A1–A4 (owner decision 2026-11-01). Acceptance authorizes individually approved WorkScopes only; it is not implementation authority by itself.
 - Authors: Product-owner proposal, prepared for review
 - Created: 2026-11-01
 - Updated: 2026-11-01
-- Work scope: [WS-0020@1 (proposed)](../../../work/WS-0020-r1-market-index-baseline.md); subsequent slices require their own approved scopes
+- Work scope: [WS-0020@1 (approved 2026-11-01)](../../../work/WS-0020-r1-market-index-baseline.md); subsequent slices require their own approved scopes
 - Review owners: Human product owner; independent architecture and data-policy reviewers
 - Tracking issue: Not yet assigned
 - Implementation PR: Not yet assigned
@@ -58,7 +59,7 @@ Measure:
 
 An operator registers a verified source with retrieval and display/retention permissions. The independent acquisition scheduler fetches bounded pages and records observations. Changed observations cause deterministic updates of the affected vacancy projections. A client sends a typed read-only query, e.g. junior IT or research roles in Oslo with an advertised workload overlapping 40–60%. The API returns records, occurrence links, sources, freshness, and field-level evidence or an explicit unknown state. A separate personal client may save the vacancy, prepare a CV and manage its application lifecycle; none of those actions change the shared job index.
 
-## Reference-level design
+## Reference-level explanation
 
 ### Logical data and control flow
 
@@ -112,7 +113,7 @@ See [technical architecture proposal](../architecture/read-only-market-index.md)
 
 This is a substantial product, identity, interface and state-boundary revision; it requires an accepted RFC, then individually approved WorkScopes and evidence. Maintain the current six-document agent read-order in `AGENTS.md`, the accepted architecture in `docs/internal/architecture`, and existing tests. Tracer slices must not self-approve gates, deploy, alter retention, or remove features without explicit approval.
 
-## Security, privacy and capabilities
+## Security, privacy, and capabilities
 
 - Strictly separate shared public vacancy data from owner-specific private data.
 - Preserve source access policy independently from application-submission policy and independently from content reuse/redistribution permissions.
@@ -121,7 +122,13 @@ This is a substantial product, identity, interface and state-boundary revision; 
 - Support verified takedown and deletion obligations even if the logical processing model is append-oriented.
 - Avoid exposing personal applicant data in public repository examples, query results, telemetry or fixtures.
 
-## Drawbacks and alternatives
+## Drawbacks
+
+- During migration, one Worker serves both the public index and the personal workspace, so the boundary is enforced by route groups and auth middleware, not by deployment isolation.
+- Correcting vacancy identity (D05) touches stored canonical IDs and saved snapshots; that is R3 work with its own gate.
+- Until TB-05, corpus freshness depends on personal-feed traffic (amendment A2).
+
+## Rationale and alternatives
 
 - **Retain full assistant product:** preserves current scope and integrated UI; rejected as the intended general-purpose boundary due to operational and privacy coupling. Existing implementation is retained during migration.
 - **Create a new independent indexer repo immediately:** reduces semantic confusion but duplicates functioning Effect/D1 infrastructure. Defer until measurable ownership or deployment isolation requires it.
@@ -133,11 +140,11 @@ This is a substantial product, identity, interface and state-boundary revision; 
 
 Singer (`SCHEMA/RECORD/STATE`) and dlt (cursor ingestion); schema.org `JobPosting` and Brønnøysundregistrene (vocabulary/entity identity); W3C PROV (lineage); Nix and Salsa (versioned derivations/dependency invalidation); SQLite/D1 and Datasette (query execution and browsable views); Materialize/Feldera (future complex incremental view maintenance). References inform design; none is mandatory installation.
 
-## Unresolved approval decisions
+## Unresolved questions
 
-1. Product scope and naming: is indexer-only product boundary accepted, and which existing application features migrate to job-hunting versus remain as external clients?
-2. Owner of personal application lifecycle state during migration; Linear and D1 must not both become uncoordinated sources of truth.
-3. Second-source permission/redistribution policy and retention contract; FINN is not assumed legally or operationally ingestible.
+1. ~~Is the indexer-only boundary accepted?~~ Accepted with amendments (2026-11-01). Still open: product naming, and which existing application features migrate to job-hunting.
+2. Personal application state: **interim freeze** (D02, 2026-11-01). D1 stays authoritative for existing in-app history, Linear for the job-hunting pipeline, with no new writers. The final owner is decided by the migration WorkScope.
+3. Second-source policy: **interim NAV-only** (amendment A4). The per-source permission, redistribution and retention contract is still open; FINN is excluded.
 4. Stable-ID migration strategy for already-saved jobs and ambiguity resolution, with compatibility and reversal.
 5. Production scheduling design and evidence given historical Cloudflare cron concerns.
 6. The minimum publicly exposed source detail and any access controls/quotas required for safe service operation.
@@ -162,12 +169,16 @@ Proposal review → accepted RFC → approved first tracer → additive schema/A
 
 ## Decision record
 
-- Decision: **Pending human review**
-- Decision date: —
-- Decision owner: Product owner
-- Final rationale: —
-- Dissent or residual concerns: Scope migration, identity stability, external source permissions and cron evidence
+- Decision: Accepted with amendments A1–A4
+- Decision date: 2026-11-01
+- Decision owner: Human product owner (phibkro), via the technical-lead gate review recorded in the [lead handoff](../product/market-index-lead-handoff.md#lead-review-and-gate-decisions-2026-11-01)
+- Final rationale: The boundary fits the existing code. NAV adapter, source lease, checkpointed ingestion, occurrence/canonical split, monotonic `sequence`, and an unauthenticated corpus read group already exist on `main` at `881eb40`. The pivot is therefore an additive refocus rather than a rewrite. The amendments address the one structural conflict found in review (A2) and keep current features authoritative until migration is proven (A1, A3).
+- Companion owner decisions recorded at the same gate: **D02**, freeze personal application state with no new writers. **D04**, NAV is the only live source and others are fixture-only; FINN is excluded from the shared index.
+- Dissent or residual concerns: Canonical identity merges same-title requisitions by construction (D05, open). Lazy refresh is coupled to personal reads (A2). The memory bank is stale about integrated WorkScopes WS-0016 to WS-0019.
 
 ## Amendments
 
-None.
+- **A1. Current vision governs existing features.** [`vision.md`](../product/vision.md) and the accepted application-focused RFCs stay authoritative for existing implemented behavior until a migration WorkScope is approved. This RFC governs new market-index work only.
+- **A2. Independent refresh precedes personal-route retirement.** On `main`, the only deployed acquisition trigger is `armsGate` in `apps/worker/src/index.ts`. It arms lazy ingestion only on authenticated *personal* reads (`/api/v1/me/feed`, `/api/v1/me/matches/*`), after the response, via `waitUntil`. The public `/api/v1/jobs` read does not refresh the corpus. TB-05 (independent refresh) must therefore pass its gate before any personal route is retired or moved. Until then, the read-armed gate is a recorded, accepted deviation from invariant 6.
+- **A3. Supersession is decided at migration time.** The exact list of superseded vision sections and RFCs is set by the migration WorkScope, not by this acceptance.
+- **A4. Source policy for the tracer program (D04).** NAV is the only live source for TB-00 to TB-04. A second source is fixture-only until a per-source access, redistribution and retention review is recorded. FINN is excluded from the shared index; job-hunting's personal-scale watcher grants no shared-index permission.

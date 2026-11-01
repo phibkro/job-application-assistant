@@ -2,10 +2,11 @@
 
 - ID: WS-0020
 - Revision: 1
-- Status: **Proposed — not approved for execution**
+- Status: **Approved for execution with lead amendments L1–L4** (owner gate 2026-11-01)
 - Owner: Human product owner
 - Risk tier: R1 (characterization and tests; elevate before API/schema/production changes)
-- Repository/ref: `phibkro/job-application-assistant` / `main`; agent must pin the exact starting commit
+- Repository/ref: `phibkro/job-application-assistant`, branch `claude/clever-heisenberg-lwui1b` (fast-forwarded from `main` `881eb40` onto proposal head `a41b2ef`). The agent pins the exact starting commit.
+- Roles: product/integration owner phibkro (human); supervisor is the technical-lead agent session (proposes, does not approve); the implementing actor is a delegated coding agent; the independent reviewer is a separate agent that receives the diff, not the implementer's conclusions.
 - Attempt budget: 2 bounded implementation attempts; stop and report unresolved failures
 
 ## Goal
@@ -50,6 +51,13 @@ Read source/tests; run local deterministic tests and preview; write characteriza
 ## Required evidence
 
 Exact commit; executed commands, test logs and any new fixture/test paths; source-to-client map; gap table; explicit production-evidence status; next Ticket candidate. Independent reviewer should be able to reproduce local behavior.
+
+## Lead amendments (approved with the WorkScope)
+
+- **L1. Identity falsifier.** Add a characterization test that pins *current* behavior. Two NAV listings with different `externalId` but equal normalized title/employer/location derive the same `canonicalJobId`, producing one `canonical_jobs` row with two `occurrences` (`deriveCanonicalKey`, `apps/worker/src/corpus/identity.ts:128`). The test documents the D05 risk; it must not change identity semantics, and its name must say it characterizes a known risk.
+- **L2. Refresh-trigger characterization.** Record with a test or a file:line citation that `armsGate` arms ingestion only on `/api/v1/me/feed` and `/api/v1/me/matches/*`, and that `/api/v1/jobs` does not. This grounds RFC 0016 amendment A2.
+- **L3. Evidence location.** Evidence lives in `evidence/WS-0020/`, following the existing `evidence/WS-000N/` convention. Command logs must not contain secrets or personal data.
+- **L4. Memory-bank correction.** Update `memory-bank/activeContext.md` and `progress.md` only for facts the evidence verifies, e.g. WS-0016 to WS-0019 integrated on `main`, and the Effect pin being `4.0.0-rc.108` while `techContext.md` says `beta.104`. Do not rewrite product decisions.
 
 ## Supersedes
 

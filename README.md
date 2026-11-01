@@ -1,6 +1,6 @@
 # Job Application Assistant
 
-> **Proposed direction (review pending):** Re-scope the reusable core as a read-only Norwegian Job Market Index, with [technical product/project lead handoff](docs/internal/product/market-index-lead-handoff.md), [RFC 0016](docs/internal/rfcs/0016-read-only-norwegian-market-index.md), [target architecture](docs/internal/architecture/read-only-market-index.md), and [tracer-bullet plan](docs/internal/architecture/market-index-tracers.md). The approved product vision and implemented application features remain unchanged until the proposal is accepted and migration work is separately authorized.
+> **Accepted direction (RFC 0016, with amendments, 2026-11-01):** Re-scope the reusable core as a read-only Norwegian Job Market Index, with [technical product/project lead handoff](docs/internal/product/market-index-lead-handoff.md), [RFC 0016](docs/internal/rfcs/0016-read-only-norwegian-market-index.md), [target architecture](docs/internal/architecture/read-only-market-index.md), and [tracer-bullet plan](docs/internal/architecture/market-index-tracers.md). The current vision still governs existing application features (amendment A1); any migration needs its own approved WorkScope.
 
 `Job Application Assistant` is the working product name; repository and package
 identifiers remain `job-index`.
