@@ -67,6 +67,23 @@ Inside `nix develop`, the equivalent `just ...` commands are permitted.
 
 A deployment claim is invalid when `./bootstrap verify` did not pass for the same source revision.
 
+## Effect for agents
+
+The workspace is on `effect ~4.1.0` (resolved 4.1.1). Most public Effect material and most model training data describe v3, and mixing the two is a known failure here.
+
+- **Authoritative docs for the 4.x line:** `node_modules/effect/AGENTS.md` and `node_modules/effect/ai-docs/` (shipped with the installed version), and `LLMS.md` in the Effect v4 repository: <https://github.com/Effect-TS/effect-smol/blob/main/LLMS.md> (tracks `main`, so check it against the installed source). `effect.website/llms.txt` was not verified against 4.x; do not prefer it over these.
+- **v3 vs v4 drift:** v3 names fail or mislead on 4.x. Example: v3 `Effect.catchAll` is `Effect.catch` in v4. Do not write an Effect API from memory.
+- **Read the source first:** before using any Effect API, read it in `node_modules/effect/src` (`packages/effect/src` in the repository) and match the installed version's signature.
+- **Diagnostics:** `bun run effect:check` (part of `bun run check`) runs `@effect/language-service` and fails on errors and warnings, including floating Effects and v3-only APIs (`outdatedApi`). Exceptions live in `tools/quality/effect-exceptions.json`; do not add one without an owner decision.
+
+## Foldkit for agents
+
+Foldkit's official agent skills are installed under `.claude/skills/` (`foldkit`, `generate-program`, `audit-program`); provenance is in `.claude/skills/PROVENANCE.md`. Use them for `apps/index-web`; do not copy their content here.
+
+- The skills read the Foldkit source at `repos/foldkit/`. It is a git-ignored shallow checkout pinned to the tag **`foldkit@0.170.0`**, fetched by `scripts/setup.sh` (a no-op when already at the tag, a warning when offline).
+- Keep the tag equal to the installed `foldkit` version: when `apps/index-web` bumps `foldkit`, change `FOLDKIT_TAG` in `scripts/setup.sh`, this section, and the skills' provenance together.
+- `generate-program` offers to add a git subtree at `repos/foldkit`. Do not: the owner chose the git-ignored checkout (WS-0026).
+
 ## Delegation capability tiers
 
 When delegating to a subagent, choose a capability tier for the task, then bind it to that platform's model explicitly. Do not inherit the parent's model by default.

@@ -55,3 +55,6 @@ __pycache__/
 
 # Generated test artefacts
 /coverage/
+
+# Tag-pinned Foldkit source fetched by scripts/setup.sh (WS-0026)
+/repos/

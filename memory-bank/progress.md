@@ -8,6 +8,7 @@
 | RFC 0016 accepted (A1–A4); decision log | [RFC 0016](../docs/internal/rfcs/0016-read-only-norwegian-market-index.md), [handoff](../docs/internal/product/market-index-lead-handoff.md) |
 | TB-00 baseline characterization | [`evidence/WS-0020/`](../evidence/WS-0020/README.md) (`b601267`, ACCEPT WITH NITS) |
 | Effect `~4.1` (4.1.1) across the workspace; legacy Foldkit UI retired (54 files, recoverable at `35e93e1`) | [`evidence/WS-0021/`](../evidence/WS-0021/README.md) (delta review ACCEPT WITH NITS) |
+| Agent tooling: Effect language service gate, Effect/Foldkit agent docs, Foldkit skills (implemented, pending review) | [`evidence/WS-0026/`](../evidence/WS-0026/README.md) |
 | JVM stack spike (Clojure + Datomic Local); TS kept | [`evidence/WS-0024/`](../evidence/WS-0024/README.md) (REPRODUCES WITH NITS) |
 | Reusable qualification evidence: Gate 1 staging provenance (`dfa0fe3`), Gate 3 complete-table D1 restore drill, the 50k-row query-plan qualification | `work/WS-0014-r1-execution-plan.md`, `.artifacts/` |
 

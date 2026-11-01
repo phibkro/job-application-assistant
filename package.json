@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "effect:check": "bun run scripts/ts/effect-diagnostics.ts",
     "fmt": "oxfmt packages apps",
     "fmt:check": "oxfmt --check packages apps",
     "lint": "oxlint",
@@ -19,7 +20,7 @@
     "coverage:workers": "nix shell nixpkgs#nodejs -c node node_modules/.bin/vitest run -c vitest.workers.config.ts --coverage",
     "coverage:all": "bun run coverage && bun run coverage:workers",
     "e2e": "playwright test --config e2e/playwright.config.ts --pass-with-no-tests",
-    "check": "bun run fmt:check && bun run lint && bun run imports:check && bun run typecheck && bun run schema:check && bun run catalog:check && bun run bundle:check && bun run coverage:all",
+    "check": "bun run fmt:check && bun run lint && bun run imports:check && bun run typecheck && bun run effect:check && bun run schema:check && bun run catalog:check && bun run bundle:check && bun run coverage:all",
     "schema": "bun run scripts/ts/schema.ts --emit",
     "schema:check": "bun run scripts/ts/schema.ts",
     "bundle:check": "bun build apps/worker/src/index.ts --target=browser --conditions=workerd --conditions=worker --external \"cloudflare:*\" > /dev/null",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@cloudflare/vitest-pool-workers": "0.20.3",
+    "@effect/language-service": "0.87.5",
     "@phibkro/oxlint-effect-plugin": "^0.1.0",
     "@playwright/test": "1.61.1",
     "@types/node": "^22",

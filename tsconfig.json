@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/@effect/language-service/schema.json",
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
@@ -33,6 +34,11 @@
       "node",
       "vitest/importMeta",
       "@cloudflare/vitest-pool-workers/types"
+    ],
+    "plugins": [
+      {
+        "name": "@effect/language-service"
+      }
     ]
   },
   "include": [

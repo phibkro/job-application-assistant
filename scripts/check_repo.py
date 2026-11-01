@@ -21,11 +21,17 @@ NOT_OUR_SOURCE = {
     ".direnv",
     ".preview",
     "__pycache__",
+    # Tag-pinned Foldkit checkout fetched by scripts/setup.sh (git-ignored).
+    "repos",
 }
 
 
 def ours(path: Path) -> bool:
-    return not any(part in NOT_OUR_SOURCE for part in path.parts)
+    parts = path.relative_to(ROOT).parts
+    # Upstream Foldkit agent skills, copied unmodified (see PROVENANCE.md there).
+    if parts[:2] == (".claude", "skills"):
+        return False
+    return not any(part in NOT_OUR_SOURCE for part in parts)
 
 
 REQUIRED = [

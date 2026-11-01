@@ -1,0 +1,37 @@
+{
+  "$comment": "Exceptions to @effect/language-service error/warning diagnostics (WS-0026). Checked by scripts/ts/effect-diagnostics.ts: every finding must match an entry by file + rule, and every entry must still match exactly `count` findings (a stale or wrong-count entry fails the check). Suggestion-severity diagnostics are not gated.",
+  "exceptions": [
+    {
+      "id": "EFX-001",
+      "file": "apps/worker/src/index.ts",
+      "rule": "multipleEffectProvide",
+      "count": 2,
+      "reason": "Two chained Effect.provide calls (services(env) then platform) in the lazy-ingestion gate and the scheduled handler. Merging them into one provide changes layer build/lifecycle semantics and the recovery boundary documented at the call site (catchDefect wraps the provided effect), so it is a behavior change and out of scope for R1.",
+      "retirement": "Owner decides whether to merge the layers; retire with the first WorkScope that touches the Worker composition root (TB-05 event loop replaces the lazy gate) and has runtime-test authority."
+    },
+    {
+      "id": "EFX-002",
+      "file": "apps/worker/src/accounts/accounts.test.ts",
+      "rule": "multipleEffectProvide",
+      "count": 1,
+      "reason": "Test helper provides the service layer then the fake database layer in two calls. Merging changes layer construction in the tests; not a behavior-free edit.",
+      "retirement": "Retire when the test layers are composed into a single test layer in a WorkScope that owns the accounts tests."
+    },
+    {
+      "id": "EFX-003",
+      "file": "apps/worker/src/accounts/index.test.ts",
+      "rule": "multipleEffectProvide",
+      "count": 1,
+      "reason": "Same two-step layer provision as EFX-002.",
+      "retirement": "Same trigger as EFX-002."
+    },
+    {
+      "id": "EFX-004",
+      "file": "apps/worker/src/accounts/profiles.test.ts",
+      "rule": "multipleEffectProvide",
+      "count": 1,
+      "reason": "Same two-step layer provision as EFX-002.",
+      "retirement": "Same trigger as EFX-002."
+    }
+  ]
+}
