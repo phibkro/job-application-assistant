@@ -2,6 +2,14 @@
 
 ## Current focus
 
+**Market-index program (2026-11-01).** RFC 0016 is accepted with amendments, and the decision log is in `docs/internal/product/market-index-lead-handoff.md`:
+- WS-0020 (TB-00 baseline) is done: `b601267`, review ACCEPT WITH NITS.
+- WS-0024 (Clojure + Datomic Local spike) is done: `450103c`. The owner kept TS + Effect `~4.1` + Cloudflare and ported the spike's model.
+- WS-0021@3 is in progress: effect `~4.1` for the back end, with the Foldkit app frozen as a legacy island with vendored domain and `Api.ts` copies.
+- Next is WS-0022 (TB-01 workload facts), currently proposed.
+- Frontend target: Astro + template + islands.
+
+
 **WS-0020 (TB-00 market-index characterization) is implementation-complete
 and awaits independent review and the human gate**, under RFC 0016 (accepted
 with amendments A1–A4). Evidence and gap table:
@@ -104,6 +112,9 @@ just soak               # bounded staging soak; use seven days for acceptance
 ```
 
 ## Next action
+
+- **Market index:** land WS-0021@3, then gate WS-0022 (TB-01). The owner should send the drafted NAV redistribution question and refresh the stale memory-bank text (WS-0020 G16/F2).
+
 
 Proceed on two parallel tracks:
 
