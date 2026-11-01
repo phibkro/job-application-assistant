@@ -23,7 +23,7 @@ Contracts: [WS-0029@2](../../work/WS-0029-r2-infra-alchemy-previews.md), then [W
 > - L5: never log `state read` output (it prints Redacted secrets);
 > - production: check which `job-index-production*` resources already exist before the first apply.
 
-**Current state: pass A merged in PR #28 (`f00ccb5`), with CI green on `70611d2`. Review round 2 found nothing at medium or above; L6 (quoted-key and shorthand `migrations` spellings) was added to the follow-ups. P0 was run by the owner.** Attempts 1 and 2, below, are kept as recorded.
+**Current state: pass A merged in PR #28 (`f00ccb5`). Pass B (WS-0029@2, attempt 1 of 2) is implemented in `f9a0c3b` on branch `ws29b`. See "Pass B" at the end. Its real-PR checks run in CI on the pass B PR.** The pass A attempts are kept as recorded.
 
 ## Pass A
 
@@ -214,3 +214,133 @@ After any beta.84 deploy, nobody has shown that a rollback to beta.72 works, bec
 - **CI:** the `pull request preview` workflow must deploy `pr-<n>` with this `infra/` and pass its smoke test on the PR.
 - **Unverified here:** what a plan against live state shows, the live Worker's current flags, and whether Cloudflare accepts `legacy_module_registry` on date 2026-05-25. The CI preview deploy is the first real upload.
 - **Follow-ups (r4):** adopt `new_module_registry` deliberately in its own ticket. Move `infra/` to effect ~4.1 once an Alchemy release includes alchemy-run/alchemy#2754. Check the assumption that "`nodejs_compat` is not enabled" against the live Worker (both versions send it).
+
+## Pass B (WS-0029@2: Worker Previews behind Access)
+
+Base `f00ccb5` (main after PR #28). Implementation commit `f9a0c3b` on `ws29b`. Attempt 1 of 2. No Cloudflare credentials were used, and nothing was deployed. Network use: `registry.npmjs.org` (install) and the Cloudflare documentation search. The inventory below came from the read-only Cloudflare connector.
+
+### Design
+
+**How previews are declared.** Every API below is from the pinned `@alchemy.run/cloudflare@2.0.0-beta.84` (`infra/node_modules/@alchemy.run/cloudflare/src`) or `alchemy@2.0.0-beta.84` (`infra/node_modules/alchemy/src`).
+
+| Stage | Declares | API (file:line) |
+| --- | --- | --- |
+| `pr-previews` (host; new) | `Api` Worker `job-index-pr-previews` with `workersDev: { enabled: false, previewsEnabled: true }`, no domain, no email, `crons: []`. Its own stable URL is off, so it serves nothing publicly. `TypeScriptDb` D1 `job-index-pr-previews-typescript-db`: the shared preview D1. No legacy `Db`. | `Workers/Worker.ts:576` (`workersDev?: boolean \| WorkersDevConfig`), `:184` (`previewsEnabled`). `Workers/WorkerProvider.ts:467` `resolveWorkersDev` and `:1207` `setWorkerSubdomain`: the two toggles are independent on the API |
+| `pr-<n>` | Only `Api`, with `preview: { of: yield* Cloudflare.Worker.ref("Api", { stage: "pr-previews" }), name: "pr-<n>" }`, the same `main`, assets and compatibility, and the same `env` as before: `DB` bound to `Cloudflare.D1.Database.ref("TypeScriptDb", { stage: "pr-previews" })`, plus `SOURCE_LEASE`. It sets no `name`, `workersDev`, `domain` or `crons`. | `Workers/Worker.ts:469-512` (`WorkerPreviewOptions`), `:563` (`preview?`), `:2054` (the `Worker.ref` PR example). `alchemy/src/Resource.ts:533` (`ref`, on every resource class, D1 included). `Plan.ts:1013` resolves a ref from the other stage's state and fails with "Have you deployed …" if it is missing |
+
+What the provider does with `preview.of` (`Workers/WorkerProvider.ts` `putWorkerPreview`, `:2871`):
+- It rejects `name`, `namespace`, `crons`, `tailConsumers`, `domain`, `routes`, `workersDev` and `access` on a Preview (`:2892-2911`). This is why the PR branch omits them and `crons: []` sits only on the non-PR branch.
+- The Preview name must match `^[a-z][a-z0-9-]*$` and `<name>-<parent>` must fit in 63 characters (`:2918-2934`). `pr-<n>` plus `job-index-pr-previews` (21 characters) leaves 41.
+- `createPreview` is called with `ignoreBaseConfig: true` (`:2974`), so a Preview inherits no bindings. Its `env` is uploaded explicitly (`bindingsToPreviewEnv`, `:238`).
+- **Durable Objects:** a DO binding with no `scriptName` counts as hosted by the Preview (`getDurableObjectBindings`, `:5803`; the binding is lowered at `WorkerAsyncBindings.ts:594`). The first deployment sends `new_sqlite_classes: ["SourceLeaseObject"]` to that Preview (`:3057-3076`). Cloudflare's Previews docs say "Cloudflare automatically provisions a new Durable Object namespace … for each Preview". So each PR has its own `SourceLease` namespace. The binding is declared in the one unconditional `env`, never only for production.
+- **URL:** `previewResource.urls[0]`, falling back to `https://<slug>-job-index-pr-previews.<account-subdomain>.workers.dev` (`:3008-3010`). That is the `<preview>-<worker>.<subdomain>.workers.dev` shape. The deploy reads the real value from state.
+- **Changing the type:** a stage that was a normal Worker and becomes a Preview is a `replace` (`:4487-4490`). An open PR deployed by the old flow therefore converges on its next push. The Preview is created, the old `job-index-pr-<n>` Worker is replaced, and its owned `TypeScriptDb` is no longer declared, so it is deleted.
+
+**Access.** Nothing is declared in Alchemy. The Worker-level setting covers this case. Cloudflare's Workers Access docs (`/workers/configuration/cloudflare-access/`) describe selecting the Worker, then **Access** tab → **Protect this Worker behind Access** → **Previews only**. This creates a `preview_worker` destination for that Worker. The Previews docs (`/workers/previews/`) say "You can protect all Previews on an account, one Worker's Previews, or specific hostnames". The 2026-08-14 changelog says the Worker-level policy keeps "every associated domain and preview URL" protected. I found nothing in the docs or the provider showing that the setting does not cover Worker Previews, so there was no reason to stop. P4 stays unneeded.
+
+**Shared D1 seeding (`scripts/seed-preview-db.sh`).** Two entry points use it: the owner's host deploy and every PR deploy, which runs it before the Preview upload so a Preview never starts against an older schema.
+- It refuses any database except `job-index-pr-previews-typescript-db`, so it can never touch staging or production.
+- **Writers are serialised** by a one-row lease table in the shared D1 (`preview_seed_lease`). A run takes the lease with one atomic upsert, which succeeds only when the row is free or older than 600 s, then reads the holder back. It retries 30 × 10 s, then fails. An EXIT trap releases the lease. GitHub `concurrency` is not used for this: in one group it cancels every pending run but the newest.
+- **Readers never see an empty corpus.** Against the shared D1, `dev/preview-seed.sql` is applied with its `DELETE FROM` lines removed and `INSERT INTO` turned into `INSERT OR IGNORE INTO`. A re-seed only adds missing fixture rows and never wipes another PR's rows. `db/schema.sql` (`IF NOT EXISTS`, `INSERT OR IGNORE`) and `db/catalog-seed.sql` (`INSERT OR REPLACE`) were already idempotent. Wrangler records each applied migration (`wrangler@4.120.0` `cli.js:304820`: the migration file and its `d1_migrations` insert are sent as one command).
+- **Consequence of sharing:** a PR's additive migration reaches the shared D1 for every Preview. Destructive migrations keep the existing migration gate (lead handoff, "destructive migrations in a PR keep a manual gate").
+
+**Teardown.** `destroy-preview.sh pr-<n>` runs `alchemy destroy`. `Plan.destroy` plans an empty graph (`alchemy/src/Plan.ts:2276`), so only resources in the PR stage's state are deleted. For a Preview that means `deletePreview` on the parent (`WorkerProvider.ts:5303-5313`). References are not state, so the shared D1 and the parent Worker are never deleted. The script then calls `smoke-preview.sh deleted <url>`, which fails if the service token still gets 200 from the URL. The last Preview's teardown deliberately leaves the host in place: it is the shared fixture. Removing it is an owner action (`ALCHEMY_STAGE=pr-previews bun run alchemy destroy --stage pr-previews` in `infra/`). `destroy-preview.sh` cannot target it, because only numeric stages are accepted.
+
+**Order of first use (owner):**
+1. From `main` after merge, inside `devenv shell`: `vp run deploy-preview-host`. This creates `job-index-pr-previews` and the shared D1, then seeds it.
+2. Enable Access on that Worker (below).
+3. Push to, or re-run, any open PR. If step 1 has not run, the PR deploy fails with "The preview host is not deployed". If step 2 has not run, the smoke fails on the anonymous request.
+
+### For the owner to toggle
+
+- **Worker:** `job-index-pr-previews`, which exists only after step 1.
+- **Where:** Workers & Pages → `job-index-pr-previews` → **Access** → **Protect this Worker behind Access** → **Previews only**.
+- **Policy:**
+  - **Allow**, include the *Cloudflare account members* selector (P2);
+  - **Service Auth**, include the service token `ci-pr-preview` (P3).
+
+  If the dialog offers only the account-member choice, finish it, then add the Service Auth policy to the created application under Zero Trust → Access → Applications.
+
+### Staging and production unchanged (offline dump, pass A method)
+
+The pass A harness (scratch, outside the repository) evaluated `infra/alchemy.run.ts` under Bun with no credentials, `HTTPS_PROXY`/`HTTP_PROXY` pointed at a dead port and an empty `HOME`. It ran on `f00ccb5` ("before") and on `f9a0c3b` ("after"). All runs exited 0.
+
+| Stage | sha256 before | sha256 after | `diff` |
+| --- | --- | --- | --- |
+| staging | `b697ba3b…6792` | `b697ba3b…6792` | identical (exit 0) |
+| production | `b16b980f…b8` | `b16b980f…b8` | identical (exit 0) |
+| preview (old shared) | `d157a579…66` | `d157a579…66` | identical (exit 0) |
+| pr-42 | `cdcc5dd1…ae` | `3556767d…23` | intended: `TypeScriptDb` resource gone; `Api` loses `name`, `workersDev`, `crons`, gains `preview: { name: "pr-42", of: <ref> }`; `DB` becomes a ref. Bindings DB, SOURCE_LEASE (`durable_object_namespace`, no `scriptName`), ENVIRONMENT=`pr-42`, ALLOW_DEMO_MUTATIONS=`true`, MAIL_FROM |
+| pr-previews | (new) | `8c1b5555…1b` | `Api` `job-index-pr-previews`, `workersDev {enabled:false, previewsEnabled:true}`, `crons: []`; `TypeScriptDb` `job-index-pr-previews-typescript-db`; no `Db`, no `Mail` |
+
+`cd infra && npx tsc --noEmit`: exit 0.
+
+### New assertions and their controls
+
+`scripts/test_environment_safety.py` pins the flow, and the new `scripts/test_smoke_preview.sh` tests the smoke's behaviour against a stub `curl`. It runs in `vp run policy`, and it also checks that the token secret never reaches curl's argv or the log. Each control was applied to the committed tree, run, and restored. The base and restored runs exit 0.
+
+| Control | Gate | Exit | Message |
+| --- | --- | --- | --- |
+| C1 host stage literal → `staging` | env-safety | 1 | `infra must declare exactly const PREVIEW_HOST_STAGE = "pr-previews";` |
+| C2 Preview of the staging Worker | env-safety | 1 | `a PR stage must be a Worker Preview of the pr-previews host's Api Worker` |
+| C3 PR binds the production D1 | env-safety | 1 | `a PR stage must bind the host's shared preview D1 by reference, never own a database` |
+| C4 `SOURCE_LEASE` only under `PRODUCTION` | env-safety | 1 | `SOURCE_LEASE must be bound unconditionally in the Worker env, Previews included` |
+| C5 `access:` declared in Alchemy | env-safety | 1 | `infra must not declare Worker Access (owner's dashboard setting)` |
+| C6 seed accepts the staging D1 | env-safety | 1 | `seed-preview-db.sh must accept only the shared preview D1` |
+| C7 shared seed runs the resetting fixture | env-safety | 1 | `the shared seed must be insert-only (no DELETE)` |
+| C8 seed lease removed | env-safety | 1 | `shared seeding must take the lease` |
+| C9 deploy without the Access smoke | env-safety | 1 | `deploy-preview.sh must end with the Access smoke` |
+| C10 teardown without the deleted check | env-safety | 1 | `AssertionError` (the `smoke-preview.sh deleted` assertion) |
+| C11 an unparsed `alchemy state read` | env-safety | 1 | `scripts/destroy-preview.sh:55: pipe \`alchemy state read\` into the parser` |
+| C12 destroy job loses the fork guard | env-safety | 1 | `every pr-preview job must carry the same-repository guard` |
+| C13 an extra secret in the workflow | env-safety | 1 | `pr-preview.yml may use only the Cloudflare and Access service-token secrets` |
+| C14 smoke tests dropped from policy | env-safety | 1 | `policy must run the smoke-preview tests` |
+| C15 smoke accepts an anonymous 200 (Access off) | smoke tests | 1 | `smoke-preview tests: 1 failure(s)` |
+| K1 kept guard: a cron literal | env-safety | 1 | `infra must declare exactly const CRONS: ReadonlyArray<string> = [];` |
+| K2 kept guard: a `migrations:` prop on the D1 | env-safety | 1 | ``Alchemy must not apply migrations (`migrations:` prop)…`` |
+| K3 kept guard: `legacy_module_registry` removed | env-safety | 1 | `infra must declare exactly compatibility: { date: "2026-05-25", flags: ["legacy_module_registry"] },` |
+
+The smoke tests cover these cases:
+- an anonymous 200 fails;
+- a 302 to `phibkro.cloudflareaccess.com` passes, and so do 401 and 403;
+- a redirect elsewhere fails;
+- a 404 that never settles fails;
+- an empty jobs page fails;
+- the wrong `environment` fails;
+- a token refused with 403 fails;
+- after teardown, a 200 fails and a 404 passes;
+- a non-workers.dev URL is refused, and so is a missing secret.
+
+### Gates (on `f9a0c3b`, exit codes checked directly)
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `nix shell nixpkgs#shellcheck -c bash -c 'DEVENV_ROOT=/x PATH="/tmp/stubbin:$PWD/node_modules/.bin:$PATH" vp run verify'` | 0 | `20/20 successful`. Bun suite `Test Files 92 passed (92)`, `Tests 764 passed \| 4 skipped (768)`. workerd suite `Test Files 25 passed (25)`, `Tests 137 passed (137)`. `effect-diagnostics: ok (2 excepted finding(s), 1 registry entries)`. Policy includes `smoke-preview tests passed` and the environment-safety pass |
+| `vp run e2e`, with `node_modules/.bun/wrangler@4.120.0/node_modules/.bin` on PATH | 0 | `6 passed` |
+| `cd infra && npx tsc --noEmit` | 0 | |
+| pre-commit hook (`vp run policy`) on `f9a0c3b` | 0 | `8/8 successful` |
+
+### Inventory of leftovers (read-only Cloudflare connector, 2026-11-01). Nothing was deleted.
+
+| Resource | Facts | Recommendation (owner approval required) |
+| --- | --- | --- |
+| Worker `job-index-preview` | created 2026-08-07, last modified 2026-08-08. The old shared `preview` stage, with the custom domain `job-index.phibkro.org` in `alchemy.run.ts` | Delete once nobody uses `job-index.phibkro.org`, with `ALCHEMY_STAGE=preview bun run alchemy destroy --stage preview`, so that state goes too. Its declaration is unchanged by pass B |
+| D1 `job-index-preview-db` | 29.7 MB, created 2026-08-07. The legacy `Db` of the `preview` stage | Goes with the stage above. Export first if the corpus matters |
+| D1 `job-index-preview-typescript-db` | **not present** in the account, although `alchemy.run.ts` declares it for `preview` | The `preview` stage has not been deployed since that declaration. Its next deploy would create it |
+| `job-index-pr-<n>` Workers / `job-index-pr-<n>-typescript-db` | **none present**. PR #28's stage was removed by its close-time destroy | nothing to do |
+
+### Only the real PR can verify
+
+- The host deploy and the Access toggle, which come first (owner).
+- That beta.84's `createPreview` / `createPreviewDeployment` calls succeed on this account. Previews are "private beta" in the provider's own doc comment (`Worker.ts:555`).
+- That the parent's `previews_enabled` with `enabled: false` serves Preview `workers.dev` URLs. The Previews docs configure Preview `workers.dev` URLs separately from production; this was not observed here.
+- **End state 1:** the anonymous request is refused or redirected to `phibkro.cloudflareaccess.com`. The smoke prints `access check: … -> <status> (redirect host: …)`.
+- **End state 2:** the service token gets 200 from `/api/health` (environment `pr-<n>`) and from `/api/v1/jobs?limit=1` with at least one seeded job. The smoke prints the status lines and `jobs returned = …, first id = …`.
+- **End state 3:** closing the PR deletes the Preview. The destroy job prints `teardown check: … -> <status>`. A dashboard or API check that the Preview list is empty is still worth doing once.
+- **End state 5:** the build fails if Access is off. The smoke's behaviour is tested offline (C15); the live drift case would show as `Cloudflare Access is not protecting it`.
+- The `wrangler d1 execute --json --command` output shape that the lease read parses, and the lease under two truly concurrent PR deploys.
+- That each Preview gets its own `SourceLeaseObject` namespace. That rests on Cloudflare's docs and the provider's `new_sqlite_classes`; it was not observed.
+
+### Follow-ups touched
+
+None of L1–L6 was fixed. L5 (never log `state read` output) is now asserted for every preview script, as part of this pass (C11).

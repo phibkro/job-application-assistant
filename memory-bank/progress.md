@@ -22,7 +22,8 @@
 - **Refresh:** no deployed trigger (see techContext); TB-05.
 - **Public exposure:** no public API docs or rate limits yet; planned in TB-01/TB-04.
 - **Presets:** anonymous owner-scoped presets were split out of WS-0025 (after WS-0029/WS-0028).
-- **`infra/` upgrade (WS-0029@4 pass A):** implemented (`f32ece1`: beta.84, effect 4.0.7, `legacy_module_registry` opt-out); verify, e2e and WS-0020 pass. Waiting on the CI `pr-<n>` deploy and P0, the owner's local plan ([evidence](../evidence/WS-0029/README.md)).
+- **`infra/` upgrade (WS-0029@4 pass A):** merged in #28 (`f00ccb5`).
+- **PR previews (WS-0029@2 pass B):** Worker Previews behind Access, implemented in `f9a0c3b`. verify and e2e pass; 15 new controls fail as intended. Waiting on the owner's host deploy and Access toggle, then the CI run on a real PR ([evidence](../evidence/WS-0029/README.md#pass-b-ws-00292-worker-previews-behind-access)). The leftover `job-index-preview` Worker and `job-index-preview-db` are inventoried; deleting them needs the owner's approval.
 - **OpenAPI:** `openapi/job-index-v1.json` is not generated from `Api.ts`.
 - **Administrative routes:** principal administration and corpus maintenance were not ported (WS-0006/0008/0009).
 
