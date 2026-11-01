@@ -2,7 +2,7 @@
 
 - ID: WS-0029
 - Revision: 3. Supersedes [r2](WS-0029-r2-infra-alchemy-previews.md) for pass A only. Pass B, with its prerequisites P1–P4 and their statuses, is unchanged from r2.
-- Status: **Approved** (owner, 2026-11-01: option A).
+- Status: **Pass A superseded by [r4](WS-0029-r4-infra-alchemy-previews.md)** (attempts exhausted; flag opt-out added).
 - Risk tier: R2. Attempt budget: pass A has 1 attempt left (attempt 1 stopped correctly; see below). Pass B has 2.
 
 ## Why r3
