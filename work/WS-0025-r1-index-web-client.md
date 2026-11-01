@@ -36,6 +36,8 @@ A preset saved in one anonymous session is visible to another anonymous user. Or
 - [ ] Owner isolation is tested at the API (a workerd test) and in e2e: user A's presets are invisible to user B and to unauthenticated reads. A broken twin (a missing owner filter) is seen failing.
 - [ ] URL ↔ query state round-trips (query-sync law: parse(print(q)) = q).
 - [ ] `bun run check`, the e2e suite and `check_repo.py` pass. Foldkit's `audit-program` skill runs over the app, and its findings are fixed or recorded.
+- [ ] **Single Effect (WS-0021@4 review F5):** `apps/index-web` joins the root workspace, so `bun.lock` must resolve exactly one `effect` (Foldkit 0.170 declares `effect ~4.1.0`, matching the root pin; verified at foldkit `a471adb`, `packages/foldkit/package.json`).
+- [ ] **Remove `--pass-with-no-tests`** from the `e2e` script once the first spec exists (WS-0021@4 review F4), so a mis-configured suite can't pass empty.
 - [ ] Evidence is in `evidence/WS-0025/README.md`.
 
 ## Exclusions
