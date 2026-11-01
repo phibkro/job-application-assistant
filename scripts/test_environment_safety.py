@@ -148,9 +148,32 @@ assert "bootstrap-publish" in deploy
 # against it coming back. WS-0025@2 added the index client, whose build is the
 # Worker's asset directory, so it must be built fresh before publication.
 assert "apps/web" not in deploy
-assert "run_logged web-build" not in deploy
-assert "run_logged index-web-build bash scripts/build-index-web.sh" in deploy
-assert deploy.index("run_logged index-web-build") < deploy.index("deploy_stack 0")
+# The old ban kept at full strength: no `web-build` anywhere except the one
+# allowed client build step (WS-0025@2 review L1).
+INDEX_WEB_BUILD = "run_logged index-web-build bash scripts/build-index-web.sh"
+assert deploy.count(INDEX_WEB_BUILD) == 1, "deploy must build the index client exactly once"
+assert "web-build" not in deploy.replace(INDEX_WEB_BUILD, ""), "only the index-client build may say web-build"
+assert deploy.index(INDEX_WEB_BUILD) < deploy.index("deploy_stack 0")
+
+# The Worker's assets are the index client's build output in every stage, and
+# every path that bundles the Worker builds that output first (review L2).
+CLIENT_DIST = "apps/index-web/dist"
+infra = (ROOT / "infra/alchemy.run.ts").read_text()
+infra_assets = re.findall(r'^\s*directory:\s*"([^"]+)"', infra, flags=re.MULTILINE)
+assert infra_assets == [f"../{CLIENT_DIST}"], f"infra assets must be the client build: {infra_assets}"
+preview_config = (ROOT / "dev/preview.wrangler.jsonc").read_text()
+preview_assets = re.findall(r'"directory":\s*"([^"]+)"', preview_config)
+assert preview_assets == [f"../{CLIENT_DIST}"], f"preview assets must be the client build: {preview_assets}"
+for script in ("scripts/preview.sh", "scripts/deploy-preview.sh"):
+    text = (ROOT / script).read_text()
+    assert "bash scripts/build-index-web.sh" in text, f"{script} must build the index client"
+    assert text.index("bash scripts/build-index-web.sh") < text.index("bun build apps/worker/src/index.ts"), (
+        f"{script} must build the index client before bundling the Worker"
+    )
+build_index_web = (ROOT / "scripts/build-index-web.sh").read_text()
+assert "apps/web" not in build_index_web.replace("apps/index-web", ""), "build-index-web.sh must not build apps/web"
+assert 'cd "$ROOT/apps/index-web"' in build_index_web
+assert "test -f dist/index.html" in build_index_web
 assert "run_logged worker-build bun build apps/worker/src/index.ts" in deploy
 assert deploy.index("run_logged worker-build") < deploy.index("deploy_stack 0")
 # The two-phase production publication: a first version before the database

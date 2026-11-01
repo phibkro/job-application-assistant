@@ -7,8 +7,10 @@ import { getJob, listCurrentJobs } from "./api.ts";
 
 /**
  * The read cache. One keyed Query per endpoint: the list is keyed by the
- * filter state, the detail by job id, so revisiting a query or a vacancy
- * renders from the Model while a refresh runs (api-cache-query example).
+ * filter state, the detail by job id (api-cache-query example). Route entry
+ * uses `loadIfMissing`, so a revisited query or vacancy renders from the Model
+ * and is NOT revalidated within a tab session: data loaded once stays until a
+ * reload, or until a failed load is retried.
  */
 export const jobsQuery = Query.define({
   name: "Jobs",

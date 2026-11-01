@@ -146,3 +146,29 @@ Self-assessed verdict after fixes: PASS with the recorded NICE items. This is no
 | `vp run e2e` | 0, but with **no specs** (`--pass-with-no-tests`) | 0; **6 passed**, 7 Axe scans, 0 violations |
 
 The 25 new unit tests are 8 Story, 10 Scene, 4 route-law and 3 typed-client tests.
+
+## 7. Review follow-up (independent review of `449e48b`: ACCEPT, nothing at medium or above)
+
+Gate findings fixed in one new commit, so no gate is weaker than at `983312a`:
+
+- **L1:** `scripts/test_environment_safety.py` again bans any `web-build` in `scripts/deploy.sh`, except the one allowed step `run_logged index-web-build bash scripts/build-index-web.sh`. That step must appear exactly once, before `deploy_stack 0`.
+- **L2:** new policy assertions:
+  - The only assets `directory` in `infra/alchemy.run.ts` and in `dev/preview.wrangler.jsonc` is `../apps/index-web/dist`.
+  - `scripts/preview.sh` and `scripts/deploy-preview.sh` call `bash scripts/build-index-web.sh` before bundling the Worker.
+  - `scripts/build-index-web.sh` builds in `apps/index-web`, checks `dist/index.html`, and names no `apps/web`.
+- **Negative controls:** each mutation was applied, the gate run, then the file restored. All exit 1 with the named assertion; the clean tree exits 0.
+
+| Control | Mutation | Failing assertion |
+| --- | --- | --- |
+| C1 | `run_logged legacy-web-build` added to `deploy.sh` | "only the index-client build may say web-build" |
+| C2 | a bare `bun run web-build` added to `deploy.sh` | the same |
+| C3 | infra assets repointed to `../dev/static-placeholder` | "infra assets must be the client build" |
+| C4 | `build-index-web.sh` pointed at `apps/web` | "build-index-web.sh must not build apps/web" |
+| C5 | preview assets repointed to `./static-placeholder` | "preview assets must be the client build" |
+| C6 | client build removed from `deploy-preview.sh` | "… must build the index client" |
+| C7 | client build removed from `preview.sh` | the same |
+
+- **N1:** `PROVENANCE.md` no longer credits the weather example with `Role("alert")`. That role, and `Role("status")`, come from the generate-program a11y checklist.
+- **L3:** the `query.ts` comment now says that route entry uses `loadIfMissing`, so loaded data is not revalidated within a tab session. There is no behaviour change.
+- **N2:** the r2 section's "6 before, 6 after" counts lines containing `"better-auth`. The reviewer counted every line mentioning better-auth (17). Either way, 0 lines changed.
+- **Gates after the fix:** `vp check` 0, `vp run policy` 0 (7/7), `vp run test` 0 with unchanged counts (Bun 84 files, 689 passed, 4 skipped; workerd 22 files, 109 passed).
