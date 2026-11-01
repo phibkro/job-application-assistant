@@ -84,6 +84,20 @@ Foldkit's official agent skills are installed under `.claude/skills/` (`foldkit`
 - Keep the tag equal to the installed `foldkit` version: when `apps/index-web` bumps `foldkit`, change `FOLDKIT_TAG` in `scripts/setup.sh`, this section, and the skills' provenance together.
 - `generate-program` offers to add a git subtree at `repos/foldkit`. Do not: the owner chose the git-ignored checkout (WS-0026).
 
+## Merge delegation (owner, 2026-11-01)
+
+The owner pre-approves merging a PR into `main` when all of these hold:
+
+1. **CI is green on the current head commit.**
+2. **An independent review round** (a reviewer that did not author the change) has run on that head.
+3. **Severity rule by round:**
+   - **Rounds 1–3:** merge only when the latest round finds **nothing at medium or above**.
+   - **Rounds 4–5:** merge when **nothing above high** remains. Open medium and high findings are recorded as follow-ups, never dropped.
+   - **Critical always blocks.**
+4. **Hard cap:** if round 5 still leaves a blocking finding, stop and ask the owner.
+
+A round is one review pass plus any fix pushed in response. This delegates the **merge** gate only. Deploys, releases, production changes and capability grants keep their own human gates.
+
 ## Delegation capability tiers
 
 When delegating to a subagent, choose a capability tier for the task, then bind it to that platform's model explicitly. Do not inherit the parent's model by default.
