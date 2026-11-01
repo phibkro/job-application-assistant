@@ -2,7 +2,7 @@
 
 - ID: WS-0027
 - Revision: 1
-- Status: **Proposed**. Needs owner approval. Sequenced after WS-0026 and **before** WS-0022 and WS-0025 (owner decision 2026-11-01).
+- Status: **Approved** (owner gate 2026-11-01). Sequenced after WS-0026 (done) and **before** WS-0022 and WS-0025.
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2**: developer-environment, CI and preview-deployment changes. No runtime behavior change.
 - Roles: implementer and independent reviewer at the `complex-reasoning` tier.

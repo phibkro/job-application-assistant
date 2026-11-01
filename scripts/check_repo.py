@@ -21,15 +21,18 @@ NOT_OUR_SOURCE = {
     ".direnv",
     ".preview",
     "__pycache__",
-    # Tag-pinned Foldkit checkout fetched by scripts/setup.sh (git-ignored).
-    "repos",
 }
 
 
 def ours(path: Path) -> bool:
     parts = path.relative_to(ROOT).parts
-    # Upstream Foldkit agent skills, copied unmodified (see PROVENANCE.md there).
-    if parts[:2] == (".claude", "skills"):
+    # Tag-pinned Foldkit checkout fetched by scripts/setup.sh (git-ignored),
+    # anchored at the repository root only (WS-0026 review N1).
+    if parts[:1] == ("repos",):
+        return False
+    # Upstream Foldkit agent skills, copied unmodified. The repo-owned
+    # PROVENANCE.md beside them is still checked (WS-0026 review N1).
+    if parts[:2] == (".claude", "skills") and parts[2:] != ("PROVENANCE.md",):
         return False
     return not any(part in NOT_OUR_SOURCE for part in parts)
 

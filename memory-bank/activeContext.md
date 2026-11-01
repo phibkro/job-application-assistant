@@ -4,11 +4,11 @@
 
 - **Merged to `main`** in PR #22 (`7b850d7`): RFC 0016, the TB-00 baseline, effect ~4.1, legacy UI retired, the G14 flaky-test fix.
 - **WS-0026 integrated** on the designated branch: Effect language-service gate in `bun run check`, agent docs, Foldkit skills. Review ACCEPT WITH NITS (`evidence/WS-0026/review.md`); five `multipleEffectProvide` findings are registered as exceptions.
-- **WS-0027** (devenv + Vite+ + Alchemy Previews) is proposed and sequenced before WS-0022/WS-0025.
+- **WS-0027** (devenv + Vite+ + Alchemy Previews) is approved and next, before WS-0022/WS-0025.
 
 ## Next
 
-1. **WS-0027**: toolchain (proposed, awaiting approval).
+1. **WS-0027**: toolchain (approved, next).
 2. **WS-0022 (TB-01)** in parallel with **WS-0025** (index-web). Both are approved and start after WS-0027.
 4. Then TB-02 (identity, R3), TB-05 (event-loop triggers, which also retire the lazy gate), and the WS-0023 query-algebra spike.
 
