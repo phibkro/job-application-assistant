@@ -26,8 +26,10 @@
   sidebar/bottom-bar shell in `apps/web`, ported from course-data-platform
   with provenance headers and integrated in `d56f5e2`; evidence is in
   `.artifacts/ws-0013/`.
-- WS-0016 S1 document-to-profile inference is implementation-complete but
-  UNCOMMITTED/UNTRACKED pending owner integration. Pasted text and PDFs through
+- WS-0016 to WS-0019 are integrated on `main`: `f233d75` (WS-0016),
+  `f33348b` (WS-0017 lazy ingestion), `3b2862a` (WS-0018 document studio), and
+  `881eb40` (WS-0019 privacy controls). Verified from `git log` by WS-0020.
+- WS-0016 S1 document-to-profile inference is integrated in `f233d75`. Pasted text and PDFs through
   `unpdf@1.8.1` produce deterministic heuristic proposals behind a
   model-inference capability seam; the AI binding is deliberately unprovisioned
   until prompt review. It uses no Firecrawl and performs transient parsing with
@@ -39,8 +41,7 @@
   full Playwright passed 2/2 with Axe, responsive, and keyboard journey
   coverage; actual independent R2 review passed. Evidence is in
   `.artifacts/ws-0016/`; scope is
-  `work/WS-0016-r1-document-profile-inference.md`. Exactly 18 new paths remain
-  untracked, with the empty index restored.
+  `work/WS-0016-r1-document-profile-inference.md`.
 - The approved closed-loop roadmap is WS-0015. S1 is delivered source; S2
   document studio is the next value slice after owner integration of S1.
   Firecrawl Parse is a future escalation tier requiring operator data-processor
@@ -52,9 +53,10 @@
 These gaps are current boundaries or evidence limits, not claims that source code is absent where it is implemented:
 
 - **Administrative surface.** API-key principal administration (quotas, revocation, audit log), owned saved-search webhook subscriptions/delivery, and corpus maintenance (audit/dry-run reconcile/purge) are not implemented in the TypeScript service. The unused `ADMIN_SYNC_TOKEN` production gate and secret binding have been removed rather than pretending that a credential protects absent routes.
-- **Scheduled ingestion.** Gate 2's authenticated owner journey passed, but its bounded NAV checkpoint is blocked by Cloudflare platform cron non-dispatch. The trigger installs and is API-visible, yet this Worker receives no ticks while control Workers on the same account do. Operator escalation to Cloudflare support is required. Staging schedules are off.
+- **Scheduled ingestion.** No stage declares a cron (`infra/alchemy.run.ts:144`, `CRONS = []`). The only runtime trigger is the lazy gate `armsGate` (`apps/worker/src/index.ts:193-211`). WS-0020 shows it arms on the `/api/v1/me/feed` and `/api/v1/me/matches/*` paths even for unauthenticated requests. The earlier cron non-dispatch finding is superseded for ingestion by WS-0017. Operator-independent refresh is TB-05.
 - **Production qualification.** Local P1 integration and Gate 1 staging redeploy passed at commit `dfa0fe3` with immutable source provenance. Gate 2's authenticated owner journey passed. Gate 3's authorized disposable complete-table D1 restore drill passed across 22 tables with equal source/target digests, owner invariants, and NAV cursor; the target was deleted. The seven-day soak depends on the dispatch fix. NAV private-token rotation, production smoke/deploy, and independent G5 remain operator/human gates. Production stays blocked.
-- **Staging evidence.** The Gate 1 redeploy at `dfa0fe3` has immutable source provenance, and staging schedules are off. Local `main` is four qualification commits ahead of `origin` and unpushed: `d4e10e6`, `d56f5e2`, `ed3c1eb`, and `dfa0fe3`.
+- **Staging evidence.** The Gate 1 redeploy at `dfa0fe3` has immutable source provenance, and staging schedules are off. WS-0020 did not re-verify this. The qualification commits `d4e10e6`, `d56f5e2`, `ed3c1eb`, and `dfa0fe3` are contained in `origin/main` (`881eb40`). No staging or production evidence exists for the current revision.
+- **Market-index baseline (WS-0020).** Local characterization of the NAV → D1 → public API path, with a gap table (G1–G16) covering source provenance exposure, the non-read-only `GET /api/v1/jobs/:id`, unsequenced hydration writes, D05 same-title merges, the unauthenticated gate arming, and unused source policy. See [`evidence/WS-0020/README.md`](../evidence/WS-0020/README.md).
 - **OpenAPI contract.** `openapi/job-index-v1.json` is not a current generated artifact; nothing currently generates a replacement from `apps/worker/src/Api.ts`.
 - **PR preview evidence.** Source, policy checks, local seeded E2E, and the full repository gate pass at `b5c23c9`. The repository now has a configured `origin`; provider provisioning and teardown evidence remains a separate lifecycle gate.
 
@@ -66,11 +68,12 @@ drill are established. WS-0017 retires cron-driven ingestion by owner decision
 2026-08-25, superseding the bounded NAV checkpoint; the seven-day soak re-points
 at lazy-ingestion gate evidence. Production remains blocked on the soak,
 NAV private-token rotation, production smoke/deploy, and independent G5 review.
-WS-0016 S1 source is complete but awaits owner integration.
+WS-0016 to WS-0019 are integrated. WS-0020 (TB-00) is implementation-complete
+and awaits independent review and the human gate.
 
 ## Next work
 
-- **OWNER:** integrate and commit WS-0016, then push the accumulated local commits. After that, S2 document studio is the next WS-0015 value slice.
-- **OPERATOR:** open the Cloudflare cron support ticket, rotate the NAV private token, and decide on and remove the leftover active `job-index-preview` cron.
+- **OWNER / REVIEWER:** review and gate WS-0020. If it is accepted, scope TB-01 (workload filtering) from the Ticket proposed in its evidence.
+- **OPERATOR:** rotate the NAV private token, and decide on and remove the leftover active `job-index-preview` cron. The cron support ticket is moot for ingestion under WS-0017.
 - After platform dispatch works, rerun one bounded checkpoint and begin the seven-day soak. Keep production blocked until all remaining operator/human gates pass.
 - Decide separately whether to port administrative capabilities and generate a replacement OpenAPI contract.

@@ -2,8 +2,14 @@
 
 ## Current focus
 
-Production qualification and owner integration of the completed WS-0016 S1
-source are the current focus. Qualification closeout passed local P1 integration
+**WS-0020 (TB-00 market-index characterization) is implementation-complete
+and awaits independent review and the human gate**, under RFC 0016 (accepted
+with amendments A1–A4). Evidence and gap table:
+[`evidence/WS-0020/README.md`](../evidence/WS-0020/README.md). The next tracer,
+TB-01 (workload filtering), is proposed there and needs its own WorkScope.
+
+Production qualification remains open. Owner integration of WS-0016 is
+complete (`f233d75`). Qualification closeout passed local P1 integration
 and the Gate 1 staging redeploy at commit `dfa0fe3` with immutable source
 provenance and staging schedules off. Gate 2's authenticated owner journey
 passed; its bounded NAV checkpoint is superseded — WS-0017 retires cron-driven
@@ -29,7 +35,8 @@ The approved product direction is the Job Application Assistant mission and MVP 
 - NAV credentials resolve per request. Staging can use the cached public token. Production requires a private NAV secret. A 401 refreshes only the failed token. The private token must be rotated before production.
 - Qualification closeout passed local P1 integration and the Gate 1 staging redeploy at commit `dfa0fe3` with immutable source provenance; staging schedules are off. Gate 2's authenticated owner journey passed. Its bounded NAV checkpoint is blocked by Cloudflare platform cron non-dispatch: the trigger installs and is API-visible, but this Worker receives no ticks while control Workers on the same account do. This requires operator escalation to Cloudflare support.
 - Gate 3's authorized disposable complete-table D1 restore drill passed: all 22 tables were restored, source and target digests, owner invariants, and the NAV cursor were equal, and the target was deleted. The seven-day soak depends on the dispatch fix. NAV private-token rotation, production smoke/deploy, and independent G5 remain operator/human gates.
-- Local `main` is four qualification commits ahead of `origin` and remains unpushed: `d4e10e6`, `d56f5e2`, `ed3c1eb`, and `dfa0fe3`.
+- The qualification commits `d4e10e6`, `d56f5e2`, `ed3c1eb`, and `dfa0fe3` are contained in `origin/main`. `main` and `origin/main` are both `881eb40`, according to remote-tracking refs checked 2026-11-01 (WS-0020).
+- WS-0016 to WS-0019 are integrated on `main`: `f233d75` (WS-0016), `f33348b` (WS-0017), `3b2862a` (WS-0018), and `881eb40` (WS-0019).
 - Saved data is owner-scoped in SQL. D1 stores frozen vacancy snapshots, custom labels, active-attempt pointers, and complete prior attempts. Application updates use optimistic concurrency through `expectedUpdatedAt`, preserve existing notes when an event omits them, and the web model rejects late profile/Saved messages from an earlier session epoch.
 - `scripts/migrate-d1.sh` and `d1_migrations` upgrade existing D1 databases. `scripts/preview.sh` starts from a clean local state so schema drift cannot poison the demo.
 - A local browser smoke proved real NAV ingestion, checkpointed one-page runs, browse pagination, search, detail hydration, save, draft, assisted preparation, approval, custom-label filtering, submission confirmation, and history. This is local evidence only.
@@ -44,8 +51,8 @@ The approved product direction is the Job Application Assistant mission and MVP 
   sidebar/bottom-bar shell ported from course-data-platform with provenance
   headers. Evidence lives in `.artifacts/ws-0013/`; work scope is
   `work/WS-0013-r1-design-system-port.md`.
-- WS-0016 S1 document-to-profile inference is implementation-complete but
-  UNCOMMITTED/UNTRACKED pending owner integration. It accepts pasted text and
+- WS-0016 S1 document-to-profile inference is integrated on `main` in
+  `f233d75`. It accepts pasted text and
   PDF through `unpdf@1.8.1`, produces deterministic heuristic proposals, and
   includes a model-inference capability seam. The AI binding is deliberately
   unprovisioned until prompt review. It uses no Firecrawl and parses transiently
@@ -57,14 +64,22 @@ The approved product direction is the Job Application Assistant mission and MVP 
   workerd tests; full Playwright passed 2/2 with Axe, responsive, and keyboard
   journey coverage; actual independent R2 review passed. Evidence is in
   `.artifacts/ws-0016/`, and scope is
-  `work/WS-0016-r1-document-profile-inference.md`. Exactly 18 new paths remain
-  untracked, with the empty index restored.
+  `work/WS-0016-r1-document-profile-inference.md`. At `25bb8e9` plus WS-0020's
+  test, `bun run check` passes: 807 Bun tests passed with 4 skipped, and 109
+  workerd tests passed.
 - WS-0017 lazy ingestion retires cron-driven ingestion by owner decision
   2026-08-25: no stage declares a trigger; the freshness gate arms on
   authenticated feed reads after the response resolves, respects a six-hour
   attempt floor, and fails loudly toward migration 0003 when its table is
   missing. The soak re-points at lazy evidence; the Cloudflare dispatch
   ticket is moot for ingestion.
+- WS-0020 verified facts (local tests only, no staging or production access).
+  The only runtime ingestion trigger is `armsGate`. It is path-only, so it
+  also arms on unauthenticated `/api/v1/me/feed` and `/api/v1/me/matches/*`
+  requests. Public `GET /api/v1/jobs/:id` can fetch NAV detail and write D1.
+  D05 same-title merges are pinned by a test. `techContext.md` still says
+  Effect `beta.104`; the actual pin is `4.0.0-rc.108`. See the WS-0020 gap
+  table.
 - The approved closed-loop roadmap is WS-0015. S1 is now delivered source; S2
   document studio is the next value slice only after the owner integrates S1.
   Firecrawl Parse remains a future escalation tier requiring operator
@@ -91,10 +106,11 @@ just soak               # bounded staging soak; use seven days for acceptance
 
 Proceed on two parallel tracks:
 
-1. **OWNER:** integrate and commit WS-0016, then push the accumulated local
-   commits.
-2. **OPERATOR:** open the Cloudflare cron support ticket, rotate the NAV private
-   token, and decide on and remove the leftover active `job-index-preview` cron.
+1. **OWNER / REVIEWER:** independent review and gate decision for WS-0020.
+   If accepted, scope TB-01 from the evidence's proposed Ticket.
+2. **OPERATOR:** rotate the NAV private token, and decide on and remove the
+   leftover active `job-index-preview` cron. The cron support ticket is moot
+   for ingestion under WS-0017: `infra/alchemy.run.ts:144` declares no crons.
 
 After platform dispatch works, rerun one bounded checkpoint and then begin the
 seven-day soak. Production stays blocked. The qualification gate sequence,
