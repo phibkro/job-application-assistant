@@ -23,7 +23,7 @@ Contracts: [WS-0029@2](../../work/WS-0029-r2-infra-alchemy-previews.md), then [W
 > - L5: never log `state read` output (it prints Redacted secrets);
 > - production: check which `job-index-production*` resources already exist before the first apply.
 
-**Current state: pass A merged in PR #28 (`f00ccb5`). Pass B (WS-0029@2, attempt 1 of 2) is implemented in `f9a0c3b` on branch `ws29b`. See "Pass B" at the end. Its real-PR checks run in CI on the pass B PR.** The pass A attempts are kept as recorded.
+**Current state: pass A merged in PR #28 (`f00ccb5`). Pass B (WS-0029@2) is on PR #29: attempt 1 is `bb608c0` and `6fd2d9b` (cherry-picks of `f9a0c3b` and `1ce8107`), and attempt 2, the review round 1 fixes, is `9c0fa48`. See "Pass B" and "Pass B attempt 2" at the end. Its real-PR checks run in CI on PR #29, after the owner's first host deploy from that branch.** The pass A attempts are kept as recorded.
 
 ## Pass A
 
@@ -238,18 +238,18 @@ What the provider does with `preview.of` (`Workers/WorkerProvider.ts` `putWorker
 
 **Access.** Nothing is declared in Alchemy. The Worker-level setting covers this case. Cloudflare's Workers Access docs (`/workers/configuration/cloudflare-access/`) describe selecting the Worker, then **Access** tab → **Protect this Worker behind Access** → **Previews only**. This creates a `preview_worker` destination for that Worker. The Previews docs (`/workers/previews/`) say "You can protect all Previews on an account, one Worker's Previews, or specific hostnames". The 2026-08-14 changelog says the Worker-level policy keeps "every associated domain and preview URL" protected. I found nothing in the docs or the provider showing that the setting does not cover Worker Previews, so there was no reason to stop. P4 stays unneeded.
 
-**Shared D1 seeding (`scripts/seed-preview-db.sh`).** Two entry points use it: the owner's host deploy and every PR deploy, which runs it before the Preview upload so a Preview never starts against an older schema.
+**Shared D1 seeding (`scripts/seed-preview-db.sh`).** Two entry points use it: the owner's host deploy (`apply`), and every PR deploy (`refuse`), which runs it before the Preview upload so a Preview never starts against an older schema. *Attempt 2 (M1): only `apply` runs migrations; see "Pass B attempt 2".*
 - It refuses any database except `job-index-pr-previews-typescript-db`, so it can never touch staging or production.
-- **Writers are serialised** by a one-row lease table in the shared D1 (`preview_seed_lease`). A run takes the lease with one atomic upsert, which succeeds only when the row is free or older than 600 s, then reads the holder back. It retries 30 × 10 s, then fails. An EXIT trap releases the lease. GitHub `concurrency` is not used for this: in one group it cancels every pending run but the newest.
+- **Writers are serialised** by a one-row lease table in the shared D1 (`preview_seed_lease`). A run takes the lease with one atomic upsert, which succeeds only when the row is free or older than 600 s, then reads the holder back. It retries 66 × 10 s (attempt 1 had 30 × 10 s; review L2), then fails. An EXIT trap releases the lease. GitHub `concurrency` is not used for this: in one group it cancels every pending run but the newest.
 - **Readers never see an empty corpus.** Against the shared D1, `dev/preview-seed.sql` is applied with its `DELETE FROM` lines removed and `INSERT INTO` turned into `INSERT OR IGNORE INTO`. A re-seed only adds missing fixture rows and never wipes another PR's rows. `db/schema.sql` (`IF NOT EXISTS`, `INSERT OR IGNORE`) and `db/catalog-seed.sql` (`INSERT OR REPLACE`) were already idempotent. Wrangler records each applied migration (`wrangler@4.120.0` `cli.js:304820`: the migration file and its `d1_migrations` insert are sent as one command).
-- **Consequence of sharing:** a PR's additive migration reaches the shared D1 for every Preview. Destructive migrations keep the existing migration gate (lead handoff, "destructive migrations in a PR keep a manual gate").
+- **Migrations (corrected in attempt 2, review M1).** Attempt 1 said that destructive migrations "keep the existing migration gate". That was wrong. No such gate exists on this path: `scripts/test_d1_migrations.py` only checks that a PR's snapshot and migrations compose on a fresh database, and the lead handoff line states an intent. As of attempt 2, a PR deploy never applies a migration to the shared D1. It fails when one is pending, and the owner applies it with `vp run deploy-preview-host` from that branch.
 
-**Teardown.** `destroy-preview.sh pr-<n>` runs `alchemy destroy`. `Plan.destroy` plans an empty graph (`alchemy/src/Plan.ts:2276`), so only resources in the PR stage's state are deleted. For a Preview that means `deletePreview` on the parent (`WorkerProvider.ts:5303-5313`). References are not state, so the shared D1 and the parent Worker are never deleted. The script then calls `smoke-preview.sh deleted <url>`, which fails if the service token still gets 200 from the URL. The last Preview's teardown deliberately leaves the host in place: it is the shared fixture. Removing it is an owner action (`ALCHEMY_STAGE=pr-previews bun run alchemy destroy --stage pr-previews` in `infra/`). `destroy-preview.sh` cannot target it, because only numeric stages are accepted.
+**Teardown.** `destroy-preview.sh pr-<n>` runs `alchemy destroy`. `Plan.destroy` plans an empty graph (`alchemy/src/Plan.ts:2276`), so only resources in the PR stage's state are deleted. For a Preview that means `deletePreview` on the parent (`WorkerProvider.ts:5303-5313`). References are not state, so the shared D1 and the parent Worker are never deleted. The script then calls `smoke-preview.sh deleted <url>`, which requires a 404 for the service token's request (attempt 2, review L3; attempt 1 accepted any non-200). The last Preview's teardown deliberately leaves the host in place: it is the shared fixture. Removing it is an owner action (`ALCHEMY_STAGE=pr-previews bun run alchemy destroy --stage pr-previews` in `infra/`). `destroy-preview.sh` cannot target it, because only numeric stages are accepted.
 
 **Order of first use (owner):**
-1. From `main` after merge, inside `devenv shell`: `vp run deploy-preview-host`. This creates `job-index-pr-previews` and the shared D1, then seeds it.
+1. **The first host deploy runs from the pass B PR branch** (PR #29), inside `devenv shell`: `vp run deploy-preview-host`. This creates `job-index-pr-previews` and the shared D1, applies the migrations and seeds it. It must happen before merge, because PR #29's own preview CI needs the host (review G1). Later host deploys run from `main`. The exception is a PR that adds a D1 migration: after reviewing it, the owner deploys the host from that branch.
 2. Enable Access on that Worker (below).
-3. Push to, or re-run, any open PR. If step 1 has not run, the PR deploy fails with "The preview host is not deployed". If step 2 has not run, the smoke fails on the anonymous request.
+3. Re-run PR #29's `pull request preview` workflow, or push to any open PR. If step 1 has not run, the PR deploy fails with "The preview host is not deployed". If step 2 has not run, the smoke fails on the anonymous request.
 
 ### For the owner to toggle
 
@@ -344,3 +344,90 @@ The smoke tests cover these cases:
 ### Follow-ups touched
 
 None of L1–L6 was fixed. L5 (never log `state read` output) is now asserted for every preview script, as part of this pass (C11).
+
+## Pass B attempt 2 (review round 1 fixes)
+
+Review: `/tmp/ws-0029-pass-b-review.md`, round 1 of PR #29. Base `6fd2d9b` (`claude/clever-heisenberg-lwui1b`). Fix commit `9c0fa48`. No push, no deploy, no credentials.
+
+### Fixes
+
+| Finding | Fix |
+| --- | --- |
+| **M1** PR migrations reach the shared D1 | `seed-preview-db.sh` takes a fourth argument, `apply` or `refuse`. The host deploy passes `apply`, and only that mode calls `migrate-d1.sh`. A PR deploy passes `refuse`: under the lease and before any write, it runs `wrangler d1 migrations list <db> --remote` with the shared D1's `migrations_dir`. If one is pending, it prints the listing and fails with "This PR adds D1 migrations; the owner applies them to the shared preview D1 with `vp run deploy-preview-host` from this branch." An unrecognised listing also fails. Source: `wrangler@4.120.0` `wrangler-dist/cli.js:305265` `d1MigrationsListCommand`. It has no `--json` flag; it logs "No migrations to apply!" or "Migrations to be applied:" and a table. Snapshot, catalogue and the additive seed run as before, under the lease. The README sentence claiming a gate is corrected above |
+| **I3** host and PR stages bind shell secrets | `secretBindings()` returns `{}` when `PR_STAGE \|\| PREVIEW_HOST` (`infra/alchemy.run.ts`). Staging and production are unchanged (dumps below) |
+| **G1** host needed before this PR can go green | `deploy-preview-host.sh` header, "Order of first use" and the memory bank now say that the first host deploy runs from the PR branch and later ones from `main` |
+| **L2** (optional) | `WAIT_ATTEMPTS = LEASE_SECONDS/10 + 6` = 66 × 10 s = 660 s, which is longer than the 600 s lease |
+| **L3** (optional) | `smoke-preview.sh deleted` passes only on a 404 for the token request; 403, 5xx and `000` fail |
+
+New `scripts/test_seed_preview_db.sh` runs in `vp run policy` against a stub wrangler. It checks:
+- a PR deploy with a pending migration fails before any `--file` write and never calls `migrations apply`;
+- with none pending, the PR deploy applies the snapshot and the additive seed, still without migrating;
+- an unreadable listing fails;
+- the host deploy migrates;
+- a lease held by someone else means no seeding (this covers review L4 G-d);
+- other databases and a missing mode are refused.
+
+### Offline dump (pass A method), `f00ccb5` vs `9c0fa48`
+
+Two runs:
+- **(a) clean shell:** no secrets exported;
+- **(b) secrets shell:** `NAV_API_TOKEN`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `OTLP_ENDPOINT`, `OTLP_AUTH_HEADER` and `CLOUDFLARE_ACCOUNT_ID` set to dummy values.
+
+All runs exited 0.
+
+| Stage | (a) `diff` vs base | (b) `diff` vs base | (b) `Api` env keys after |
+| --- | --- | --- | --- |
+| staging | identical | identical | ALLOW_DEMO_MUTATIONS, CLOUDFLARE_ACCOUNT_ID, DB, EMAIL, ENVIRONMENT, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, MAIL_FROM, NAV_API_TOKEN, OTLP_AUTH_HEADER, OTLP_ENDPOINT, SOURCE_LEASE |
+| production | identical | identical | same as staging |
+| preview (old shared) | identical | identical | unchanged |
+| pr-42 | intended Preview change | intended | ALLOW_DEMO_MUTATIONS, DB, ENVIRONMENT, MAIL_FROM, SOURCE_LEASE. On base, the same shell bound all six secrets to `pr-42` |
+| pr-previews | new | new | ALLOW_DEMO_MUTATIONS, DB, ENVIRONMENT, MAIL_FROM, SOURCE_LEASE |
+
+`CLOUDFLARE_ACCOUNT_ID`, which CI exports, used to reach every `pr-<n>` Worker as a secret. Previews no longer get it. `apps/worker/src` does not read it.
+
+### Controls (each applied to `9c0fa48`, run, restored; base and restored exit 0)
+
+All 18 attempt-1 controls (C1–C15, K1–K3) still fail as before. New:
+
+| Control | Gate | Exit | Message |
+| --- | --- | --- | --- |
+| R1 PR path calls `migrate-d1.sh` | env-safety | 1 | `the PR deploy path must never call migrate-d1.sh` |
+| R2 PR deploy seeds with `apply` | env-safety | 1 | `the PR deploy must seed with migrations refused` |
+| R3 seed migrates in every mode | env-safety | 1 | `seed-preview-db.sh may migrate only in apply mode` |
+| R3b same mutation | seed tests | 1 | `seed-preview-db tests: 1 failure(s)` |
+| R4 pending migration no longer refused | seed tests | 1 | `seed-preview-db tests: 1 failure(s)` (the first version of the test passed this because the "unreadable listing" guard still stopped the run. I tightened it to pin the refusal message.) |
+| R5 `secretBindings()` early return removed | env-safety | 1 | `secretBindings() must return {} for the PR Preview host and every PR stage` |
+| R6 teardown accepts any non-200 | smoke tests | 1 | `smoke-preview tests: 2 failure(s)` |
+| R7 seed tests dropped from policy | env-safety | 1 | `policy must run the seed-preview-db tests` |
+| R8 lease read-back bypassed (review G-d) | seed tests | 1 | `seed-preview-db tests: 2 failure(s)` |
+
+### Gates (on `9c0fa48`, exit codes checked directly)
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `nix shell nixpkgs#shellcheck -c bash -c 'DEVENV_ROOT=/x PATH="/tmp/stubbin:$PWD/node_modules/.bin:$PATH" vp run verify'` | 0 | `21/21 successful`. Bun suite `Test Files 92 passed (92)`, `Tests 764 passed \| 4 skipped (768)`. workerd suite `Test Files 25 passed (25)`, `Tests 137 passed (137)`. `effect-diagnostics: ok (2 excepted finding(s), 1 registry entries)` |
+| `vp run e2e`, with `node_modules/.bun/wrangler@4.120.0/node_modules/.bin` on PATH | 0 | `6 passed` |
+| `cd infra && npx tsc --noEmit` | 0 | |
+| pre-commit hook on `9c0fa48` | 0 | `9/9 successful` |
+
+The first verify run on this attempt exited 1: shellcheck SC2016 in the new test, on an `eval`'d check string. I fixed it with a helper and re-ran it to exit 0 before committing.
+
+### Still only verifiable on the real PR
+
+Everything in "Only the real PR can verify" above, plus:
+- that CI's nixpkgs `wrangler` prints the same `migrations list` messages as 4.120.0 (review gate note);
+- what a deleted Preview's URL returns for the token request. Attempt 2 requires 404; if Cloudflare answers otherwise, the destroy job fails and shows the status.
+
+### Recorded follow-ups (not fixed here)
+
+- **L1:** the seed's name guard does not bind the database id. Resolve the id by name and compare.
+- **L4:** textual guards that valid edits can bypass:
+  - G-a: a DB ref in `env`;
+  - G-b: `|| true` in the job guard;
+  - G-c: `toJSON(secrets)`.
+
+  G-d is now covered by R8.
+- **I1:** the smoke detects drift; it is not an adversarial control.
+- **I2:** the shared D1 is the new `job-index-pr-previews-typescript-db`, not the `preview` stage's. The owner should acknowledge this deviation.
+- **I4:** remote `--file` imports briefly make the shared D1 unavailable to every Preview.
+- **I5:** `ALLOW_DEMO_MUTATIONS` is unread. Demo-principal writes are shared across Previews, and `INSERT OR IGNORE` never restores a mutated row.
