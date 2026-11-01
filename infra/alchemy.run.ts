@@ -35,6 +35,27 @@ const PRODUCTION = STAGE === "production";
 const PR_STAGE = /^pr-[1-9][0-9]*$/.test(STAGE);
 
 /**
+ * WS-0029@2 pass B: pull requests are Cloudflare Worker Previews of one
+ * parent Worker, not Workers of their own.
+ *
+ * The `pr-previews` stage owns the parent Worker (`job-index-pr-previews`)
+ * and the one shared, seeded preview D1 every Preview binds to. It is
+ * bootstrapped once by the owner (`scripts/deploy-preview-host.sh`), never by
+ * a pull request, and it is not a PR stage: its name fails `PR_STAGE`, so
+ * `scripts/destroy-preview.sh` cannot target it.
+ *
+ * A `pr-<n>` stage declares only the Preview. It references the host's
+ * Worker and D1 (`ref`, read from the host stage's state) instead of owning
+ * them, so destroying the stage deletes the Preview and nothing shared.
+ *
+ * Access is not declared here: the owner enables it on the parent Worker
+ * ("Previews only"), and the CI smoke asserts that an unauthenticated request
+ * is refused.
+ */
+const PREVIEW_HOST_STAGE = "pr-previews";
+const PREVIEW_HOST = STAGE === PREVIEW_HOST_STAGE;
+
+/**
  * Every stage runs the TypeScript service. The Rust worker it replaced is
  * deleted, so there is no longer a second thing to point at.
  *
@@ -149,7 +170,7 @@ export default Alchemy.Stack(
   Effect.gen(function* () {
     // Shared environments retain the legacy resource for safe cutover. PR
     // stages are disposable and must contain only the TypeScript stack.
-    if (!PR_STAGE) {
+    if (!PR_STAGE && !PREVIEW_HOST) {
       yield* Cloudflare.D1.Database("Db", {
         name: `job-index-${STAGE}-db`,
         primaryLocationHint: "weur",
@@ -164,13 +185,18 @@ export default Alchemy.Stack(
     //
     // No `migrationsDir` here: an incremental ALTER migration would run during
     // resource provisioning, before a new database has its generated baseline.
-    const database = yield* Cloudflare.D1.Database("TypeScriptDb", {
-      name: `job-index-${STAGE}-typescript-db`,
-      // Norwegian vacancies read from Norway.
-      primaryLocationHint: "weur",
-    });
+    //
+    // A PR Preview never owns a database: it binds the host stage's shared
+    // preview D1 by reference, which is never the staging or production one.
+    const database = PR_STAGE
+      ? yield* Cloudflare.D1.Database.ref("TypeScriptDb", { stage: PREVIEW_HOST_STAGE })
+      : yield* Cloudflare.D1.Database("TypeScriptDb", {
+          name: `job-index-${STAGE}-typescript-db`,
+          // Norwegian vacancies read from Norway.
+          primaryLocationHint: "weur",
+        });
 
-    const email = PR_STAGE
+    const email = PR_STAGE || PREVIEW_HOST
       ? undefined
       : yield* Cloudflare.Email.SendEmail("Mail", {
           destinationAddress: MAIL_VERIFIED_DESTINATION,
@@ -189,8 +215,33 @@ export default Alchemy.Stack(
       className: "SourceLeaseObject",
     });
 
+    // Script-level settings (name, workers.dev, domain, crons) belong to
+    // the parent; the provider rejects them on a Preview
+    // (@alchemy.run/cloudflare src/Workers/WorkerProvider.ts
+    // `putWorkerPreview`). A Preview does not inherit the parent's bindings
+    // (`createPreview` with `ignoreBaseConfig: true`), so the Preview
+    // declares its own `env` below, `SOURCE_LEASE` included: the class is
+    // hosted by the Preview, which gets its own Durable Object namespace.
+    const scriptSettings = PR_STAGE
+      ? {
+          preview: {
+            of: yield* Cloudflare.Worker.ref("Api", { stage: PREVIEW_HOST_STAGE }),
+            name: STAGE,
+          },
+        }
+      : {
+          name: `job-index-${STAGE}`,
+          // The workers.dev URL stays on alongside the custom domain: it is
+          // what the smoke checks hit, and it keeps working if DNS is
+          // mid-change. The preview host serves nothing of its own: its
+          // stable URL is off and only its Previews' URLs are on.
+          workersDev: PREVIEW_HOST ? { enabled: false, previewsEnabled: true } : true,
+          domain: STAGE === "preview" ? PREVIEW_DOMAIN : undefined,
+          crons: [...CRONS],
+        };
+
     const api = yield* Cloudflare.Worker("Api", {
-      name: `job-index-${STAGE}`,
+      ...scriptSettings,
       // A pre-built artifact, not a source: the deploy script bundles it with
       // the same command the local preview uses, so what deploys is what was
       // run locally.
@@ -216,10 +267,6 @@ export default Alchemy.Stack(
       // `withDefaultFlags`). The opt-out keeps the runtime beta.72 deployed.
       // Adopting the new registry is its own ticket.
       compatibility: { date: "2026-05-25", flags: ["legacy_module_registry"] },
-      // The workers.dev URL stays on alongside the custom domain: it is what
-      // the smoke checks hit, and it keeps working if DNS is mid-change.
-      workersDev: true,
-      domain: PR_STAGE || STAGE !== "preview" ? undefined : PREVIEW_DOMAIN,
       env: {
         DB: database,
         ...(email ? { EMAIL: email } : {}),
@@ -228,7 +275,6 @@ export default Alchemy.Stack(
         MAIL_FROM,
         ...secretBindings(),
       },
-      crons: [...CRONS],
       observability: {
         enabled: true,
         logs: { enabled: true, invocationLogs: true },

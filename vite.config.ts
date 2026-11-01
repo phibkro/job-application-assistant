@@ -158,6 +158,7 @@ export default defineConfig({
           "python3 scripts/check_repo.py",
           "bash scripts/test_nav_key.sh",
           "bash scripts/test_deploy_preflight.sh",
+          "bash scripts/test_smoke_preview.sh",
           "python3 scripts/test_environment_safety.py",
           "python3 scripts/test_d1_migrations.py",
           "python3 scripts/test_d1_restore.py",
@@ -180,6 +181,12 @@ export default defineConfig({
       // command (not `dependsOn`, which `vp run --ignore-depends-on` would skip) and stops if either fails.
       dev: { command: "bash scripts/preview.sh", cache: false, dependsOn: ["setup"] },
       "deploy-preview": { command: "bash scripts/deploy-preview.sh", cache: false, dependsOn: ["setup"] },
+      // WS-0029@2 pass B: the owner deploys the PR Preview host (parent Worker + shared preview D1) from main.
+      "deploy-preview-host": {
+        command: `${requireDevenv} && bash scripts/deploy-preview-host.sh`,
+        cache: false,
+        dependsOn: ["setup"],
+      },
       deploy: { command: `${requireDevenv} && vp run verify && bash scripts/deploy.sh staging`, cache: false },
       "deploy-production": { command: `${requireDevenv} && vp run verify && bash scripts/deploy.sh production`, cache: false },
       "nav-key": { command: "bash scripts/configure-nav-key.sh", cache: false, dependsOn: ["setup"] },

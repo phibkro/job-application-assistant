@@ -103,19 +103,92 @@ for script in ("scripts/deploy.sh", "scripts/deploy-preview.sh"):
 # ingestion, and teardown can target only a validated numeric PR stage.
 preview_deploy = (ROOT / "scripts/deploy-preview.sh").read_text()
 preview_destroy = (ROOT / "scripts/destroy-preview.sh").read_text()
+preview_host = (ROOT / "scripts/deploy-preview-host.sh").read_text()
+preview_seed = (ROOT / "scripts/seed-preview-db.sh").read_text()
+preview_smoke = (ROOT / "scripts/smoke-preview.sh").read_text()
 preview_workflow = (ROOT / ".github/workflows/pr-preview.yml").read_text()
-assert "dev/preview-seed.sql" in preview_deploy
-assert "NAV_API_TOKEN" not in preview_deploy
+for text in (preview_deploy, preview_host, preview_seed):
+    assert "NAV_API_TOKEN" not in text
 assert 'STAGE="pr-$1"' in preview_deploy
 assert "job-index-${STAGE}-typescript-db" in infra
 assert 'bun run alchemy destroy --stage "$STAGE" --yes' in preview_destroy
-for forbidden_stage in ("preview", "staging", "production"):
+for forbidden_stage in ("preview", "staging", "production", "pr-previews"):
     assert f'STAGE="{forbidden_stage}"' not in preview_destroy
 assert "types: [opened, reopened, synchronize, closed]" in preview_workflow
 assert "cancel-in-progress: false" in preview_workflow
-assert "github.event.pull_request.head.repo.full_name == github.repository" in preview_workflow
 assert './scripts/deploy-preview.sh "${{ github.event.pull_request.number }}"' in preview_workflow
 assert './scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"' in preview_workflow
+
+# WS-0029@2 pass B: a PR is a Cloudflare Worker Preview of one parent Worker,
+# bound to one shared seeded preview D1, private behind Cloudflare Access.
+# (1) The PR stage uploads a Preview of the host stage's Worker and owns no
+# Worker or database of its own: both are references to the host stage.
+PREVIEW_HOST_LITERAL = 'const PREVIEW_HOST_STAGE = "pr-previews";'
+assert infra_code.count(PREVIEW_HOST_LITERAL) == 1, "infra must declare exactly " + PREVIEW_HOST_LITERAL
+assert re.search(
+    r"const scriptSettings = PR_STAGE\s*\?\s*\{\s*preview: \{\s*of: yield\* Cloudflare\.Worker\.ref\(\"Api\", \{ stage: PREVIEW_HOST_STAGE \}\),",
+    infra_code,
+), "a PR stage must be a Worker Preview of the pr-previews host's Api Worker"
+assert re.search(
+    r"const database = PR_STAGE\s*\?\s*yield\* Cloudflare\.D1\.Database\.ref\(\"TypeScriptDb\", \{ stage: PREVIEW_HOST_STAGE \}\)",
+    infra_code,
+), "a PR stage must bind the host's shared preview D1 by reference, never own a database"
+# (2) The Durable Object binding is declared for every stage, Previews
+# included (a Preview inherits no bindings), never only in a
+# production-only branch.
+assert re.findall(r"^\s*SOURCE_LEASE: sourceLease,\s*$", infra_code, flags=re.MULTILINE) == [
+    "        SOURCE_LEASE: sourceLease,"
+], "SOURCE_LEASE must be bound unconditionally in the Worker env, Previews included"
+# (3) Access is the owner's Worker-level setting, not an Alchemy resource.
+assert not re.search(r"\baccess\s*:", infra_code), "infra must not declare Worker Access (owner's dashboard setting)"
+assert "Cloudflare.Access" not in infra_code, "infra must not declare an Access application"
+# (4) The shared D1 is seeded only through the guarded script: it accepts only
+# the preview D1's name, serialises writers with a lease, and never deletes
+# fixture rows other Previews read.
+for script, text in (("scripts/deploy-preview.sh", preview_deploy), ("scripts/deploy-preview-host.sh", preview_host)):
+    assert './scripts/seed-preview-db.sh "$DB_NAME" "$DB_ID"' in text, f"{script} must seed through seed-preview-db.sh"
+assert "  job-index-pr-previews-typescript-db) ;;" in preview_seed, "seed-preview-db.sh must accept only the shared preview D1"
+for needed in ("db/schema.sql", "migrate-d1.sh", "db/catalog-seed.sql", "dev/preview-seed.sql"):
+    assert needed in preview_seed, f"seed-preview-db.sh must apply {needed}"
+assert "grep -v '^DELETE FROM ' dev/preview-seed.sql | sed 's/^INSERT INTO /INSERT OR IGNORE INTO /'" in preview_seed, (
+    "the shared seed must be insert-only (no DELETE)"
+)
+assert "--file dev/preview-seed.sql" not in preview_seed, "the resetting local fixture must not run on the shared D1"
+assert "ON CONFLICT(id) DO UPDATE SET holder = excluded.holder" in preview_seed, "shared seeding must take the lease"
+# (5) The deploy ends with the Access smoke, and teardown proves the Preview
+# is gone; the smoke's behaviour is tested by scripts/test_smoke_preview.sh.
+vite_policy = (ROOT / "vite.config.ts").read_text()
+assert '"bash scripts/test_smoke_preview.sh",' in vite_policy, "policy must run the smoke-preview tests"
+assert preview_deploy.rstrip().endswith('./scripts/smoke-preview.sh deployed "$DEPLOYMENT_URL" "$STAGE"'), (
+    "deploy-preview.sh must end with the Access smoke"
+)
+assert './scripts/smoke-preview.sh deleted "$DEPLOYMENT_URL"' in preview_destroy
+assert 'ACCESS_TEAM_HOST="phibkro.cloudflareaccess.com"' in preview_smoke
+# (6) `alchemy state read` prints Redacted secrets (WS-0029 L5): every read is
+# piped straight into a parser.
+for script, text in (
+    ("scripts/deploy-preview.sh", preview_deploy),
+    ("scripts/deploy-preview-host.sh", preview_host),
+    ("scripts/destroy-preview.sh", preview_destroy),
+):
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if "alchemy state read" in line and not line.lstrip().startswith("#"):
+            window = "\n".join(lines[index : index + 2])
+            assert ") | python3 -c" in window, f"{script}:{index + 1}: pipe `alchemy state read` into the parser"
+# (7) Fork safety on every job, and no secret beyond Cloudflare's and the two
+# Access service-token ones.
+preview_jobs = re.findall(r"^  [a-z][\w-]*:\s*$", preview_workflow.split("\njobs:\n", 1)[1], flags=re.MULTILINE)
+assert preview_jobs, "pr-preview.yml must declare jobs"
+assert preview_workflow.count("github.event.pull_request.head.repo.full_name == github.repository") == len(preview_jobs), (
+    "every pr-preview job must carry the same-repository guard"
+)
+assert set(re.findall(r"secrets\.([A-Z_]+)", preview_workflow)) == {
+    "CLOUDFLARE_API_TOKEN",
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CF_ACCESS_CLIENT_ID",
+    "CF_ACCESS_CLIENT_SECRET",
+}, "pr-preview.yml may use only the Cloudflare and Access service-token secrets"
 
 
 # WS-0027@2: the deploy entry points are Vite+ tasks. Each must fail closed
