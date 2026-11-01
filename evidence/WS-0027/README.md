@@ -158,3 +158,26 @@ Why the Python and bash gates were kept rather than ported to TypeScript: Python
 ## 7. Left stale (out of scope)
 
 Some comments mention the old commands. Application files (`apps/worker/src/**`, e.g. `bun run check`) are excluded by "no application code changes". `infra/alchemy.run.ts` (`just build`) is excluded by "no `infra/` changes". `dev/test.wrangler.jsonc` (`just preview`) is left alone. RFCs, `work/`, `evidence/` and `design-specs/` are historical records and were not rewritten.
+
+## 8. Review fixes (attempt 2; review ACCEPT WITH NITS on `2c0dffb`)
+
+New commits: `f38f7c2` (M1, L1) and `b20b19e` (L2, L3, N1, N2). N3 to N6 are left to the coordinator. Local shims, outside the repository: shellcheck 0.11.0 from a scratch venv, and a stub `wrangler` that answers `--version` and logs and exits 99 for anything else. The setup check now requires `wrangler` on PATH; devenv provides the real one.
+
+- **M1:** `vite.config.ts` `requireDevenv`: `bash -c 'test -n "$DEVENV_ROOT" || { echo …; exit 1; }'` is the first command of `deploy` and `deploy-production`. Vite Task does pass `DEVENV_ROOT` to tasks: a probe task printed `[/x]` when it was set and `[]` when it was not. `test_environment_safety.py` asserts the guard definition and its position. `deployment.md` was updated to match.
+- **L1:** each deploy task is `${requireDevenv} && vp run verify && bash scripts/deploy.sh <stage>`, with no `dependsOn`, and that is asserted too.
+- **L2:** `scripts/setup.sh` requires bun, node, wrangler, python3, curl, jq and shellcheck. `sqlite3` is not on the list, because the scripts only use Python's `sqlite3` module.
+- **L3:** `vp hooks enable` is documented for pre-WS-0027 clones in `AGENTS.md`, `README.md` and `docs/internal/lifecycle/quality-assurance.md`.
+- **N1:** the `vitest.workers.config.ts` comment was fixed (comment only).
+- **N2:** `manage-principals.md` no longer shows `just principal-key`.
+
+| Control | Command | Exit | Seen |
+| --- | --- | --- | --- |
+| Deploy outside devenv | `env -u DEVENV_ROOT vp run deploy` | 1 | `deploys must run inside the pinned toolchain…`; nothing after the guard ran |
+| The same with the flag | `env -u DEVENV_ROOT vp run --ignore-depends-on deploy-production` | 1 | the same; verify and deploy never started |
+| `--ignore-depends-on` inside devenv | `DEVENV_ROOT=… vp run --ignore-depends-on deploy-production` | 1 | setup, policy, `vp check`, the gates and both coverage suites (80 and 22 files) ran first, then `deploy.sh production` stopped at `Production requires a NAV-issued private consumer token.`; `19/20 successful`; 0 non-`--version` wrangler calls |
+| Policy: guard removed from `deploy` | `vp run policy` | 1 | `deploy must require devenv, then run verify, then deploy` |
+| Policy: `deploy-production` back on `dependsOn: ["verify"]` | `vp run policy` | 1 | the same assertion for `"deploy-production"` |
+| Policy: guard weakened (`exit 1` → `true`) | `vp run policy` | 1 | `vite.config.ts must define requireDevenv: fail when DEVENV_ROOT is unset` |
+| Setup without wrangler | `bash scripts/setup.sh` | 1 | `Missing 'wrangler': run inside the pinned toolchain` |
+
+Reruns: `vp check` exit 0 (269 formatted, 273 linted, 0 findings). `vp run test` exit 0 (Bun 80 files, 664 passed, 4 skipped; workerd 22 files, 109 passed). `vp run verify` exit 0 (18/18; `effect-diagnostics: ok (5 excepted finding(s), 4 registry entries)`; the same counts). The shared `.git/config` was unchanged.
