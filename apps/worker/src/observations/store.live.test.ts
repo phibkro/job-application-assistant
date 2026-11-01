@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import * as Effect from "effect/Effect";
 import { NAV_PLATFORM_ID } from "@job-index/adapters/nav";
 import { observationId } from "@job-index/domain/observation/Ir";
+import type { ObservationContent } from "@job-index/domain/observation/Ir";
 import type { CanonicalJob } from "@job-index/domain/Job";
 import type { WorkloadSection } from "@job-index/domain/observation/Query";
 import { runTest } from "../db/TestLayer.ts";
@@ -19,6 +20,7 @@ import {
   INACTIVE_ITEM,
   ingestionFor,
   navScript,
+  page,
   rows,
   seedCatalog,
   uuidOf,
@@ -103,6 +105,124 @@ describe("trigger guarantee: observations are append-only (migration 0006)", () 
     await expect(
       runTest(Store.append([{ ...content!, kind: "Bogus" as never }], recording)),
     ).rejects.toThrow();
+  });
+});
+
+const seqOf = async (id: string) =>
+  (
+    await env.DB.prepare("SELECT recordedSeq FROM observations WHERE id = ?")
+      .bind(id)
+      .all<{ recordedSeq: number }>()
+  ).results[0]?.recordedSeq;
+const issued = async () =>
+  (
+    await rows<{ seq: number }>(
+      "SELECT recordedSeq AS seq FROM observations UNION ALL SELECT recordedSeq FROM observation_tombstones",
+    )
+  ).map((row) => row.seq);
+const insertRaw = (verb: string, id: string, status: string, seq: number, payload: string) =>
+  env.DB.prepare(
+    `INSERT ${verb} observations (id, irVersion, sourceId, externalId, kind, status, dateModified, recordedSeq, recordedAt, runId, payload) VALUES (?, 0, 'nav', 'x', 'FeedEntry', ?, NULL, ?, '2026-11-01T00:00:00Z', 'raw', ?)`,
+  )
+    .bind(id, status, seq, payload)
+    .run();
+
+/** One append per content, so each gets its own recorded sequence. */
+const appendEach = (...contents: ReadonlyArray<ObservationContent | undefined>) =>
+  runTest(
+    Effect.forEach(contents, (content) => Store.append([content!], recording), {
+      discard: true,
+    }),
+  );
+
+describe("review round 1: recorded sequence and REPLACE guards (migration 0006)", () => {
+  const [a, b, c] = feedContents(page(ACTIVE_ITEM, INACTIVE_ITEM, withUuid(ACTIVE_ITEM, "seq-c")));
+
+  it("R1: purge the newest row, append, and the new seq exceeds every seq ever issued, the purged one included", async () => {
+    await appendEach(a, b);
+    const idB = observationId(b!);
+    const purgedSeq = await seqOf(idB);
+    const before = await issued();
+    expect(purgedSeq).toBe(Math.max(...before));
+    expect(await runTest(Store.purge(idB, "lawful erasure (test)", "2026-11-02T00:00:00Z"))).toBe(
+      true,
+    );
+    expect(await rows("SELECT recordedSeq FROM observation_tombstones")).toEqual([
+      { recordedSeq: purgedSeq },
+    ]);
+    await appendEach(c);
+    const newSeq = await seqOf(observationId(c!));
+    expect(newSeq).toBeGreaterThan(Math.max(...before));
+    expect(newSeq).toBeGreaterThan(purgedSeq!);
+  });
+
+  it("R1: the database rejects a recordedSeq at or below one already issued, the purged one included", async () => {
+    await appendEach(a, b);
+    const idB = observationId(b!);
+    const purgedSeq = (await seqOf(idB))!;
+    await runTest(Store.purge(idB, "lawful erasure (test)", "2026-11-02T00:00:00Z"));
+    await expect(insertRaw("INTO", "raw-1", "ACTIVE", purgedSeq, "{}")).rejects.toThrow(
+      /recordedSeq must exceed every sequence ever issued/,
+    );
+    await expect(insertRaw("INTO", "raw-1", "ACTIVE", purgedSeq - 1, "{}")).rejects.toThrow(
+      /recordedSeq must exceed every sequence ever issued/,
+    );
+    await insertRaw("INTO", "raw-1", "ACTIVE", purgedSeq + 1, "{}");
+    expect(await seqOf("raw-1")).toBe(purgedSeq + 1);
+  });
+
+  it("R2: D1 runs REPLACE's implicit delete without delete triggers (recursive_triggers is off)", async () => {
+    expect(await rows("PRAGMA recursive_triggers")).toEqual([{ recursive_triggers: 0 }]);
+  });
+
+  it("R2: INSERT OR REPLACE and an upsert can neither overwrite nor delete an observation, nor a tombstone", async () => {
+    await insertRaw("INTO", "r-1", "ACTIVE", 1, "{}");
+    await insertRaw("INTO", "r-2", "ACTIVE", 2, "{}");
+    // Same id, other content: an overwrite.
+    await expect(insertRaw("OR REPLACE INTO", "r-1", "INACTIVE", 3, "{}")).rejects.toThrow(
+      /an id names one content/,
+    );
+    await expect(
+      env.DB.prepare(
+        "INSERT INTO observations (id, irVersion, sourceId, externalId, kind, status, dateModified, recordedSeq, recordedAt, runId, payload) VALUES ('r-1', 0, 'nav', 'x', 'FeedEntry', 'INACTIVE', NULL, 3, 't', 'raw', '{}') ON CONFLICT (id) DO UPDATE SET status = excluded.status",
+      ).run(),
+    ).rejects.toThrow(/an id names one content/);
+    // A new id colliding on another row's recordedSeq: REPLACE would delete r-2.
+    await expect(insertRaw("OR REPLACE INTO", "r-3", "ACTIVE", 2, "{}")).rejects.toThrow(
+      /recordedSeq must exceed/,
+    );
+    // Same id, same content: a replay, a no-op even under REPLACE (r-2's seq is not taken over).
+    await insertRaw("OR REPLACE INTO", "r-1", "ACTIVE", 2, "{}");
+    expect(await rows("SELECT id, status, recordedSeq FROM observations ORDER BY id")).toEqual([
+      { id: "r-1", status: "ACTIVE", recordedSeq: 1 },
+      { id: "r-2", status: "ACTIVE", recordedSeq: 2 },
+    ]);
+    expect(await rows("SELECT COUNT(*) AS n FROM observation_tombstones")).toEqual([{ n: 0 }]);
+    // A tombstone cannot be replaced away either (by id or by sequence).
+    await runTest(Store.purge("r-2", "lawful erasure (test)", "2026-11-02T00:00:00Z"));
+    const replaceTombstone = env.DB.prepare(
+      "INSERT OR REPLACE INTO observation_tombstones (observationId, sourceId, externalId, recordedSeq, reason, purgedAt) VALUES (?, 'nav', 'x', ?, 'r', 't')",
+    );
+    await expect(replaceTombstone.bind("r-2", 9).run()).rejects.toThrow(/permanent/);
+    await expect(replaceTombstone.bind("other", 2).run()).rejects.toThrow(/permanent/);
+    expect(await rows("SELECT observationId, recordedSeq FROM observation_tombstones")).toEqual([
+      { observationId: "r-2", recordedSeq: 2 },
+    ]);
+  });
+
+  it("control twin: without the INSERT guards, the same REPLACE rewrites one row and deletes another, leaving no tombstone", async () => {
+    await insertRaw("INTO", "r-1", "ACTIVE", 1, "{}");
+    await insertRaw("INTO", "r-2", "ACTIVE", 2, "{}");
+    await env.DB.batch([
+      env.DB.prepare("DROP TRIGGER observations_replay_is_noop"),
+      env.DB.prepare("DROP TRIGGER observations_no_overwrite"),
+      env.DB.prepare("DROP TRIGGER observations_seq_monotone"),
+    ]);
+    await insertRaw("OR REPLACE INTO", "r-1", "INACTIVE", 2, "{}");
+    expect(await rows("SELECT id, status, recordedSeq FROM observations")).toEqual([
+      { id: "r-1", status: "INACTIVE", recordedSeq: 2 },
+    ]);
+    expect(await rows("SELECT COUNT(*) AS n FROM observation_tombstones")).toEqual([{ n: 0 }]);
   });
 });
 

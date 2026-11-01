@@ -450,9 +450,14 @@ const observationTables: Record<string, TableSpec> = {
     model: ObservationTombstoneRow,
     primaryKey: ["observationId"],
     columnOverrides: { reason: "TEXT NOT NULL CHECK (length(reason) > 0)" },
+    // A tombstone keeps the purged row's recorded sequence, so the sequence stays monotone across purges (review R1).
+    unique: [["recordedSeq"]],
     triggers: [
       "CREATE TRIGGER IF NOT EXISTS observation_tombstones_no_update BEFORE UPDATE ON observation_tombstones BEGIN SELECT RAISE(ABORT, 'observation tombstones are permanent'); END",
       "CREATE TRIGGER IF NOT EXISTS observation_tombstones_no_delete BEFORE DELETE ON observation_tombstones BEGIN SELECT RAISE(ABORT, 'observation tombstones are permanent'); END",
+      // REPLACE deletes the conflicting row without firing delete triggers (D1: recursive_triggers is off), so any
+      // insert that collides with a tombstone is rejected before the conflict is resolved (review R2).
+      "CREATE TRIGGER IF NOT EXISTS observation_tombstones_no_replace BEFORE INSERT ON observation_tombstones WHEN EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = NEW.observationId OR recordedSeq = NEW.recordedSeq) BEGIN SELECT RAISE(ABORT, 'observation tombstones are permanent'); END",
     ],
   },
   observations: {
@@ -467,8 +472,16 @@ const observationTables: Record<string, TableSpec> = {
     indexes: [["sourceId", "externalId"]],
     triggers: [
       "CREATE TRIGGER IF NOT EXISTS observations_no_update BEFORE UPDATE ON observations BEGIN SELECT RAISE(ABORT, 'observations are append-only'); END",
-      "CREATE TRIGGER IF NOT EXISTS observations_no_delete BEFORE DELETE ON observations WHEN NOT EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = OLD.id) BEGIN SELECT RAISE(ABORT, 'observations are append-only; purge writes a tombstone first'); END",
+      "CREATE TRIGGER IF NOT EXISTS observations_no_delete BEFORE DELETE ON observations WHEN NOT EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = OLD.id AND recordedSeq = OLD.recordedSeq) BEGIN SELECT RAISE(ABORT, 'observations are append-only; purge writes a tombstone first'); END",
       "CREATE TRIGGER IF NOT EXISTS observations_no_resurrection BEFORE INSERT ON observations WHEN EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = NEW.id) BEGIN SELECT RAISE(IGNORE); END",
+      // Review R2. The three INSERT guards below have disjoint conditions, so their firing order does not matter.
+      // Same id, same content: a replay, a no-op (this also keeps INSERT OR REPLACE from deleting a row whose
+      // recordedSeq it collides with). Same id, other content: an overwrite, rejected.
+      "CREATE TRIGGER IF NOT EXISTS observations_replay_is_noop BEFORE INSERT ON observations WHEN EXISTS (SELECT 1 FROM observations WHERE id = NEW.id AND irVersion IS NEW.irVersion AND sourceId IS NEW.sourceId AND externalId IS NEW.externalId AND kind IS NEW.kind AND status IS NEW.status AND dateModified IS NEW.dateModified AND payload IS NEW.payload) BEGIN SELECT RAISE(IGNORE); END",
+      "CREATE TRIGGER IF NOT EXISTS observations_no_overwrite BEFORE INSERT ON observations WHEN EXISTS (SELECT 1 FROM observations WHERE id = NEW.id AND NOT (irVersion IS NEW.irVersion AND sourceId IS NEW.sourceId AND externalId IS NEW.externalId AND kind IS NEW.kind AND status IS NEW.status AND dateModified IS NEW.dateModified AND payload IS NEW.payload)) BEGIN SELECT RAISE(ABORT, 'observations are append-only; an id names one content'); END",
+      // Review R1: a new row's recordedSeq must exceed every sequence ever issued, the purged ones included (their
+      // tombstones keep them). This also rejects a REPLACE that collides on recordedSeq with another row.
+      "CREATE TRIGGER IF NOT EXISTS observations_seq_monotone BEFORE INSERT ON observations WHEN NOT EXISTS (SELECT 1 FROM observations WHERE id = NEW.id) AND NOT EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = NEW.id) AND NEW.recordedSeq <= MAX(COALESCE((SELECT MAX(recordedSeq) FROM observations), 0), COALESCE((SELECT MAX(recordedSeq) FROM observation_tombstones), 0)) BEGIN SELECT RAISE(ABORT, 'recordedSeq must exceed every sequence ever issued, purged ones included'); END",
     ],
   },
   workload_projection: {
@@ -526,7 +539,7 @@ const migrations = [
   {
     name: "0006_observation-store.sql",
     currentWhen:
-      "EXISTS (SELECT 1 FROM pragma_table_info('observations') WHERE name = 'payload') AND EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = 'observations_no_resurrection')",
+      "EXISTS (SELECT 1 FROM pragma_table_info('observations') WHERE name = 'payload') AND EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = 'observations_seq_monotone')",
   },
 ] as const;
 

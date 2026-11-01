@@ -13,7 +13,9 @@ import type { Write } from "../services/Database.ts";
 /**
  * The append-only observation store (WS-0022 §3), at the edge: SQL and `Database` only, every decision in the pure
  * core (`@job-index/domain/observation/*`). Append-only is the database's guarantee, not this module's: triggers
- * reject `UPDATE` and `DELETE` on `observations` (migration 0006), and `purge` is the one path through.
+ * (migration 0006) reject `UPDATE`, `DELETE` and any `INSERT` that would overwrite a row (`INSERT OR REPLACE`
+ * included), and reject a `recordedSeq` that does not exceed every sequence ever issued. `purge` is the one path
+ * through, and its tombstone keeps the purged sequence.
  */
 
 export interface Recording {
@@ -24,10 +26,12 @@ export interface Recording {
 /**
  * Content-addressed insert. `ON CONFLICT (id) DO NOTHING`, not `INSERT OR IGNORE`: OR IGNORE would also swallow a
  * `CHECK`/`NOT NULL` violation, and a malformed row must fail loudly. The recorded sequence is assigned inside the
- * statement, so a batch numbers its rows in order and a replayed row consumes no number.
+ * statement, so a batch numbers its rows in order and a replayed row consumes no number. The next number is one past
+ * every sequence ever issued, so it reads the tombstones too: a purged row's number is never reused (review R1;
+ * `observations_seq_monotone` rejects anything else).
  */
 const INSERT_OBSERVATION = `INSERT INTO observations (id, irVersion, sourceId, externalId, kind, status, dateModified, recordedSeq, recordedAt, runId, payload)
-VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(recordedSeq), 0) + 1 FROM observations), ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, MAX(COALESCE((SELECT MAX(recordedSeq) FROM observations), 0), COALESCE((SELECT MAX(recordedSeq) FROM observation_tombstones), 0)) + 1, ?, ?, ?)
 ON CONFLICT (id) DO NOTHING`;
 
 const SELECT_COLUMNS =
@@ -59,8 +63,8 @@ HAVING SUM(CASE WHEN o.kind IN ('Detail', 'StatusOnly') THEN 1 ELSE 0 END) = 0
 ORDER BY MAX(o.recordedSeq) DESC
 LIMIT ?`;
 
-const INSERT_TOMBSTONE = `INSERT INTO observation_tombstones (observationId, sourceId, externalId, reason, purgedAt)
-SELECT id, sourceId, externalId, ?, ? FROM observations WHERE id = ?`;
+const INSERT_TOMBSTONE = `INSERT INTO observation_tombstones (observationId, sourceId, externalId, recordedSeq, reason, purgedAt)
+SELECT id, sourceId, externalId, recordedSeq, ?, ? FROM observations WHERE id = ?`;
 
 const DELETE_OBSERVATION = "DELETE FROM observations WHERE id = ?";
 
