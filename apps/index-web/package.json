@@ -1,0 +1,19 @@
+{
+  "name": "@job-index/index-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@effect/platform-browser": "4.1.1",
+    "@foldkit/ui": "0.170.0",
+    "clsx": "2.1.1",
+    "effect": "~4.1.0",
+    "foldkit": "0.170.0"
+  },
+  "devDependencies": {
+    "@foldkit/vite-plugin": "0.29.0",
+    "@tailwindcss/vite": "4.3.3",
+    "tailwindcss": "4.3.3",
+    "vite": "8.3.5"
+  }
+}

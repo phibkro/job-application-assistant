@@ -1,6 +1,6 @@
 {
   // Local preview of the TypeScript service: the Worker serving the API, with
-  // the static placeholder page (dev/static-placeholder) as its assets. Not a deploy target —
+  // the index client (apps/index-web/dist, built by scripts/preview.sh) as its assets. Not a deploy target —
   // infra/alchemy.run.ts owns staging and production, and still points at the
   // Rust worker until cutover.
   "name": "job-index-preview",
@@ -28,7 +28,7 @@
   // local config, so it is declared here directly.
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SourceLeaseObject"] }],
   "assets": {
-    "directory": "./static-placeholder",
+    "directory": "../apps/index-web/dist",
     "binding": "ASSETS",
     // The interface routes client-side, so a deep link must reach it rather
     // than 404 on a file that was never written.

@@ -206,7 +206,7 @@ export default Alchemy.Stack(
       // metadata.assets.config.config, which the Cloudflare API silently drops,
       // leaving SPA fallback off (the deep-link 404 regression of 2026-08-25).
       assets: {
-        directory: "../dev/static-placeholder",
+        directory: "../apps/index-web/dist",
         notFoundHandling: "single-page-application",
         runWorkerFirst: ["/api/*"],
       },

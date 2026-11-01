@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Runs the TypeScript service locally: the Worker serving the API on workerd,
-# with a static placeholder page as its assets (dev/static-placeholder; the legacy
-# apps/web interface was retired in WS-0021@4), over a local D1 holding
-# the generated schema and a small seed.
+# with the index client as its assets (apps/index-web/dist, WS-0025; it
+# replaced the WS-0021@4 placeholder), over a local D1 holding the generated
+# schema and a small seed.
 #
 # This is the whole stack talking to itself — the same bundle, schema, and
 # routing a deploy would use, minus the deploy. It exists because "it compiles"
@@ -15,6 +15,9 @@ cd "$ROOT"
 PORT="${PORT:-8799}"
 CONFIG="dev/preview.wrangler.jsonc"
 STATE_DIR=".preview/state"
+
+echo "==> building the index client (apps/index-web/dist)"
+bash scripts/build-index-web.sh
 
 echo "==> bundling the worker for workerd"
 rm -rf "$STATE_DIR"

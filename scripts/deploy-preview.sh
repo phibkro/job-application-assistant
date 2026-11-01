@@ -36,6 +36,9 @@ case "${1:-preview}" in
     ;;
 esac
 
+echo "==> building the index client (apps/index-web/dist)"
+bash scripts/build-index-web.sh
+
 echo "==> bundling the worker for workerd"
 mkdir -p .preview
 bun build apps/worker/src/index.ts \

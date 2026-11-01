@@ -1,4 +1,28 @@
+import { createRequire } from "node:module";
 import { defineConfig } from "vite-plus";
+
+/**
+ * Foldkit's own lint rules for the index client (WS-0025): the plugin's
+ * `recommended.json`, scoped to `apps/index-web/` with its own test/entry
+ * overrides, so `vp check` enforces the same invariants the Foldkit scaffold does.
+ */
+interface OxlintOverride {
+  readonly files: ReadonlyArray<string>;
+  readonly excludeFiles?: ReadonlyArray<string>;
+  readonly rules: Record<string, string>;
+}
+const foldkitRecommended = createRequire(import.meta.url)("@foldkit/oxlint-plugin/recommended.json") as {
+  readonly rules: Record<string, string>;
+  readonly overrides: ReadonlyArray<OxlintOverride>;
+};
+const inIndexWeb = (glob: string): string => glob.replace(/^\*\*\//, "apps/index-web/**/");
+const foldkitOverrides = [
+  { files: ["apps/index-web/**/*.ts"], rules: foldkitRecommended.rules },
+  ...foldkitRecommended.overrides.map((override) => ({
+    files: override.files.map(inIndexWeb),
+    rules: override.rules,
+  })),
+];
 
 /**
  * Vite+ (WS-0027@2): one entry point for static checks and repository tasks. `vp check` is format + lint over
@@ -24,7 +48,7 @@ const bundle =
 export default defineConfig({
   fmt: {
     // Today's scope: `oxfmt --check packages apps`. Everything at the root except those two is ignored.
-    ignorePatterns: ["/*", "!/packages/", "!/apps/"],
+    ignorePatterns: ["/*", "!/packages/", "!/apps/", "/apps/index-web/dist/"],
   },
   lint: {
     categories: {
@@ -39,7 +63,7 @@ export default defineConfig({
       "typescript/consistent-type-imports": "error",
       "no-underscore-dangle": ["error", { allow: ["_tag"] }],
     },
-    ignorePatterns: ["node_modules", "infra/node_modules", "target", ".wrangler", ".artifacts", "crates"],
+    ignorePatterns: ["node_modules", "infra/node_modules", "target", ".wrangler", ".artifacts", "crates", "apps/index-web/dist"],
     overrides: [
       {
         files: ["packages/domain/**/*.ts"],
@@ -60,6 +84,7 @@ export default defineConfig({
         },
       },
       { files: ["**/*.test.ts"], rules: { "effect/no-ambient-authority": "off" } },
+      ...foldkitOverrides,
       {
         files: [
           "apps/worker/src/runtime/**/*.ts",
@@ -72,7 +97,10 @@ export default defineConfig({
         rules: { "effect/no-ambient-authority": "off" },
       },
     ],
-    jsPlugins: [{ name: "effect", specifier: "@phibkro/oxlint-effect-plugin" }],
+    jsPlugins: [
+      { name: "effect", specifier: "@phibkro/oxlint-effect-plugin" },
+      { name: "foldkit", specifier: "@foldkit/oxlint-plugin" },
+    ],
   },
   run: {
     tasks: {
@@ -88,6 +116,8 @@ export default defineConfig({
       "schema:check": { command: "bun run scripts/ts/schema.ts", cache: false },
       "catalog:check": { command: "bun run scripts/ts/catalog.ts", cache: false },
       "bundle:check": { command: `${bundle} > /dev/null`, cache: false },
+      // The index client (WS-0025): the production build the Worker serves as its assets.
+      "web:build": { command: "bash scripts/build-index-web.sh", cache: false },
       // Compares imports against git's index, which is not a file input either.
       "imports:check": { command: "bun run scripts/ts/tracked-imports.ts", cache: false },
 
@@ -101,7 +131,8 @@ export default defineConfig({
       "test:workers": { command: workerdSuite, cache: false },
       "test:watch": { command: "bun node_modules/vitest/vitest.mjs", cache: false },
       coverage: { command: `${bunSuite} --coverage && ${workerdSuite} --coverage`, cache: false },
-      e2e: { command: "playwright test --config e2e/playwright.config.ts --pass-with-no-tests", cache: false },
+      // No `--pass-with-no-tests` (WS-0021@4 review F4): a mis-configured suite that finds no spec must fail.
+      e2e: { command: "playwright test --config e2e/playwright.config.ts", cache: false },
 
       // Repository, credential and script policy gates (the old `just check` / scripts/check.sh).
       policy: {
@@ -122,7 +153,8 @@ export default defineConfig({
       verify: {
         command:
           "vp run setup && vp run policy && vp check && vp run imports:check && vp run typecheck && " +
-          "vp run effect:check && vp run schema:check && vp run catalog:check && vp run bundle:check && vp run coverage",
+          "vp run effect:check && vp run schema:check && vp run catalog:check && vp run bundle:check && vp run web:build && " +
+          "vp run coverage",
         cache: false,
       },
 

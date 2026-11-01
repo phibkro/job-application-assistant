@@ -14,6 +14,7 @@
     "@axe-core/playwright": "4.13.0",
     "@cloudflare/vitest-pool-workers": "0.20.3",
     "@effect/language-service": "0.87.5",
+    "@foldkit/oxlint-plugin": "0.15.4",
     "@phibkro/oxlint-effect-plugin": "^0.1.0",
     "@playwright/test": "1.61.1",
     "@types/node": "^22",
