@@ -73,14 +73,16 @@ export default defineConfig({
       // Environment: installs, git hook dispatcher (.vite-hooks), pinned Foldkit checkout (scripts/setup.sh).
       setup: { command: "bash scripts/setup.sh && vp config --no-agent", cache: false },
 
-      // Static gates. Cached: each reads only tracked inputs that Vite Task fingerprints automatically
-      // (guide/automatic-data-tracking.md); a planted failure after a warm cache is in evidence/WS-0027 r2.
+      // Static gates. Only `typecheck` is cached: tsc runs on Node, and Vite Task's automatic file tracking
+      // (guide/automatic-data-tracking.md) sees its reads; a planted type error after a warm cache is a miss.
+      // Tasks run by Bun are NOT cached: tracking does not see the files Bun's module loader and bundler read,
+      // so an edited domain model or Worker source replayed a stale pass (evidence/WS-0027, r2 §4).
       typecheck: "tsc --noEmit",
-      "effect:check": "bun run scripts/ts/effect-diagnostics.ts",
-      "schema:check": "bun run scripts/ts/schema.ts",
-      "catalog:check": "bun run scripts/ts/catalog.ts",
-      "bundle:check": `${bundle} > /dev/null`,
-      // Not cached: it compares imports against git's index, which is not a file input.
+      "effect:check": { command: "bun run scripts/ts/effect-diagnostics.ts", cache: false },
+      "schema:check": { command: "bun run scripts/ts/schema.ts", cache: false },
+      "catalog:check": { command: "bun run scripts/ts/catalog.ts", cache: false },
+      "bundle:check": { command: `${bundle} > /dev/null`, cache: false },
+      // Compares imports against git's index, which is not a file input either.
       "imports:check": { command: "bun run scripts/ts/tracked-imports.ts", cache: false },
 
       // Generators (write db/ files).
