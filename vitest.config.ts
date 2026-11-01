@@ -67,6 +67,8 @@ export default defineConfig({
       "apps/worker/src/handlers/corpus.live.test.ts",
       "apps/worker/src/handlers/navToClient.live.test.ts",
       "apps/worker/src/hydration/live.test.ts",
+      // WS-0022: the observation store and its triggers, against real D1.
+      "apps/worker/src/observations/*.live.test.ts",
     ],
     coverage: {
       /**
@@ -90,6 +92,8 @@ export default defineConfig({
        */
       include: [
         "packages/domain/src/decide/**",
+        // WS-0022: the pure observation core (IR, workload pass, projection, query).
+        "packages/domain/src/observation/**",
         "packages/adapters/**/src/**",
         "apps/worker/src/{corpus,accounts,drafting,applications,agenda,handlers,runtime,ingestion}/**",
         // Not `db/**`: `db/repositories/**` and `db/Erase.ts` moved to the

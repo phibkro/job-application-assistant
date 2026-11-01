@@ -8,30 +8,6 @@
       "count": 2,
       "reason": "Two chained Effect.provide calls (services(env), then platform): one in runLazyIngestion (index.ts ~172, where catchDefect wraps the provided effect as the documented recovery boundary) and one in the scheduled handler (index.ts ~225, local-preview-only, no catchDefect). The fix is a dependency-chain rewrite (Layer.provide), not a flat merge, and the first site's recovery boundary needs a decision, so it is deferred rather than changed under R1 (WS-0026 review N3).",
       "retirement": "Retire in TB-05: the event-driven ingestion loop replaces runLazyIngestion and the scheduled handler at the composition root."
-    },
-    {
-      "id": "EFX-002",
-      "file": "apps/worker/src/accounts/accounts.test.ts",
-      "rule": "multipleEffectProvide",
-      "count": 1,
-      "reason": "Test helper provides the service layer, then the fake database layer it depends on (a dependency chain). A flat merge would not type-check; the fix is a chain-style rewrite (Layer.provide(serviceLayer, fakeDatabaseLayer)), which is likely behavior-equivalent but was out of R1 scope, so it is deferred rather than rewritten blind (WS-0026 review N2).",
-      "retirement": "Retire in WS-0022, which adds test layers for the observation store: compose the accounts test layers with Layer.provide in the same change."
-    },
-    {
-      "id": "EFX-003",
-      "file": "apps/worker/src/accounts/index.test.ts",
-      "rule": "multipleEffectProvide",
-      "count": 1,
-      "reason": "Test helper provides the service layer, then the fake database layer it depends on (a dependency chain). A flat merge would not type-check; the fix is a chain-style rewrite (Layer.provide(serviceLayer, fakeDatabaseLayer)), which is likely behavior-equivalent but was out of R1 scope, so it is deferred rather than rewritten blind (WS-0026 review N2).",
-      "retirement": "Retire in WS-0022, which adds test layers for the observation store: compose the accounts test layers with Layer.provide in the same change."
-    },
-    {
-      "id": "EFX-004",
-      "file": "apps/worker/src/accounts/profiles.test.ts",
-      "rule": "multipleEffectProvide",
-      "count": 1,
-      "reason": "Test helper provides the service layer, then the fake database layer it depends on (a dependency chain). A flat merge would not type-check; the fix is a chain-style rewrite (Layer.provide(serviceLayer, fakeDatabaseLayer)), which is likely behavior-equivalent but was out of R1 scope, so it is deferred rather than rewritten blind (WS-0026 review N2).",
-      "retirement": "Retire in WS-0022, which adds test layers for the observation store: compose the accounts test layers with Layer.provide in the same change."
     }
   ]
 }

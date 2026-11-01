@@ -18,6 +18,7 @@ import {
   SavedView as DomainSavedView,
 } from "@job-index/domain/Saved";
 import { CanonicalJob } from "@job-index/domain/Job";
+import { WorkloadSection } from "@job-index/domain/observation/Query";
 import {
   MatchAssessment as DomainMatchAssessment,
   MatchEvidence as DomainMatchEvidence,
@@ -317,6 +318,11 @@ const PageMeta = Schema.Struct({
 export const JobPage = Schema.Struct({
   data: Schema.Array(CanonicalJob),
   meta: PageMeta,
+  /**
+   * WS-0022, **experimental**: present only when the request names a workload interval (`workloadMin`/`workloadMax`).
+   * Absent otherwise, so every existing response is byte-for-byte unchanged.
+   */
+  workload: Schema.optionalKey(WorkloadSection),
 });
 export type JobPage = typeof JobPage.Type;
 
@@ -363,6 +369,9 @@ const corpus = HttpApiGroup.make("corpus").add(
       status: Schema.optional(Schema.String),
       cursor: Schema.optional(Schema.String),
       limit: Schema.optional(Schema.String),
+      // WS-0022, experimental: an FTE interval in percent; results come back grouped by workload fact state.
+      workloadMin: Schema.optional(Schema.String),
+      workloadMax: Schema.optional(Schema.String),
     },
     success: JobPage,
   }),

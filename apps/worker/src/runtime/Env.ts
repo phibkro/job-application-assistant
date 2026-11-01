@@ -1,8 +1,16 @@
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
 import type { D1Database } from "../db/D1.ts";
 import type { SourceLeaseNamespace } from "../ingestion/SourceLeaseObject.ts";
 import type { WorkersAi } from "../inference/model/index.ts";
 import { DEFAULT_ATTEMPT_FLOOR_MS } from "../ingestion/lazy.ts";
+import {
+  HYDRATION_PER_RUN_KEY,
+  MAX_HYDRATION_PER_RUN,
+  hydrationPerRun,
+} from "../ingestion/hydrationBudget.ts";
 
 /**
  * The Worker's environment, checked at the edge of the program.
@@ -39,6 +47,12 @@ export interface Env {
    * success-staleness knob. Absence keeps the default.
    */
   readonly INGESTION_ATTEMPT_FLOOR_MS: number;
+  /**
+   * Bounded background hydration per ingestion run (WS-0022, option A): an Effect `Config`
+   * (`ingestion/hydrationBudget.ts`) read from this environment. Absent keeps the provisional default (5); 0 turns it
+   * off. Optional in the type only so hand-built test environments may omit it; `decodeEnv` always sets it.
+   */
+  readonly INGESTION_HYDRATION_PER_RUN?: number;
   /** Optional native Workers AI binding. Absence keeps the deterministic
    * heuristic fallback available; presence enables entitled model requests. */
   readonly AI?: WorkersAi;
@@ -105,6 +119,22 @@ const decodeFloorMs = (value: unknown): number => {
   return parsed;
 };
 
+/**
+ * `INGESTION_HYDRATION_PER_RUN` through the Effect `Config` itself, so the default and the bounds live in one place.
+ * A malformed override fails with the same named error as a missing binding.
+ */
+const decodeHydrationPerRun = (bag: Record<string, unknown>): number => {
+  const parsed = Effect.runSync(
+    Effect.result(hydrationPerRun.parse(ConfigProvider.fromUnknown(bag))),
+  );
+  if (Result.isFailure(parsed)) {
+    throw new EnvironmentIncomplete({
+      missing: [`${HYDRATION_PER_RUN_KEY} (an integer from 0 to ${MAX_HYDRATION_PER_RUN})`],
+    });
+  }
+  return parsed.success;
+};
+
 export const decodeEnv = (env: unknown): Env => {
   const bag = (typeof env === "object" && env !== null ? env : {}) as Record<string, unknown>;
   const missing: Array<string> = [];
@@ -128,6 +158,7 @@ export const decodeEnv = (env: unknown): Env => {
     SOURCE_LEASE: bag.SOURCE_LEASE as SourceLeaseNamespace,
     NAV_API_TOKEN: isNonEmptyString(bag.NAV_API_TOKEN) ? bag.NAV_API_TOKEN : undefined,
     INGESTION_ATTEMPT_FLOOR_MS: decodeFloorMs(bag.INGESTION_ATTEMPT_FLOOR_MS),
+    INGESTION_HYDRATION_PER_RUN: decodeHydrationPerRun(bag),
     AI: isWorkersAi(bag.AI) ? bag.AI : undefined,
   };
 };

@@ -46,6 +46,11 @@ import { Proposal } from "../../packages/domain/src/Proposals.ts";
 import { StudioDocument } from "../../packages/domain/src/Documents.ts";
 import { CatalogRecord } from "../../packages/domain/src/Source.ts";
 import { Subscription } from "../../packages/domain/src/Subscription.ts";
+import {
+  ObservationRow,
+  ObservationTombstoneRow,
+  WorkloadProjectionRow,
+} from "../../packages/domain/src/observation/Rows.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const TARGET = path.join(ROOT, "db/schema.sql");
@@ -174,6 +179,20 @@ const columnTypes: Record<string, string> = {
   learnedAt: "TEXT",
   decidedAt: "TEXT",
   revokedAt: "TEXT",
+  // Observation store (WS-0022). `kind`/`status`/`reason` are per-table overrides on these tables.
+  irVersion: "INTEGER NOT NULL CHECK (irVersion IN (0))",
+  dateModified: "TEXT",
+  recordedSeq: "INTEGER NOT NULL CHECK (recordedSeq >= 1)",
+  recordedAt: "TEXT NOT NULL",
+  runId: "TEXT NOT NULL",
+  payload: "TEXT NOT NULL",
+  observationId: "TEXT NOT NULL",
+  purgedAt: "TEXT NOT NULL",
+  workloadState:
+    "TEXT NOT NULL CHECK (workloadState IN ('Stated', 'Derived', 'Negotiable', 'Conflicting', 'Unknown', 'TempUnknown', 'Unsupported'))",
+  workloadMin: "REAL",
+  workloadMax: "REAL",
+  workloadMethod: "TEXT NOT NULL",
 };
 
 /**
@@ -189,6 +208,11 @@ const columnTypes: Record<string, string> = {
 type Key = { readonly primaryKey: ReadonlyArray<string> } | { readonly appendOnly: "rowid" };
 
 type TableSpec = Key & {
+  /**
+   * `CREATE TRIGGER` statements, one line each (`... BEGIN ...; END`). Emitted after every table, so a trigger body may
+   * name a table declared later. WS-0022 introduced them for the append-only observation store.
+   */
+  readonly triggers?: ReadonlyArray<string>;
   readonly model: unknown;
   /** Per-table column-type overrides: two tables may share a field name
    * (e.g. `confidence`) while asserting different CHECK domains. */
@@ -203,7 +227,7 @@ type TableSpec = Key & {
   }>;
 };
 
-const tables: Record<string, TableSpec> = {
+const baseTables: Record<string, TableSpec> = {
   answers: {
     model: Answer,
     // One answer per question per profile: re-answering replaces, never appends.
@@ -418,6 +442,57 @@ const tables: Record<string, TableSpec> = {
   },
 };
 
+// WS-0022: append-only observations. The DELETE trigger lets exactly one path through: a row that already has a
+// tombstone (`observations/store.ts` `purge` writes the tombstone and the delete in one batch). The INSERT trigger
+// keeps a purge from being undone by a replay of the same content.
+const observationTables: Record<string, TableSpec> = {
+  observation_tombstones: {
+    model: ObservationTombstoneRow,
+    primaryKey: ["observationId"],
+    columnOverrides: { reason: "TEXT NOT NULL CHECK (length(reason) > 0)" },
+    // A tombstone keeps the purged row's recorded sequence, so the sequence stays monotone across purges (review R1).
+    unique: [["recordedSeq"]],
+    triggers: [
+      "CREATE TRIGGER IF NOT EXISTS observation_tombstones_no_update BEFORE UPDATE ON observation_tombstones BEGIN SELECT RAISE(ABORT, 'observation tombstones are permanent'); END",
+      "CREATE TRIGGER IF NOT EXISTS observation_tombstones_no_delete BEFORE DELETE ON observation_tombstones BEGIN SELECT RAISE(ABORT, 'observation tombstones are permanent'); END",
+      // REPLACE deletes the conflicting row without firing delete triggers (D1: recursive_triggers is off), so any
+      // insert that collides with a tombstone is rejected before the conflict is resolved (review R2).
+      "CREATE TRIGGER IF NOT EXISTS observation_tombstones_no_replace BEFORE INSERT ON observation_tombstones WHEN EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = NEW.observationId OR recordedSeq = NEW.recordedSeq) BEGIN SELECT RAISE(ABORT, 'observation tombstones are permanent'); END",
+    ],
+  },
+  observations: {
+    model: ObservationRow,
+    primaryKey: ["id"],
+    columnOverrides: {
+      kind: "TEXT NOT NULL CHECK (kind IN ('FeedEntry', 'Detail', 'StatusOnly'))",
+      status: "TEXT NOT NULL",
+    },
+    // The recorded-time axis: one observation per recorded sequence number.
+    unique: [["recordedSeq"]],
+    indexes: [["sourceId", "externalId"]],
+    triggers: [
+      "CREATE TRIGGER IF NOT EXISTS observations_no_update BEFORE UPDATE ON observations BEGIN SELECT RAISE(ABORT, 'observations are append-only'); END",
+      "CREATE TRIGGER IF NOT EXISTS observations_no_delete BEFORE DELETE ON observations WHEN NOT EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = OLD.id AND recordedSeq = OLD.recordedSeq) BEGIN SELECT RAISE(ABORT, 'observations are append-only; purge writes a tombstone first'); END",
+      "CREATE TRIGGER IF NOT EXISTS observations_no_resurrection BEFORE INSERT ON observations WHEN EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = NEW.id) BEGIN SELECT RAISE(IGNORE); END",
+      // Review R2. The three INSERT guards below have disjoint conditions, so their firing order does not matter.
+      // Same id, same content: a replay, a no-op (this also keeps INSERT OR REPLACE from deleting a row whose
+      // recordedSeq it collides with). Same id, other content: an overwrite, rejected.
+      "CREATE TRIGGER IF NOT EXISTS observations_replay_is_noop BEFORE INSERT ON observations WHEN EXISTS (SELECT 1 FROM observations WHERE id = NEW.id AND irVersion IS NEW.irVersion AND sourceId IS NEW.sourceId AND externalId IS NEW.externalId AND kind IS NEW.kind AND status IS NEW.status AND dateModified IS NEW.dateModified AND payload IS NEW.payload) BEGIN SELECT RAISE(IGNORE); END",
+      "CREATE TRIGGER IF NOT EXISTS observations_no_overwrite BEFORE INSERT ON observations WHEN EXISTS (SELECT 1 FROM observations WHERE id = NEW.id AND NOT (irVersion IS NEW.irVersion AND sourceId IS NEW.sourceId AND externalId IS NEW.externalId AND kind IS NEW.kind AND status IS NEW.status AND dateModified IS NEW.dateModified AND payload IS NEW.payload)) BEGIN SELECT RAISE(ABORT, 'observations are append-only; an id names one content'); END",
+      // Review R1: a new row's recordedSeq must exceed every sequence ever issued, the purged ones included (their
+      // tombstones keep them). This also rejects a REPLACE that collides on recordedSeq with another row.
+      "CREATE TRIGGER IF NOT EXISTS observations_seq_monotone BEFORE INSERT ON observations WHEN NOT EXISTS (SELECT 1 FROM observations WHERE id = NEW.id) AND NOT EXISTS (SELECT 1 FROM observation_tombstones WHERE observationId = NEW.id) AND NEW.recordedSeq <= MAX(COALESCE((SELECT MAX(recordedSeq) FROM observations), 0), COALESCE((SELECT MAX(recordedSeq) FROM observation_tombstones), 0)) BEGIN SELECT RAISE(ABORT, 'recordedSeq must exceed every sequence ever issued, purged ones included'); END",
+    ],
+  },
+  workload_projection: {
+    model: WorkloadProjectionRow,
+    // Rebuildable: no triggers, a rebuild deletes and rewrites it.
+    primaryKey: ["canonicalJobId"],
+  },
+};
+
+const tables: Record<string, TableSpec> = { ...baseTables, ...observationTables };
+
 const fieldsOf = (model: unknown): ReadonlyArray<string> => {
   const candidate = model as { select?: { fields?: object }; fields?: object };
   const fields = candidate.select?.fields ?? candidate.fields ?? {};
@@ -460,6 +535,11 @@ const migrations = [
   {
     name: "0005_profile-consent.sql",
     currentWhen: "EXISTS (SELECT 1 FROM pragma_table_info('profiles') WHERE name = 'aiAssist')",
+  },
+  {
+    name: "0006_observation-store.sql",
+    currentWhen:
+      "EXISTS (SELECT 1 FROM pragma_table_info('observations') WHERE name = 'payload') AND EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = 'observations_seq_monotone')",
   },
 ] as const;
 
@@ -512,6 +592,24 @@ const render = (): string => {
       const name = `idx_${table}_${columnSet.join("_")}`;
       lines.push(`CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${columnSet.join(", ")});`, "");
     }
+  }
+  const triggers = Object.entries(tables).flatMap(([table, spec]) =>
+    (spec.triggers ?? []).map((trigger) => {
+      if (!trigger.includes(` ON ${table} `) || trigger.includes("\n")) {
+        throw new Error(`${table}: a trigger must be one line and be declared ON ${table}`);
+      }
+      return trigger;
+    }),
+  );
+  if (triggers.length > 0) {
+    lines.push(
+      "-- Triggers (WS-0022), after every table so a body may name any of them. One",
+      "-- statement per line, so a line-oriented splitter keeps BEGIN ... END whole.",
+    );
+    for (const trigger of triggers) {
+      lines.push(`${trigger};`);
+    }
+    lines.push("");
   }
   lines.push(
     "-- Wrangler records ordered D1 migrations in this table. A generated",

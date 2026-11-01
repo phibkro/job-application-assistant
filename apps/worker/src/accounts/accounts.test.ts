@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { Session } from "@job-index/domain/Access";
 import { ProfileId, PrincipalId } from "@job-index/domain/Ids";
@@ -13,7 +14,9 @@ const principal = (raw: string) => Schema.decodeUnknownSync(PrincipalId)(raw);
 const principalOne = principal("principal-1");
 
 const run = <A, E>(state: FakeState, effect: Effect.Effect<A, E, Accounts>) =>
-  Effect.runPromise(effect.pipe(Effect.provide(layer), Effect.provide(fakeDatabaseLayer(state))));
+  Effect.runPromise(
+    effect.pipe(Effect.provide(Layer.provideMerge(layer, fakeDatabaseLayer(state)))),
+  );
 
 const withAccounts = <A>(f: (accounts: Accounts["Service"]) => Effect.Effect<A>) =>
   Effect.gen(function* () {

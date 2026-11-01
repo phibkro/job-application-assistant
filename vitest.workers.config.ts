@@ -85,6 +85,8 @@ export default defineConfig({
       "apps/worker/src/handlers/corpus.live.test.ts",
       "apps/worker/src/handlers/navToClient.live.test.ts",
       "apps/worker/src/hydration/live.test.ts",
+      // WS-0022: the observation store and its triggers, against real D1.
+      "apps/worker/src/observations/*.live.test.ts",
     ],
     setupFiles: ["./apps/worker/src/testSupport/workersSetup.ts"],
     coverage: {
@@ -117,6 +119,9 @@ export default defineConfig({
         "apps/worker/src/corpus/hydrate.ts",
         "apps/worker/src/handlers/corpus.ts",
         "apps/worker/src/hydration/index.ts",
+        // WS-0022: the observation store and projection maintenance, exercised against real D1.
+        "apps/worker/src/observations/store.ts",
+        "apps/worker/src/observations/projection.ts",
       ],
       // `branches` is lower than `vitest.config.ts`'s 70: this project's
       // live tests deliberately exercise one path each (e.g.

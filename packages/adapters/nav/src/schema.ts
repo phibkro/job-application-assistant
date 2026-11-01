@@ -28,6 +28,8 @@ export type WorkLocation = typeof WorkLocation.Type;
 
 export const Employer = Schema.Struct({
   name: nullishString,
+  /** Organisation number (WS-0022: IR `taxID`). */
+  orgnr: nullishString,
 });
 export type Employer = typeof Employer.Type;
 
@@ -45,6 +47,10 @@ const AdContent = Schema.Struct({
   jobtitle: nullishString,
   link: nullishString,
   employer: Schema.optional(Employer),
+  /** NAV's schedule category, `Heltid`/`Deltid` (WS-0022: IR `employmentType`). Detail only. */
+  extent: nullishString,
+  /** Number of openings. The recorded live detail sends a string (`"3"`); a number is accepted too. */
+  positioncount: Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number]))),
 });
 export type AdContent = typeof AdContent.Type;
 

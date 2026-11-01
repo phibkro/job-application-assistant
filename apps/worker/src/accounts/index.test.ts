@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { PrincipalId, ProfileId } from "@job-index/domain/Ids";
 import { Accounts, Profiles } from "../services/Accounts.ts";
@@ -21,7 +22,7 @@ describe("layer", () => {
         });
         const cv = yield* profiles.get(profileId);
         return { resolved, cv };
-      }).pipe(Effect.provide(layer), Effect.provide(fakeDatabaseLayer(state))),
+      }).pipe(Effect.provide(Layer.provideMerge(layer, fakeDatabaseLayer(state)))),
     );
 
     expect(result.resolved).toBeUndefined();

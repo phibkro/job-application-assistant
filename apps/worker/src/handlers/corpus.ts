@@ -1,7 +1,9 @@
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import type { AcquisitionTier } from "@job-index/domain/Source";
+import { groupByWorkload, parseWorkloadQuery } from "@job-index/domain/observation/Query";
 import { api, NotFound } from "../Api.ts";
+import * as WorkloadProjection from "../observations/projection.ts";
 import { Corpus, type JobFilter } from "../services/Corpus.ts";
 import { Hydration } from "../services/Hydration.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
@@ -29,11 +31,27 @@ export const layer = HttpApiBuilder.group(api, "corpus", (handlers) =>
         const limit = decodeLimit(query.limit);
         const cursor = decodeCursor(query.cursor);
         const filter = decodeJobFilter(query);
+        const workload = parseWorkloadQuery(query.workloadMin, query.workloadMax);
+        if (workload._tag === "Invalid") {
+          // Same contract as an unrecognised `status`: `listJobs` declares no error to reject it with.
+          return yield* Effect.die(new Error(workload.reason));
+        }
         const data =
           filter === undefined
             ? yield* corpus.changedSince(cursor, limit)
             : yield* corpus.search(filter, cursor, limit);
-        return { data, meta: { limit, nextCursor: nextCursorOf(data, limit) } };
+        const meta = { limit, nextCursor: nextCursorOf(data, limit) };
+        if (workload._tag === "Absent") return { data, meta };
+        // WS-0022, experimental. The cursor walks the same scan as an unfiltered page, so a page may hold fewer than
+        // `limit` jobs once determined-but-outside ones are excluded; `nextCursor` still says whether the scan is done.
+        const rows = yield* WorkloadProjection.rowsFor(data.map((job) => job.id));
+        const grouped = groupByWorkload(
+          workload.query,
+          data.map((job) => job.id),
+          rows,
+        );
+        const kept = new Set(grouped.kept);
+        return { data: data.filter((job) => kept.has(job.id)), meta, workload: grouped.section };
       }),
     )
     // Opening a vacancy is the "someone hovered, or clicked" moment the

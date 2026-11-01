@@ -4,7 +4,7 @@
 
 - Source occurrence `(sourceId, externalId)` and vacancy are separate identities; never merge within one source.
 - **Homogeneous shape, heterogeneous content:** every source fills the same closed `Fact<T>` attribute set (schema.org names); variance lives in `state`, evidence and authority.
-- *(Target, lands in WS-0022)* Observations are append-only (enforced by triggers) and content-addressed, carrying valid and recorded time; projections are rebuildable.
+- Observations (WS-0022) are append-only (D1 triggers reject UPDATE/DELETE/REPLACE; purge leaves a tombstone; `recordedSeq` strictly monotone) and content-addressed, carrying valid and recorded time; projections are rebuildable.
 - Canonical changes get a monotonic sequence; replaying identical input is a no-op.
 
 ## Code (adopted design; enforcement lands per ticket)
