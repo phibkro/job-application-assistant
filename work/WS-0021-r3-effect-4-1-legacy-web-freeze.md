@@ -2,7 +2,7 @@
 
 - ID: WS-0021
 - Revision: 3
-- Status: **Approved** (owner decisions 2026-11-01: pin `effect ~4.1`; Astro + islands is the target frontend; freeze the Foldkit app as a legacy island)
+- Status: **Superseded by [WS-0021@4](WS-0021-r4-effect-4-1-retire-legacy-web.md)** (owner decision 2026-11-01: retire the legacy UI instead of freezing it). Implementation `5bf0e41` on local branch `ws21-r3` got review REQUEST CHANGES (`evidence/WS-0021/r3/review.md`). Its back-end hunk is reused by r4.
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2**: dependency changes plus a workspace restructure. Requires plan review, independent review, a rollback plan and provenance, plus the human gates `scope` and `acceptance_or_integration`.
 - Repository/ref: `phibkro/job-application-assistant`. The implementer pins the starting commit.
