@@ -2,7 +2,7 @@
 
 - ID: WS-0027
 - Revision: 1
-- Status: **Approved** (owner gate 2026-11-01). Sequenced after WS-0026 (done) and **before** WS-0022 and WS-0025.
+- Status: **Superseded by [WS-0027@2](WS-0027-r2-toolchain-devenv-vite-plus.md).** Execution stopped correctly at its gate with nothing migrated (`f54565c` on `ws27`; evidence `evidence/WS-0027/README.md`). Three blockers: Vite+ bundles Vitest 5, but the Cloudflare workers pool and better-auth test-utils need Vitest 4; and real Alchemy Previews need alchemy ≥ beta.78, which needs a newer Effect in `infra/`.
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2**: developer-environment, CI and preview-deployment changes. No runtime behavior change.
 - Roles: implementer and independent reviewer at the `complex-reasoning` tier.
