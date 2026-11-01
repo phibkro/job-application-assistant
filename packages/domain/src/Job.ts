@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import * as Model from "effect/unstable/schema/Model";
+import * as Model from "effect/schema/Model";
 import { CanonicalJobId, OccurrenceId, PlatformId, Sequence, SourceId } from "./Ids.ts";
 
 /** A vacancy as a source published it, before identity is derived. */

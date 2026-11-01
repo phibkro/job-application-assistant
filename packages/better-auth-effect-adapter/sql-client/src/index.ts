@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import type { SqlClient } from "effect/unstable/sql/SqlClient";
+import type { SqlClient } from "effect/sql/SqlClient";
 import type { Executor } from "../../src/Executor.ts";
 
 /**

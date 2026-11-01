@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { QuestionKey } from "@job-index/domain/Answer";
 import { fromJson, toJson, toMarkdown } from "@job-index/domain/Profile";
 import { historyToJson, historyToMarkdown } from "@job-index/domain/Applications";

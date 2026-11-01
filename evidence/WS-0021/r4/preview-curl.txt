@@ -1,0 +1,45 @@
+$ curl -sS -i http://127.0.0.1:8799/
+HTTP/1.1 200 OK
+Transfer-Encoding: chunked
+Content-Type: text/html; charset=utf-8
+Cache-Control: public, max-age=0, must-revalidate
+ETag: "3c0868f849a4ab8d2ab0322a403ac7c2"
+CF-Cache-Status: HIT
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Job Index</title>
+  </head>
+  <body>
+    <main>
+      <h1>Job Index</h1>
+      <p>Index client in development; the read API is at <a href="/api/v1/jobs">/api/v1/jobs</a>.</p>
+    </main>
+  </body>
+</html>
+
+$ curl -sS -i http://127.0.0.1:8799/some/deep/link
+HTTP/1.1 200 OK
+Transfer-Encoding: chunked
+Content-Type: text/html; charset=utf-8
+Cache-Control: public, max-age=0, must-revalidate
+ETag: "3c0868f849a4ab8d2ab0322a403ac7c2"
+CF-Cache-Status: HIT
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+$ curl -sS -i "http://127.0.0.1:8799/api/v1/jobs?limit=2"
+HTTP/1.1 200 OK
+Content-Length: 857
+Content-Type: application/json
+
+{"data":[{"id":"cj_1","title":"Baker i Østfold","employerName":"Bakeriet AS","location":"Østfold","applicationUrl":"https://example.com/job/1","publishedAt":"2026-08-01T06:00:00Z","status":{"_tag":"Active"},"sequence":1,"changedAt":"2026-08-01T06:00:00Z","sources":["nav"],"hydration":{"_tag":"Hydrated","description":"Vi søker en baker til vårt bakeri. Tidlige morgener, godt arbeidsmiljø.","deadline":null}},{"id":"cj_2","title":"Frontendutvikler","employerName":"Nordic Tech AS","location":"Oslo","applicationUrl":"https://example.com/job/2","publishedAt":"2026-08-02T08:00:00Z","status":{"_tag":"Active"},"sequence":2,"changedAt":"2026-08-02T08:00:00Z","sources":["nav"],"hydration":{"_tag":"Hydrated","description":"TypeScript, React og litt Rust. Hybrid arbeidssted i Oslo sentrum.","deadline":"2026-09-01"}}],"meta":{"limit":2,"nextCursor":"2"}}
+$ curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8799/api/health
+200

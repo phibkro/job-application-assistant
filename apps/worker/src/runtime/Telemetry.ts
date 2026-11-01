@@ -1,6 +1,6 @@
 import * as Layer from "effect/Layer";
-import * as Otlp from "effect/unstable/observability/Otlp";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as Otlp from "effect/observability/Otlp";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 
 /**
  * Where this service's logs, metrics, and traces go.

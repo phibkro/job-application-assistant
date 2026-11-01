@@ -2,7 +2,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import type { Experience } from "@job-index/domain/Profile";
 import type { Profile } from "@job-index/domain/Profile";
 import { Proposal, targetOf } from "@job-index/domain/Proposals";
