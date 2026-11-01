@@ -162,7 +162,7 @@ or range, a source category (for example NAV `Heltid`/`Deltid`), negotiable,
 contradictory, or unknown. Unknown is never treated as full-time.
 
 **Facts from this baseline that shape it.** NAV's feed summary has no extent
-(G11). NAV detail has a categorical `extent`, not a percentage, and detail
+(G11). In the recorded live detail (`fixtures/nav/live-detail.json`), NAV detail has a categorical `extent`, not a percentage; whether NAV exposes a percentage field elsewhere is unverified and TB-01 must check the feed spec, and detail
 arrives only through hydration on a public read (G2). A D05 merge can
 combine two requisitions with different extents (G5). The ticket must
 therefore decide, with owner approval, where workload is acquired (an

@@ -64,9 +64,10 @@ The approved product direction is the Job Application Assistant mission and MVP 
   workerd tests; full Playwright passed 2/2 with Axe, responsive, and keyboard
   journey coverage; actual independent R2 review passed. Evidence is in
   `.artifacts/ws-0016/`, and scope is
-  `work/WS-0016-r1-document-profile-inference.md`. At `25bb8e9` plus WS-0020's
-  test, `bun run check` passes: 807 Bun tests passed with 4 skipped, and 109
-  workerd tests passed.
+  `work/WS-0016-r1-document-profile-inference.md`.
+- WS-0020 (`b601267`): `bun run check` passes with 807 Bun tests passed, 4
+  skipped, and 109 workerd tests passed; independent review ACCEPT WITH NITS
+  (`evidence/WS-0020/review.md`).
 - WS-0017 lazy ingestion retires cron-driven ingestion by owner decision
   2026-08-25: no stage declares a trigger; the freshness gate arms on
   authenticated feed reads after the response resolves, respects a six-hour

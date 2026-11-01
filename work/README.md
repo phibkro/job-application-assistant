@@ -8,7 +8,8 @@ Store immutable or versioned work-scope instances here. Do not use ad hoc task n
 - [RFC 0016](../docs/internal/rfcs/0016-read-only-norwegian-market-index.md) is **Accepted with amendments A1–A4** (2026-11-01).
 - [Tracer program](../docs/internal/architecture/market-index-tracers.md) is a roadmap, not bulk implementation authority.
 - [Coding-agent handoff](HANDOFF-market-index.md) provides a scoped, copyable entry point.
-- [WS-0020@1](WS-0020-r1-market-index-baseline.md) and its [execution plan](WS-0020-r1-execution-plan.md) are the **approved** first bounded characterization Ticket (owner gate 2026-11-01, lead amendments L1–L4). Later tracers need their own approved WorkScopes.
+- [WS-0020@1](WS-0020-r1-market-index-baseline.md) and its [execution plan](WS-0020-r1-execution-plan.md) are the **approved** first bounded characterization Ticket (owner gate 2026-11-01, lead amendments L1–L4). Later tracers need their own approved WorkScopes. WS-0020 is done (`b601267`, independent review ACCEPT WITH NITS).
+- [WS-0021@1](WS-0021-r1-effect-4-1-upgrade.md): Effect 4.1.0 upgrade, approved and next.
 
 ## Current work
 

@@ -33,8 +33,22 @@ Reviewed against `main` at `881eb40` and companion `phibkro/job-hunting` PR #1 h
 | D02 | **Interim: freeze** | D1 stays authoritative for existing in-app history; Linear for the job-hunting pipeline. No sync, no migration, and no *new* application-state writers in either repo until a migration WorkScope. |
 | D03 | **In progress** via WS-0020@1 | Implementation facts come from pinned code and executed tests, not the memory bank. |
 | D04 | **Interim: NAV only** | NAV is the only live source for TB-00 to TB-04. Second sources are fixture-only until a per-source review is recorded. FINN is excluded from the shared index. |
-| D05 | **Open.** Risk confirmed; L1 pins current behavior | No canonical-ID change. The identity migration strategy is decided inside the TB-02 WorkScope (R3: stored IDs and saved snapshots). |
-| D06 | **Open.** Specified in the TB-01 WorkScope | Missing workload ≠ 100%, negotiable ≠ 50%, overlap ≠ equality. |
+| D05 | **Approved 2026-11-01** | Never merge different `externalId`s within one source. The title/employer/location hash becomes a candidate-blocking key, not an identity. Cross-source matches are versioned `sameAs` links with evidence, keyed on `orgnr` where present. IDs are never recomputed in place: new method versions mint new IDs, with an `id_aliases` redirect table. Deterministic rules come first; Splink is deferred. Implemented in TB-02 (R3). |
+| D06 | **Approved 2026-11-01** | Facts are stored per occurrence as `Fact<T>`, with a versioned fusion function to the vacancy. Workload is an HR Open schedule category plus an FTE interval. The 7 states: `Stated · Derived · Negotiable · Conflicting · Unknown · TempUnknown · Unsupported`. FTE reference hours, the preferred range, the overlap rule and the display grouping are variables. |
+
+### Design decisions, 2026-11-01 (owner)
+
+| Topic | Decision | Prior art |
+| --- | --- | --- |
+| IR naming | schema.org JobPosting vocabulary | schema.org, Google JobPosting guide |
+| IR shape | **Homogeneous shape, heterogeneous content.** Every source fills the same closed set of `Fact<T>` attributes. Source variance lives only in `state`, evidence and authority. Unmapped content goes to a uniform `residue: RawClaim[]`, never into per-source keys. | Wikidata statements (somevalue/novalue, ranks); FHIR `data-absent-reason` (`unknown`, `unsupported`, `temp-unknown`) |
+| Adapters | Sources are thin importers onto the `SourceAdapter` port; `lower()` keeps `RawListing` consumers unchanged | tsukuri `Importer`/`IrCodec`/`Renderer`; pg-outbox narrow core |
+| Hydration (TB-01) | **Option A:** bounded background hydration, with N per run a `Config` variable chosen from measured load | — |
+| Stability | Contracts start **experimental** and are promoted on evidence (fitness functions): candidate once two different adapters fit unchanged, stable once an external client depends on it. Observations are kept (as lawful) with `irVersion`; projections are rebuildable; old IR versions decode through pure migrations. | Kubernetes alpha/beta/GA; *Building Evolutionary Architectures* (fitness functions, last responsible moment); effx `migrate.ts` |
+| Verification | One `defineSourceConformance(adapter, fixtures)` suite, with one check per numbered guarantee and one deliberately broken twin per check. A source-quirk catalogue as data (`verifiedBy: docs \| fixture \| unverified`). Known-risk pins are deleted when fixed. Property laws over passes. | pg-outbox conformance and mutation controls; file-transfer `declareGuarantees`; pg-txmode catalogue; effx laws |
+| Sequencing | Upgrade `effect` to 4.1.0 (WS-0021) **before** building the IR | Owner repos pin 4.1.0 |
+
+**Proposed, not decided: the client API algebra.** REST, RPC, MCP and CLI should be thin interpreters of **one minimal query algebra**. The algebra's constructs, relations and laws are explicit and property-tested. The CQL2-JSON subset (D09) becomes one *surface syntax* that compiles into it. The seed already exists: `packages/domain/src/SetExpression.ts` (Atom/Union/Intersection/Difference + `evaluate`). This goes to a design-spike WorkScope after TB-01, reshaping TB-04.
 
 ### Ownership
 
@@ -52,8 +66,9 @@ One Ticket is active at a time. Each later Ticket gets the next free WorkScope I
 
 | Ticket | Status | Risk | Falsifier | Must hold before scoping |
 | --- | --- | --- | --- | --- |
-| TB-00 · WS-0020@1 | **Approved, delegated** | R1 | Identical replay moves `sequence`; returned record lacks its source | — |
-| TB-01 workload facts | Next; draft after the TB-00 gap report | R2 (additive schema + API field) | An advert with no stated percentage is excluded as full-time, or 40–80% is reported as exactly 50% | D06 field spec; TB-00 evidence |
+| TB-00 · WS-0020@1 | **Done:** `b601267`, review ACCEPT WITH NITS (`evidence/WS-0020/review.md`) | R1 | Identical replay moves `sequence`; returned record lacks its source | — |
+| WS-0021 Effect 4.1.0 | **Approved, next** | R2 (dependency) | Any test assertion changes, or a semantic difference appears | — |
+| TB-01 workload facts (WS-0022) | After WS-0021; experimental IR v0 + NAV importer + workload pass + bounded hydration | R2 (additive schema + API field) | An advert with no stated percentage is excluded as full-time, or 40–80% is reported as exactly 50% | D06 field spec; TB-00 evidence |
 | TB-02 second-source identity | Blocked | R3 (canonical IDs, saved snapshots) | Two same-title NAV requisitions stay merged after the change, or a saved job is orphaned | D05 strategy; D04 fixture-only |
 | TB-03 change/retraction | Queued | R2 | A closed vacancy still matches an active query via the changes cursor | Stable identity contract (TB-02) |
 | TB-04 query AST | Queued | R2 (public contract) | Web and API return different IDs/order for the same AST; an unsupported operator compiles | TB-01 |

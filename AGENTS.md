@@ -67,17 +67,23 @@ Inside `nix develop`, the equivalent `just ...` commands are permitted.
 
 A deployment claim is invalid when `./bootstrap verify` did not pass for the same source revision.
 
-## Subagent model selection (Claude Code)
+## Delegation capability tiers
 
-When delegating to a subagent, always set its model explicitly rather than inheriting the parent's:
+When delegating to a subagent, choose a capability tier for the task, then bind it to that platform's model explicitly. Do not inherit the parent's model by default.
 
-| Task | Model | Examples |
+| Tier | Use for | Examples |
 | --- | --- | --- |
-| Default: research, exploration, bounded implementation, doc drafting | `sonnet` (Sonnet 5.5) | Pattern sweeps, fixtures, evidence write-ups |
-| Complex: architecture and design, multi-file implementation against real harnesses, independent gate review, identity/schema migration | `opus` | Tracer implementer, WorkScope gate review |
-| Short and bounded: one lookup, a format check, a single-file summary | `haiku` | Checking a citation, listing or counting files |
+| `general` (default) | Research, exploration, bounded implementation, doc drafting | Pattern sweeps, fixtures, evidence write-ups |
+| `complex-reasoning` | Architecture and design, multi-file implementation against real harnesses, independent gate review, identity/schema migration | Tracer implementer, WorkScope gate review |
+| `bounded` | One lookup, a format check, a single-file summary | Checking a citation, listing or counting files |
 
-When unsure, use `sonnet`. Escalate to `opus` only when the task needs sustained multi-step judgment.
+When unsure, use `general`. Escalate only when the task needs sustained multi-step judgment.
+
+Platform bindings, kept current here:
+
+| Platform | `general` | `complex-reasoning` | `bounded` |
+| --- | --- | --- | --- |
+| Claude Code | `sonnet` (Sonnet 5.5) | `opus` | `haiku` |
 
 ## Read-only market-index direction (RFC 0016 accepted with amendments, 2026-11-01)
 
