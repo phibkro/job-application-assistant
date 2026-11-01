@@ -2,7 +2,7 @@
 
 - ID: WS-0021
 - Revision: 2
-- Status: **Postponed** (owner decision 2026-11-01). Attempt 1 stopped correctly: foldkit 0.170.0 replaces the update return tuple with a record, forcing ~180 source and 181 test-site rewrites and changing assertions (`evidence/WS-0021/r2-attempt1/`). The owner postponed the upgrade until the WS-0024 stack spike reports. The repo stays on `effect@4.0.0-rc.108` / `foldkit@0.139.0`.
+- Status: **Superseded by [WS-0021@3](WS-0021-r3-effect-4-1-legacy-web-freeze.md)**. Previously postponed (owner decision 2026-11-01). Attempt 1 stopped correctly: foldkit 0.170.0 replaces the update return tuple with a record, forcing ~180 source and 181 test-site rewrites and changing assertions (`evidence/WS-0021/r2-attempt1/`). The owner postponed the upgrade until the WS-0024 stack spike reports. The repo stays on `effect@4.0.0-rc.108` / `foldkit@0.139.0`.
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2**: dependency changes across worker, domain and web. Requires plan review, independent review, a rollback plan and provenance, plus the human gates `scope` and `acceptance_or_integration`.
 - Repository/ref: `phibkro/job-application-assistant`, branch `claude/clever-heisenberg-lwui1b`. The implementer pins the starting commit.
