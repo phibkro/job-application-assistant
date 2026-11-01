@@ -2,14 +2,16 @@
 
 ## Now
 
-- **WS-0021@4 integrated** on the designated branch (`810bab8`, `6859df2`): effect 4.1.1 across the workspace, legacy UI retired, delta review ACCEPT WITH NITS (`evidence/WS-0021/r4/review.md`). Merging to `main` is the owner's gate.
-- **Next up:** WS-0026 agent tooling.
+- **Merged to `main`** in PR #22 (`7b850d7`): RFC 0016, the TB-00 baseline, effect ~4.1, legacy UI retired, the G14 flaky-test fix.
+- **WS-0026** (agent tooling) is implemented on `ws26` and under independent review.
+- **WS-0027** (devenv + Vite+ + Alchemy Previews) is proposed and sequenced before WS-0022/WS-0025.
+
 
 ## Next
 
-1. **WS-0026**: agent tooling (Effect language service in `check`, `LLMS.md`, Foldkit skills).
-2. **WS-0022 (TB-01)**: workload facts through the experimental observation IR (approved, L1–L4), **in parallel with**
-3. **WS-0025**: `apps/index-web` first slice: browse, detail, filters, anonymous presets (approved).
+1. **WS-0026**: review → integrate.
+2. **WS-0027**: toolchain (proposed, awaiting approval).
+3. **WS-0022 (TB-01)** in parallel with **WS-0025** (index-web). Both are approved and start after WS-0027.
 4. Then TB-02 (identity, R3), TB-05 (event-loop triggers, which also retire the lazy gate), and the WS-0023 query-algebra spike.
 
 ## Blocked / open
