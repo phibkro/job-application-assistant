@@ -10,8 +10,8 @@ A dependable, provenance-aware, up-to-date **read-only query service for Norwegi
 
 - **In:** permitted-source acquisition through thin adapters; append-only observations; versioned pure derivations; conservative identity; typed queries and change feeds; explicit `Fact` states (unknown ≠ full-time).
 - **Out:** client-facing mutations of the corpus; application submission; CV/letter workflows; personal data in the shared corpus; arbitrary SQL.
-- **Legacy:** the personal-workflow API routes and their stored data are kept, and get no new features. Their UI is being retired (WS-0021@4, in progress; recoverable at `35e93e1`). They are destined for `job-hunting`.
+- **Legacy:** the personal-workflow API routes and their stored data are kept, and get no new features. Their UI was retired in WS-0021@4 (recoverable at `35e93e1`). They are destined for `job-hunting`.
 
 ## Shape
 
-TypeScript + Effect on Cloudflare Workers, D1 and Durable Objects. `main` is on `effect 4.0.0-rc.108` until WS-0021@4 moves it to `~4.1`. Design: Effect at the edge, pure core. The planned client is `apps/index-web` (Foldkit 0.170, WS-0025). See [techContext](techContext.md).
+TypeScript + Effect on Cloudflare Workers, D1 and Durable Objects. `effect ~4.1` (4.1.1). Design: Effect at the edge, pure core. The planned client is `apps/index-web` (Foldkit 0.170, WS-0025). See [techContext](techContext.md).

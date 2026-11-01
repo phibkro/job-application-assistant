@@ -154,4 +154,4 @@ restored it exits 0.
 
 ### Rollback
 
-Revert the single commit. `apps/web`, the e2e specs, the old asset paths and the rc.108 lockfile all come back from git. Then run `bun install --frozen-lockfile`.
+Revert both WS-0021@4 commits together, newest first: the review fix (`6859df2` on the designated branch, `6a06273` on `ws21-r4`), then the upgrade (`810bab8`, `f986e35` on `ws21-r4`). Reverting only the upgrade would leave `/apps/web/` ignored and let `just clean` delete the restored source (delta review D1). `apps/web`, the e2e specs, the old asset paths and the rc.108 lockfile all come back from git. Then run `bun install --frozen-lockfile`.

@@ -2,7 +2,8 @@
 
 ## Now
 
-- **WS-0021@4**: effect `~4.1` for the whole workspace and retiring the legacy Foldkit UI. Implementation is in progress in a separate worktree; an independent review follows.
+- **WS-0021@4 integrated** on the designated branch (`810bab8`, `6859df2`): effect 4.1.1 across the workspace, legacy UI retired, delta review ACCEPT WITH NITS (`evidence/WS-0021/r4/review.md`). Merging to `main` is the owner's gate.
+- **Next up:** WS-0026 agent tooling.
 
 ## Next
 
@@ -17,7 +18,7 @@
 | --- | --- |
 | NAV's written redistribution answer (planning assumes acceptance) | Owner |
 | NAV private-token rotation | Operator |
-| Deployed corpus loses its only refresh trigger when WS-0021@4 lands, until TB-05 | TB-05 |
+| Deployed corpus has no refresh trigger (since WS-0021@4) until TB-05 | TB-05 |
 | `infra/` Effect pin (rc.108) | Follow-up ticket |
 | Production qualification | Superseded; a new gate is defined after TB-05 |
 
