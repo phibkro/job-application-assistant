@@ -57,6 +57,18 @@ assert not cron_pattern.search(infra_code_for_crons), (
     "cron-looking schedule literal found in infra; no stage may declare a trigger"
 )
 
+# WS-0029@4: Alchemy beta.84 adds `new_module_registry` to every JS Worker
+# unless `legacy_module_registry` is declared. Pin the exact opt-out (and
+# today's date) so the runtime module registry cannot change silently;
+# adopting the new registry is its own ticket.
+COMPATIBILITY_LITERAL = 'compatibility: { date: "2026-05-25", flags: ["legacy_module_registry"] },'
+assert infra_code_for_crons.count(COMPATIBILITY_LITERAL) == 1, (
+    "infra must declare exactly " + COMPATIBILITY_LITERAL
+)
+assert "new_module_registry" not in infra_code_for_crons, (
+    "new_module_registry must not be opted into in infra"
+)
+
 # Every stage starts from one generated snapshot. Ordered TypeScript-era
 # migrations then preserve databases created by an earlier snapshot. Alchemy
 # must not apply them: it provisions the resource before the deploy script can
@@ -69,6 +81,11 @@ infra_code = re.sub(r"(^|[^:])//.*$", r"\1", infra_code, flags=re.MULTILINE)
 assert "migrationsDir" not in infra_code, (
     "Alchemy must not apply migrations; the deploy establishes the snapshot first"
 )
+# WS-0029@4: Alchemy beta.84 renamed the D1 prop to `migrations` and applies
+# pending migrations on every deploy (@alchemy.run/cloudflare D1/Database.ts).
+assert not re.search(r"\bmigrations\s*:", infra_code), (
+    "Alchemy must not apply migrations (`migrations:` prop); the deploy establishes the snapshot first"
+)
 
 # The deploy paths must establish the snapshot, apply ordered migrations, and
 # seed the catalogue. Otherwise a new relation can exist beside an old parent
@@ -78,6 +95,9 @@ for script in ("scripts/deploy.sh", "scripts/deploy-preview.sh"):
     assert "db/schema.sql" in text, f"{script} must apply the generated schema"
     assert "migrate-d1.sh" in text, f"{script} must apply ordered D1 migrations"
     assert "db/catalog-seed.sql" in text, f"{script} must seed the researched catalogue"
+    # WS-0029@4: alchemy beta.84 removed `state get`; resource attributes are read with `state read <stack>/<stage>/<fqn>`.
+    assert "alchemy state get" not in text, f"{script} uses the removed `alchemy state get`"
+    assert "bun run alchemy state read \"JobIndex/" in text, f"{script} must read resource state via `alchemy state read`"
 
 # Pull-request previews contain deterministic seed data, never live NAV
 # ingestion, and teardown can target only a validated numeric PR stage.

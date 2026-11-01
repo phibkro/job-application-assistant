@@ -55,8 +55,7 @@ read_resource_attribute() {
   local attribute="$2"
   (
     cd infra
-    ALCHEMY_STAGE="$STAGE" bun run alchemy state get \
-      --stack JobIndex --stage "$STAGE" --fqn "$resource"
+    ALCHEMY_STAGE="$STAGE" bun run alchemy state read "JobIndex/$STAGE/$resource"
   ) | python3 -c '
 import json
 import sys

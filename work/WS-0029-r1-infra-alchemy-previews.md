@@ -2,7 +2,7 @@
 
 - ID: WS-0029
 - Revision: 1
-- Status: **Approved in principle** (owner decision 2026-11-01). Scope is refined after WS-0027@2 lands.
+- Status: **Superseded by [WS-0029@2](WS-0029-r2-infra-alchemy-previews.md)** (scope refined after WS-0027@2 landed; split into pass A and pass B).
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2** (infra/deploy configuration). Elevated to R3 for any production credential change, which is WS-0028's domain.
 - Roles: implementer and independent reviewer at the `complex-reasoning` tier.
