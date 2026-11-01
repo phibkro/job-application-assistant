@@ -34,8 +34,8 @@ Owner prerequisites. Each is a capability grant or a fact about the Cloudflare a
 | # | Prerequisite | Status (2026-11-01) |
 | --- | --- | --- |
 | P1 | A Zero Trust organisation | **Met.** Team domain `phibkro.cloudflareaccess.com`. |
-| P2 | Who may sign in | **Decided:** the *Cloudflare Account Member* selector, using the Cloudflare identity provider. No email address is stored anywhere. The owner checks that the Cloudflare IdP is enabled; organisations created before 2026-06-18 keep their older login methods. |
-| P3 | An Access **service token** for the CI smoke test | Owner action: create `ci-pr-preview` and store it as the `pr-preview` environment secrets `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`. |
+| P2 | Who may sign in | **Decided:** the *Cloudflare Account Member* selector, using the Cloudflare identity provider. No email address is stored anywhere. **Met:** the "Cloudflare account members" IdP is enabled (owner, 2026-11-01). One-time PIN is also enabled, but a policy that includes only account members does not admit OTP-only identities. |
+| P3 | An Access **service token** for the CI smoke test | **Met:** `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` are set in the `pr-preview` environment (owner, 2026-11-01). |
 | P4 | An API token that can edit Access apps | **Likely not needed.** Since 2026-08-14, Access can attach to the Worker itself, covering every domain and preview URL, with a previews-only option. Prefer that, enabled once by the owner, over declaring an Access app in Alchemy: adopt before build. P4 applies only if the implementer shows that the Worker-level setting can't cover our previews. |
 
 Scope:
