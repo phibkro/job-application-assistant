@@ -12,7 +12,7 @@
 | Toolchain: devenv + Vite+ (`vp check`, `vp run`); Vitest 4 kept; policy gates with negative controls (merged in PR #23, `1f53f33`; devenv proven in CI) | [`evidence/WS-0027/`](../evidence/WS-0027/README.md) (r2) |
 | WS-0025@2 index-web: browse, detail, URL-synced filters; Worker serves `apps/index-web/dist`; e2e 6/6 + Axe 0 violations; single Effect; F4 closed (two independent review rounds clean; merging under delegation). r1 stopped on better-auth's `nodejs_compat` need | [`evidence/WS-0025/`](../evidence/WS-0025/README.md) |
 | JVM stack spike (Clojure + Datomic Local); TS kept | [`evidence/WS-0024/`](../evidence/WS-0024/README.md) (REPRODUCES WITH NITS) |
-| TB-01 workload facts: IR v0 (experimental), append-only observation store with triggers, workload pass @1, projection, experimental API filter, `decide` ingestion loop, bounded hydration (implemented, pending review) | [`evidence/WS-0022/`](../evidence/WS-0022/README.md) (F1, F2, F3, F5, F6 pass in TS on D1; 7/7 controls fail) |
+| TB-01 workload facts: IR v0 (experimental), append-only observation store with triggers, workload pass @1, projection, experimental API filter, `decide` ingestion loop, bounded hydration (implemented; round 1 fixes for R1/R2/R6 in, pending review round 2; R3/R4/R5/R7 follow-ups) | [`evidence/WS-0022/`](../evidence/WS-0022/README.md) (F1, F2, F3, F5, F6 pass in TS on D1; 7/7 controls fail) |
 | Reusable qualification evidence: Gate 1 staging provenance (`dfa0fe3`), Gate 3 complete-table D1 restore drill, the 50k-row query-plan qualification | `work/WS-0014-r1-execution-plan.md`, `.artifacts/` |
 
 ## Known gaps
