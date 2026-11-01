@@ -67,7 +67,7 @@ One Ticket is active at a time. Each later Ticket gets the next free WorkScope I
 | Ticket | Status | Risk | Falsifier | Must hold before scoping |
 | --- | --- | --- | --- | --- |
 | TB-00 · WS-0020@1 | **Done:** `b601267`, review ACCEPT WITH NITS (`evidence/WS-0020/review.md`) | R1 | Identical replay moves `sequence`; returned record lacks its source | — |
-| WS-0021 Effect 4.1.0 | **Approved, next** | R2 (dependency) | Any test assertion changes, or a semantic difference appears | — |
+| WS-0021@2 Effect 4.1.0 + foldkit 0.170.0 | **Approved, next** (r1 stopped correctly; `infra/` split to a follow-up) | R2 (dependency) | Any test assertion changes, or a semantic difference appears | — |
 | TB-01 workload facts (WS-0022) | After WS-0021; experimental IR v0 + NAV importer + workload pass + bounded hydration | R2 (additive schema + API field) | An advert with no stated percentage is excluded as full-time, or 40–80% is reported as exactly 50% | D06 field spec; TB-00 evidence |
 | TB-02 second-source identity | Blocked | R3 (canonical IDs, saved snapshots) | Two same-title NAV requisitions stay merged after the change, or a saved job is orphaned | D05 strategy; D04 fixture-only |
 | TB-03 change/retraction | Queued | R2 | A closed vacancy still matches an active query via the changes cursor | Stable identity contract (TB-02) |

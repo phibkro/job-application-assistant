@@ -2,7 +2,7 @@
 
 - ID: WS-0021
 - Revision: 1
-- Status: **Approved** (owner direction 2026-11-01: "upgrade to 4.1 first"). The lead drafted the criteria below; the owner may revise them before integration.
+- Status: **Superseded by [WS-0021@2](WS-0021-r2-effect-4-1-and-foldkit.md).** Execution stopped correctly at its stop condition: foldkit 0.139.0 is incompatible with effect 4.1.0, and the characterization test imports moved modules. Nothing was committed.
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2**: a dependency change (`policy/risk-tiers.json`). It requires plan review, independent review, a rollback plan and provenance, plus the human gates `scope` and `acceptance_or_integration`.
 - Repository/ref: `phibkro/job-application-assistant`, branch `claude/clever-heisenberg-lwui1b`, starting after WS-0020's independent review is recorded. The implementer pins the exact starting commit.
