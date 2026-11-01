@@ -67,6 +67,18 @@ Inside `nix develop`, the equivalent `just ...` commands are permitted.
 
 A deployment claim is invalid when `./bootstrap verify` did not pass for the same source revision.
 
+## Subagent model selection (Claude Code)
+
+When delegating to a subagent, always set its model explicitly rather than inheriting the parent's:
+
+| Task | Model | Examples |
+| --- | --- | --- |
+| Default: research, exploration, bounded implementation, doc drafting | `sonnet` (Sonnet 5.5) | Pattern sweeps, fixtures, evidence write-ups |
+| Complex: architecture and design, multi-file implementation against real harnesses, independent gate review, identity/schema migration | `opus` | Tracer implementer, WorkScope gate review |
+| Short and bounded: one lookup, a format check, a single-file summary | `haiku` | Checking a citation, listing or counting files |
+
+When unsure, use `sonnet`. Escalate to `opus` only when the task needs sustained multi-step judgment.
+
 ## Read-only market-index direction (RFC 0016 accepted with amendments, 2026-11-01)
 
 If explicitly assigned the market-index transition, read [lead handoff](docs/internal/product/market-index-lead-handoff.md), [RFC 0016](docs/internal/rfcs/0016-read-only-norwegian-market-index.md), [target architecture](docs/internal/architecture/read-only-market-index.md), and [tracer-bullet program](docs/internal/architecture/market-index-tracers.md) after the six standard context files. The [coding-agent handoff](work/HANDOFF-market-index.md) is the scoped entry point. The first approved WorkScope is [WS-0020@1](work/WS-0020-r1-market-index-baseline.md). Every later tracer needs its own approved WorkScope. RFC acceptance does **not** authorize changing existing features, deleting features, migrating data, changing canonical IDs, adding live sources, or deploying (see RFC 0016 amendments A1–A4).
