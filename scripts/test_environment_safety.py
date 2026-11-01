@@ -90,6 +90,9 @@ for script in ("scripts/deploy.sh", "scripts/deploy-preview.sh"):
     assert "db/schema.sql" in text, f"{script} must apply the generated schema"
     assert "migrate-d1.sh" in text, f"{script} must apply ordered D1 migrations"
     assert "db/catalog-seed.sql" in text, f"{script} must seed the researched catalogue"
+    # WS-0029@4: alchemy beta.84 removed `state get`; resource attributes are read with `state read <stack>/<stage>/<fqn>`.
+    assert "alchemy state get" not in text, f"{script} uses the removed `alchemy state get`"
+    assert "bun run alchemy state read \"JobIndex/" in text, f"{script} must read resource state via `alchemy state read`"
 
 # Pull-request previews contain deterministic seed data, never live NAV
 # ingestion, and teardown can target only a validated numeric PR stage.
