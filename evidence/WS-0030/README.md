@@ -1,3 +1,5 @@
+> **Post-merge (lead):** PR #24 was squash-merged as `085b57d`. The PR's final CI run on `ddeffc5` gave the first **P2-only** verify sample, **181 s** (run 41346471745), closing review nit R2-N1. Review: `review-pr24.md`.
+
 # WS-0030 optimization passes P2 and P4: measurements and controls
 
 Baseline: [baseline.md](baseline.md) (devenv-era verify job 249 s, run 41341703410, n=1; post-merge push run 41342789158 about 226 s; Tests step 53 s; `bun install` 24-27 s). Method: GitHub Actions API jobs data (`started_at`/`completed_at`, 1 s resolution), job `verify` of the `quality` workflow. Not run: P1, P3, P5 (out of scope). Nothing pushed from the `ws30` worktree; commits were cherry-picked to PR #24 (head f6707d5; P2 = c73ffd6, P4 = f6707d5 on the PR branch; local `ws30`: P2 = 904601e, P4 = 27c92fe).

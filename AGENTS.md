@@ -98,7 +98,7 @@ The owner pre-approves merging a PR into `main` when all of these hold:
    - **Critical always blocks.**
 4. **Hard cap:** if round 5 still leaves a blocking finding, stop and ask the owner.
 
-A round is one review pass plus any fix pushed in response. This delegates the **merge** gate only. Deploys, releases, production changes and capability grants keep their own human gates.
+A round is one review pass plus any fix pushed in response. The repository allows **squash merges only**, so each merged PR becomes one commit on `main`. Keep one revertible change per PR when separate revertibility matters (e.g. WS-0030 passes). This delegates the **merge** gate only. Deploys, releases, production changes and capability grants keep their own human gates.
 
 ## Delegation capability tiers
 
