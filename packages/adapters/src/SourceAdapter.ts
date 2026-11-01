@@ -2,6 +2,7 @@ import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type { DetailFields, RawListing } from "@job-index/domain/Job";
 import type { PlatformId } from "@job-index/domain/Ids";
+import type { ObservationContent } from "@job-index/domain/observation/Ir";
 import type { DecodeFailed, SourceUnavailable } from "@job-index/domain/Failure";
 
 /**
@@ -27,6 +28,12 @@ export interface AcquiredPage {
   readonly more: boolean;
   /** Which mechanism produced this, for telemetry and for the run ledger. */
   readonly via: "feed" | "scripted" | "rendered";
+  /**
+   * WS-0022, experimental: everything the page carried as IR observations, including entries `listings` omits
+   * (NAV's INACTIVE feed entries). `listings` stays the lowered view the corpus consumes. Optional so an adapter that
+   * has no importer yet (JSON-LD) is unchanged; the ingestion run stores whatever is present.
+   */
+  readonly observations?: ReadonlyArray<ObservationContent>;
 }
 
 /**
@@ -40,8 +47,13 @@ export interface AcquiredPage {
  * `design-specs/deferred-hydration.md`'s falsifier 7.
  */
 export type HydrateOutcome =
-  | { readonly _tag: "Hydrated"; readonly detail: DetailFields }
-  | { readonly _tag: "ClosedSince" };
+  | {
+      readonly _tag: "Hydrated";
+      readonly detail: DetailFields;
+      /** WS-0022, experimental: the detail as an IR observation, when the adapter has an importer. */
+      readonly observation?: ObservationContent;
+    }
+  | { readonly _tag: "ClosedSince"; readonly observation?: ObservationContent };
 
 /**
  * A single acquisition mechanism. Registered per tier; never chosen by itself.

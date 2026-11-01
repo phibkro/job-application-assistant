@@ -161,7 +161,7 @@ interface FetchContext {
  */
 export const runLazyIngestion = (env: Env): Promise<unknown> =>
   Effect.runPromise(
-    ingestIfDue(env.INGESTION_ATTEMPT_FLOOR_MS).pipe(
+    ingestIfDue(env.INGESTION_ATTEMPT_FLOOR_MS, env.INGESTION_HYDRATION_PER_RUN).pipe(
       Effect.tap((outcome) =>
         outcome._tag === "CollectFailed"
           ? Effect.logWarning("lazy ingestion attempt failed", { error: outcome.error })

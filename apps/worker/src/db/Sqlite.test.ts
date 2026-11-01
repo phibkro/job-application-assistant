@@ -39,6 +39,9 @@ describe("layerSqlite", () => {
       "ingestion_runs",
       "judgements",
       "label_assignments",
+      // WS-0022: the observation store and its projection (migration 0006).
+      "observation_tombstones",
+      "observations",
       "occurrences",
       "platform_policies",
       "principals",
@@ -50,6 +53,7 @@ describe("layerSqlite", () => {
       "source_state",
       "submissions",
       "subscriptions",
+      "workload_projection",
     ]);
   });
 

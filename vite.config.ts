@@ -83,6 +83,23 @@ export default defineConfig({
           ],
         },
       },
+      {
+        // WS-0022 §8: the pure core is immutable by lint as well as by the boundary test
+        // (packages/domain/src/observation/boundary.test.ts lists the same files). oxlint-plugin-immutable is AST-only:
+        // shallow readonly, no deep-immutability or type-aware checks.
+        files: [
+          "packages/domain/src/observation/{Ir,Workload,Projection,Query,Rows}.ts",
+          "packages/adapters/nav/src/observe.ts",
+          "apps/worker/src/ingestion/run.ts",
+        ],
+        rules: {
+          "immutable/no-let": "error",
+          "immutable/immutable-data": "error",
+          "immutable/no-throw-statements": "error",
+          "immutable/readonly-type": "error",
+          "immutable/type-declaration-immutability": "error",
+        },
+      },
       { files: ["**/*.test.ts"], rules: { "effect/no-ambient-authority": "off" } },
       ...foldkitOverrides,
       {
@@ -100,6 +117,7 @@ export default defineConfig({
     jsPlugins: [
       { name: "effect", specifier: "@phibkro/oxlint-effect-plugin" },
       { name: "foldkit", specifier: "@foldkit/oxlint-plugin" },
+      { name: "immutable", specifier: "oxlint-plugin-immutable" },
     ],
   },
   run: {

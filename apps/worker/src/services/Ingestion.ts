@@ -23,6 +23,11 @@ export interface RunBudget {
    * `SourceLease.acquire`.
    */
   readonly leaseRecoveryMs: number;
+  /**
+   * Bounded background hydration (WS-0022, option A): at most this many detail fetches per run, into the observation
+   * store. Absent means none: a budget is an allowance. The lazy driver grants `INGESTION_HYDRATION_PER_RUN`.
+   */
+  readonly maxDetailFetches?: number;
 }
 
 export interface RunReport {
@@ -35,6 +40,8 @@ export interface RunReport {
   /** Why the run stopped: reached tail, budget exhausted, or a failure. */
   readonly stoppedReason: string;
   readonly durationMs: number;
+  /** WS-0022: detail fetches attempted by bounded hydration in this run (0 when the budget granted none). */
+  readonly detailFetches?: number;
 }
 
 export class Ingestion extends Context.Service<

@@ -73,6 +73,44 @@ describe("decodeEnv", () => {
     },
   );
 
+  // WS-0022: bounded hydration per run is an Effect `Config` with a provisional default (L4).
+  it("defaults bounded hydration to the provisional 5 detail fetches per run", () => {
+    const decoded = decodeEnv({ DB: binding, SOURCE_LEASE: sourceLease, ENVIRONMENT: "staging" });
+    expect(decoded.INGESTION_HYDRATION_PER_RUN).toBe(5);
+  });
+
+  it.each([
+    ["0", 0],
+    ["12", 12],
+    ["40", 40],
+    [7, 7],
+  ] as const)("keeps a valid bounded-hydration override (%j)", (raw, expected) => {
+    const decoded = decodeEnv({
+      DB: binding,
+      SOURCE_LEASE: sourceLease,
+      ENVIRONMENT: "staging",
+      INGESTION_HYDRATION_PER_RUN: raw,
+    });
+    expect(decoded.INGESTION_HYDRATION_PER_RUN).toBe(expected);
+  });
+
+  it.each(["-1", "41", "2.5", "many"])(
+    "fails loud on a malformed bounded-hydration override (%j)",
+    (raw) => {
+      try {
+        decodeEnv({
+          DB: binding,
+          SOURCE_LEASE: sourceLease,
+          ENVIRONMENT: "staging",
+          INGESTION_HYDRATION_PER_RUN: raw,
+        });
+        expect.unreachable("decodeEnv should have thrown");
+      } catch (error) {
+        expect((error as EnvironmentIncomplete).message).toContain("INGESTION_HYDRATION_PER_RUN");
+      }
+    },
+  );
+
   it("retains a native Workers AI binding for the model layer", () => {
     const ai = { run: () => Promise.resolve({ response: "[]" }) };
     const decoded = decodeEnv({

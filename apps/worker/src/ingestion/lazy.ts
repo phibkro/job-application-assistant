@@ -8,6 +8,7 @@ import type { RunBudget, RunReport } from "../services/Ingestion.ts";
 import { Ingestion } from "../services/Ingestion.ts";
 import { SourceCatalog } from "../services/SourceCatalog.ts";
 import * as IngestionGateRepo from "../db/repositories/IngestionGate.ts";
+import { PROVISIONAL_HYDRATION_PER_RUN } from "./hydrationBudget.ts";
 
 /**
  * One checkpointable source page per invocation. D1 folding is intentionally
@@ -17,12 +18,16 @@ import * as IngestionGateRepo from "../db/repositories/IngestionGate.ts";
  * Shared verbatim by both ingestion drivers — the cron-era `scheduled.ts`
  * (kept for local preview only) and the lazy gate below — so the two can
  * never drift apart on how much one attempt may do.
+ *
+ * `maxDetailFetches` (WS-0022, option A) is the provisional bounded-hydration
+ * default; `INGESTION_HYDRATION_PER_RUN` overrides it for the lazy driver.
  */
 export const DEFAULT_RUN_BUDGET: RunBudget = {
   maxPages: 1,
   maxObservations: 2000,
   maxDurationMs: 25_000,
   leaseRecoveryMs: 5 * 60 * 1000,
+  maxDetailFetches: PROVISIONAL_HYDRATION_PER_RUN,
 };
 
 export type LazyOutcome =
@@ -78,6 +83,7 @@ export const DEFAULT_ATTEMPT_FLOOR_MS = 21_600_000;
  */
 export const ingestIfDue = (
   floorMs: number = DEFAULT_ATTEMPT_FLOOR_MS,
+  detailFetchesPerRun: number = PROVISIONAL_HYDRATION_PER_RUN,
 ): Effect.Effect<LazyOutcome, never, Database | SourceCatalog | Ingestion> =>
   Effect.gen(function* (): Effect.gen.Return<
     LazyOutcome,
@@ -100,7 +106,12 @@ export const ingestIfDue = (
       // `LeaseHeld` only, but a *defect* (an unexpected throw inside a
       // source adapter) must also be contained here — this runs behind an
       // already-sent user response, and nothing may escape into waitUntil.
-      const result = yield* Effect.exit(ingestion.collect(entry.id, DEFAULT_RUN_BUDGET));
+      const result = yield* Effect.exit(
+        ingestion.collect(entry.id, {
+          ...DEFAULT_RUN_BUDGET,
+          maxDetailFetches: detailFetchesPerRun,
+        }),
+      );
       if (Exit.isSuccess(result)) {
         reports.push(result.value);
         continue;

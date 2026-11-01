@@ -1,7 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { RawListing } from "../../../domain/src/Job.ts";
-import type { PlatformId, SourceId } from "../../../domain/src/Ids.ts";
 import { DecodeFailed } from "../../../domain/src/Failure.ts";
 import {
   firstPresent,
@@ -14,28 +13,10 @@ import {
 import { htmlToText } from "../../shared/src/Html.ts";
 import * as NavSchema from "./schema.ts";
 
-/**
- * NAV identity constants.
- *
- * `Schema.brand` documents that it "adds no runtime check" (it only narrows
- * the type), so a cast is the correct construction for a literal that is
- * branded purely for compile-time discipline — decoding it through the
- * schema would spend a parse on a value that cannot fail.
- */
-export const NAV_SOURCE_ID = "nav" as SourceId;
-const NAV_SOURCE_NAME = "Arbeidsplassen (NAV)";
+import { NAV_PLATFORM_ID, NAV_SOURCE_ID, NAV_SOURCE_NAME, navPostingUrl } from "./ids.ts";
 
-/**
- * The catalogue seed's id for this platform (migrations/0007_source_catalog_seed.sql)
- * — distinct from `NAV_SOURCE_ID` per this module's own note above. Declared
- * here, not in `index.ts`, so `summaryListing`/`decodeDetail` can stamp
- * `RawListing.platformId` without a caller having to pass in the one value
- * this whole adapter ever produces.
- */
-export const NAV_PLATFORM_ID = "arbeidsplassen-nav" as PlatformId;
-
-const navPostingUrl = (uuid: string): string =>
-  `https://arbeidsplassen.nav.no/stillinger/stilling/${uuid}`;
+/** Moved to `ids.ts` (WS-0022) so the pure importer can use them; re-exported so existing imports are unchanged. */
+export { NAV_PLATFORM_ID, NAV_SOURCE_ID } from "./ids.ts";
 
 const toDecodeFailed =
   (field: string) =>

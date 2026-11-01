@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { ProfileId, ProposalId } from "@job-index/domain/Ids";
 import { QuestionKey } from "@job-index/domain/Answer";
@@ -16,7 +17,9 @@ const question = (raw: string) => Schema.decodeUnknownSync(QuestionKey)(raw);
 const proposalId = Schema.decodeUnknownSync(ProposalId)("proposal-defect");
 
 const run = <A>(state: FakeState, effect: Effect.Effect<A, never, Profiles>) =>
-  Effect.runPromise(effect.pipe(Effect.provide(layer), Effect.provide(fakeDatabaseLayer(state))));
+  Effect.runPromise(
+    effect.pipe(Effect.provide(Layer.provideMerge(layer, fakeDatabaseLayer(state)))),
+  );
 
 const withProfiles = <A>(f: (profiles: Profiles["Service"]) => Effect.Effect<A>) =>
   Effect.gen(function* () {

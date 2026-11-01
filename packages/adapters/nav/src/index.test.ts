@@ -252,6 +252,12 @@ describe("hydrate", () => {
         applicationUrl: "https://careers.example/jobs/100?utm_source=nav",
         deadline: "2026-08-25",
       },
+      // WS-0022: the same detail, also as an IR observation (additive; `detail` above is unchanged).
+      observation: expect.objectContaining({
+        kind: "Detail",
+        externalId: "active-vacancy-1",
+        status: "ACTIVE",
+      }),
     });
   });
 
@@ -291,7 +297,15 @@ describe("hydrate", () => {
       ),
     );
 
-    expect(outcome).toEqual({ _tag: "ClosedSince" });
+    // WS-0022: the status-only answer is kept as an observation (additive; still `ClosedSince`, not `DecodeFailed`).
+    expect(outcome).toEqual({
+      _tag: "ClosedSince",
+      observation: expect.objectContaining({
+        kind: "StatusOnly",
+        externalId: "gone",
+        status: "INACTIVE",
+      }),
+    });
   });
 
   it("still fails loudly when content is missing from something calling itself active", async () => {

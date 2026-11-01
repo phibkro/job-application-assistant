@@ -10,16 +10,19 @@ import schemaSql from "../../../../db/schema.sql?raw";
  * newline as a statement boundary (documented Cloudflare behaviour, verified
  * against a real local D1 binding — a comment line or a `CREATE TABLE`'s
  * second line each error as "SQL code did not contain a statement"). So this
- * splits on `;` after stripping `--` comment lines and sends each statement
- * through `prepare().run()` instead, sequentially: `CREATE TABLE`/`CREATE
- * INDEX` are schema DDL, not writes a batch's atomicity is needed for.
+ * splits on a `;` that ends a line, after stripping `--` comment lines, and
+ * sends each statement through `prepare().run()` instead, sequentially:
+ * `CREATE TABLE`/`CREATE INDEX` are schema DDL, not writes a batch's
+ * atomicity is needed for. Line-ending `;` rather than any `;` since WS-0022:
+ * a trigger's `BEGIN ...; END` body holds an inner `;`, and the generator
+ * keeps every trigger on one line (`scripts/ts/schema.ts`).
  */
 export const applySchema = async (db: D1Database): Promise<void> => {
   const statements = schemaSql
     .split("\n")
     .filter((line: string) => !line.trim().startsWith("--"))
     .join("\n")
-    .split(";")
+    .split(/;[ \t]*(?:\n|$)/)
     .map((statement: string) => statement.trim())
     .filter((statement: string) => statement.length > 0);
   for (const statement of statements) {

@@ -1,17 +1,12 @@
 import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
 import type * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import type * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { SourceUnavailable } from "../../../domain/src/Failure.ts";
 import type { AcquiredPage, HydrateOutcome, SourceAdapter } from "../../src/SourceAdapter.ts";
-import {
-  decodeDetail,
-  decodeFeedPage,
-  isClosedSince,
-  NAV_PLATFORM_ID,
-  NAV_SOURCE_ID,
-  summaryListing,
-} from "./decode.ts";
+import { decodeFeedPage, isClosedSince, NAV_PLATFORM_ID, NAV_SOURCE_ID } from "./decode.ts";
+import { closedObservation, detailObservation, feedObservations, lower } from "./observe.ts";
 import type { NavCredential } from "./credential.ts";
 
 export {
@@ -23,6 +18,7 @@ export {
 } from "./credential.ts";
 export type { NavCredential } from "./credential.ts";
 export { NAV_PLATFORM_ID } from "./decode.ts";
+export { closedObservation, detailObservation, feedObservations, lower } from "./observe.ts";
 
 const NAV_BASE_URL = "https://pam-stilling-feed.nav.no";
 const FEED_PAGE_SIZE = 5;
@@ -125,14 +121,20 @@ export const make = (
         fresh ? since : undefined,
       );
       const page = yield* decodeFeedPage(feedJson);
-      const activeItems = page.items.filter((item) => item.active);
-      const listings = yield* Effect.forEach(activeItems, summaryListing);
+      // WS-0022: every entry becomes an IR observation (INACTIVE ones too); the ACTIVE ones are lowered to the
+      // same summary `RawListing` `summaryListing` built (pinned by `observe.test.ts`).
+      const observations = yield* Effect.fromResult(feedObservations(feedJson));
+      const listings = yield* Effect.forEach(
+        observations.filter((observation) => observation.status === "ACTIVE"),
+        (observation) => Effect.fromResult(lower(observation)),
+      );
 
       return {
         listings,
         cursor: page.nextUrl ?? cursor,
         more: page.nextUrl !== undefined,
         via: "feed",
+        observations,
       } satisfies AcquiredPage;
     }),
   // The targeted counterpart to the eager fetch `page` no longer performs:
@@ -145,9 +147,15 @@ export const make = (
     Effect.gen(function* () {
       const detailJson = yield* fetchJson(client, credential, detailUrl(externalId));
       if (isClosedSince(detailJson)) {
-        return { _tag: "ClosedSince" } satisfies HydrateOutcome;
+        const closed = closedObservation(detailJson);
+        return (
+          Result.isSuccess(closed)
+            ? { _tag: "ClosedSince", observation: closed.success }
+            : { _tag: "ClosedSince" }
+        ) satisfies HydrateOutcome;
       }
-      const listing = yield* decodeDetail(detailJson);
+      const observation = yield* Effect.fromResult(detailObservation(detailJson));
+      const listing = yield* Effect.fromResult(lower(observation));
       return {
         _tag: "Hydrated",
         detail: {
@@ -155,6 +163,7 @@ export const make = (
           applicationUrl: listing.applicationUrl,
           deadline: listing.deadline,
         },
+        observation,
       } satisfies HydrateOutcome;
     }),
 });

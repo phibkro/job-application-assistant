@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = (ROOT / "db/schema.sql").read_text()
 MIGRATION_NAME = "0001_saved-workspace.sql"
 CONSENT_MIGRATION_NAME = "0005_profile-consent.sql"
+OBSERVATION_MIGRATION_NAME = "0006_observation-store.sql"
 # fresh snapshot pre-marks each via its currentWhen pragma probe, so the names
 # must appear in d1_migrations the moment the snapshot runs. Each entry is
 # (migration name, table whose presence the probe keys on) so this test can
@@ -61,15 +62,17 @@ new_database = sqlite3.connect(":memory:")
 new_database.executescript(SCHEMA)
 assert migration_names(new_database) == [MIGRATION_NAME] + [
     name for name, _ in LATER_MIGRATIONS
-] + [CONSENT_MIGRATION_NAME]
+] + [CONSENT_MIGRATION_NAME, OBSERVATION_MIGRATION_NAME]
 
 existing_database = sqlite3.connect(":memory:")
 existing_database.executescript(OLD_TABLES)
 existing_database.executescript(SCHEMA)
 # An old-shape database gains the *later* additive relations (0002, 0003,
-# 0004) from the snapshot itself, so their probes match and those names are
-# pre-marked; the 0001 and 0005 upgrades remain for Wrangler's ordered run.
-assert migration_names(existing_database) == [name for name, _ in LATER_MIGRATIONS]
+# 0004, 0006) from the snapshot itself, so their probes match and those names
+# are pre-marked; the 0001 and 0005 upgrades remain for Wrangler's ordered run.
+assert migration_names(existing_database) == [name for name, _ in LATER_MIGRATIONS] + [
+    OBSERVATION_MIGRATION_NAME
+]
 existing_database.executescript(MIGRATION)
 existing_database.executescript(CONSENT_MIGRATION)
 profile = existing_database.execute(
@@ -124,6 +127,76 @@ for later_name, table in LATER_MIGRATIONS:
         f"'{later_name}'" in line and f"pragma_table_info('{table}')" in line
         for line in SCHEMA.splitlines()
     ), later_name
+
+# WS-0022: 0006 is purely additive and creates exactly the snapshot's objects
+# (tables, index, triggers, same SQL text), and its triggers enforce
+# append-only storage with one tombstoned purge path.
+OBSERVATION_OBJECTS = (
+    "observation_tombstones",
+    "observations",
+    "workload_projection",
+    "idx_observations_sourceId_externalId",
+    "observation_tombstones_no_update",
+    "observation_tombstones_no_delete",
+    "observations_no_update",
+    "observations_no_delete",
+    "observations_no_resurrection",
+)
+
+
+def objects(database: sqlite3.Connection) -> dict[str, str]:
+    return {
+        name: sql
+        for name, sql in database.execute(
+            "SELECT name, sql FROM sqlite_master WHERE sql IS NOT NULL"
+        )
+        if name in OBSERVATION_OBJECTS
+    }
+
+
+migrated = sqlite3.connect(":memory:")
+migrated.executescript((ROOT / "db/migrations" / OBSERVATION_MIGRATION_NAME).read_text())
+assert set(objects(migrated)) == set(OBSERVATION_OBJECTS), sorted(objects(migrated))
+assert objects(migrated) == objects(new_database), "0006 and the snapshot disagree"
+assert any(
+    f"'{OBSERVATION_MIGRATION_NAME}'" in line and "pragma_table_info('observations')" in line
+    for line in SCHEMA.splitlines()
+)
+
+for database in (migrated, new_database):
+    database.execute(
+        "INSERT INTO observations (id, irVersion, sourceId, externalId, kind, status, dateModified, "
+        "recordedSeq, recordedAt, runId, payload) VALUES ('o1', 0, 'nav', 'x', 'FeedEntry', 'ACTIVE', "
+        "NULL, 1, '2026-11-01T00:00:00Z', 'run-1', '{}')"
+    )
+    for statement in (
+        "UPDATE observations SET status = 'INACTIVE' WHERE id = 'o1'",
+        "DELETE FROM observations WHERE id = 'o1'",
+    ):
+        try:
+            database.execute(statement)
+        except sqlite3.IntegrityError as error:
+            assert "append-only" in str(error), error
+        else:
+            raise AssertionError(f"observations accepted: {statement}")
+    database.execute(
+        "INSERT INTO observation_tombstones (observationId, sourceId, externalId, reason, purgedAt) "
+        "SELECT id, sourceId, externalId, 'lawful erasure', '2026-11-02T00:00:00Z' FROM observations WHERE id = 'o1'"
+    )
+    database.execute("DELETE FROM observations WHERE id = 'o1'")
+    database.execute(
+        "INSERT INTO observations (id, irVersion, sourceId, externalId, kind, status, dateModified, "
+        "recordedSeq, recordedAt, runId, payload) VALUES ('o1', 0, 'nav', 'x', 'FeedEntry', 'ACTIVE', "
+        "NULL, 2, '2026-11-03T00:00:00Z', 'run-2', '{}')"
+    )
+    assert database.execute("SELECT COUNT(*) FROM observations").fetchone() == (0,)
+    assert database.execute("SELECT COUNT(*) FROM observation_tombstones").fetchone() == (1,)
+    try:
+        database.execute("DELETE FROM observation_tombstones")
+    except sqlite3.IntegrityError:
+        pass
+    else:
+        raise AssertionError("a tombstone was deleted")
 
 print(
     "D1 migration checks passed: new snapshots skip and existing data upgrades safely."
