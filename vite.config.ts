@@ -12,6 +12,12 @@ import { defineConfig } from "vite-plus";
  */
 const bunSuite = "bun node_modules/vitest/vitest.mjs run";
 const workerdSuite = "node node_modules/vitest/vitest.mjs run -c vitest.workers.config.ts";
+/**
+ * Remote mutation runs only in the pinned toolchain: devenv exports DEVENV_ROOT inside `devenv shell`, so a deploy
+ * started from a host shell (for example `bunx vp run deploy`) fails closed before any gate or Cloudflare call.
+ */
+const requireDevenv =
+  "bash -c 'test -n \"$DEVENV_ROOT\" || { echo \"deploys must run inside the pinned toolchain: devenv shell -- vp run deploy\" >&2; exit 1; }'";
 const bundle =
   'bun build apps/worker/src/index.ts --target=browser --conditions=workerd --conditions=worker --external "cloudflare:*"';
 
@@ -120,11 +126,12 @@ export default defineConfig({
         cache: false,
       },
 
-      // Operator entry points. They call the kept scripts; deploys run `verify` first (dependsOn) and stop if it fails.
+      // Operator entry points. They call the kept scripts. A deploy requires devenv, then runs `verify` inside its own
+      // command (not `dependsOn`, which `vp run --ignore-depends-on` would skip) and stops if either fails.
       dev: { command: "bash scripts/preview.sh", cache: false, dependsOn: ["setup"] },
       "deploy-preview": { command: "bash scripts/deploy-preview.sh", cache: false, dependsOn: ["setup"] },
-      deploy: { command: "bash scripts/deploy.sh staging", cache: false, dependsOn: ["verify"] },
-      "deploy-production": { command: "bash scripts/deploy.sh production", cache: false, dependsOn: ["verify"] },
+      deploy: { command: `${requireDevenv} && vp run verify && bash scripts/deploy.sh staging`, cache: false },
+      "deploy-production": { command: `${requireDevenv} && vp run verify && bash scripts/deploy.sh production`, cache: false },
       "nav-key": { command: "bash scripts/configure-nav-key.sh", cache: false, dependsOn: ["setup"] },
       "nav-key-cloudflare": { command: "bash scripts/configure-nav-key.sh --cloudflare", cache: false, dependsOn: ["setup"] },
       qualification: { command: "python3 scripts/qualify.py", cache: false, dependsOn: ["setup"] },

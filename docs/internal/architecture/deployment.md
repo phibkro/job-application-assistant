@@ -29,7 +29,8 @@ vp run deploy             # disposable staging
 vp run deploy-production  # explicit production
 ```
 
-Both run inside the pinned devenv shell and execute `vp run verify` (policy,
+Both refuse to start outside the pinned devenv shell (`DEVENV_ROOT` unset)
+and then execute `vp run verify` (policy,
 format, lint, types, Effect diagnostics, schema, catalog, bundle and the
 coverage-gated test suites) before any remote mutation.
 
