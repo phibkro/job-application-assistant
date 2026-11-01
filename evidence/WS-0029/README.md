@@ -1,10 +1,12 @@
 # WS-0029 evidence
 
-Contracts: [WS-0029@2](../../work/WS-0029-r2-infra-alchemy-previews.md), then [WS-0029@3](../../work/WS-0029-r3-infra-alchemy-previews.md) for pass A. Branch `ws29`, base `031ffb6`.
+Contracts: [WS-0029@2](../../work/WS-0029-r2-infra-alchemy-previews.md), then [WS-0029@3](../../work/WS-0029-r3-infra-alchemy-previews.md), then [WS-0029@4](../../work/WS-0029-r4-infra-alchemy-previews.md) for pass A. Branch `ws29`.
+
+**Current state: pass A attempt 3 (r4 attempt 1) is implemented in `f32ece1`. See "Pass A attempt 3" at the end. P0 is still open.** Attempts 1 and 2, below, are kept as recorded.
 
 ## Pass A
 
-**Outcome: STOPPED after attempt 2 of 2. No change to `infra/` is committed.** `infra/package.json`, `infra/bun.lock` and `infra/alchemy.run.ts` are identical to `031ffb6`. This commit holds only this evidence and the memory-bank state. A gate decision is requested (see "Decision needed").
+**Attempt 2 outcome (historical): STOPPED after attempt 2 of 2. No change to `infra/` was committed at that point.** `infra/package.json`, `infra/bun.lock` and `infra/alchemy.run.ts` are identical to `031ffb6`. This commit holds only this evidence and the memory-bank state. A gate decision is requested (see "Decision needed").
 
 Network: only `registry.npmjs.org` was used. Citations below are the installed or `npm pack`-ed package sources. No Cloudflare credentials were present or used. No deploy was attempted.
 
@@ -114,3 +116,80 @@ beta.72, the version deployed today, **already sends `nodejs_compat`** to every 
   - or opt out (`legacy_module_registry`, or `bundle: false` with explicit flags), which needs an owner decision and its own evidence;
   - or stay on beta.72 until Alchemy offers a no-default-flags mode.
 - **Follow-up (r3):** move `infra/` to effect `~4.1` once an Alchemy release imports the 4.1 module layout.
+
+## Pass A attempt 3 (WS-0029@4, attempt 1 of a fresh 2)
+
+Base `cfa1fd5`. Upgrade commit `f32ece1`. Owner option 1: opt out of `new_module_registry`.
+
+### Changes (`f32ece1`)
+
+| Change | Replaces | Citation |
+| --- | --- | --- |
+| r3 list: `alchemy` and `@alchemy.run/cloudflare` `2.0.0-beta.84`; `effect`, `@effect/platform-bun`, `@effect/platform-node` `4.0.7`; `overrides` `@effect/platform-node-shared` `4.0.7`; import from `@alchemy.run/cloudflare` | see "Attempt 2" | see "Attempt 2" |
+| `Api`: `compatibility: { date: "2026-05-25", flags: ["legacy_module_registry"] }` | `compatibility: { date: "2026-05-25" }` | `@alchemy.run/cloudflare@2.0.0-beta.84/src/Workers/Worker.ts:728-740`: the `compatibility.flags` type is `string[]`. For bundled Workers, supplied flags extend the defaults, and "`new_module_registry` is added unless `legacy_module_registry` is set". The same rule is in `@alchemy.run/cloudflare-runtime/src/core/internal/constants.ts` `withDefaultFlags` |
+| `scripts/test_environment_safety.py`: the exact compatibility literal occurs once in comment-stripped infra code, and `new_module_registry` does not occur there | none | new |
+
+`infra/bun.lock` holds exactly one `effect` entry (`effect@4.0.7`). Nothing else in `infra/` changed: no rename, no new resource, no cron, no binding.
+
+### Safety control
+
+| Run | Exit | Output |
+| --- | --- | --- |
+| `python3 scripts/test_environment_safety.py` (committed tree) | 0 | `Environment-safety checks passed` |
+| control 1: opt-out removed (`compatibility: { date: "2026-05-25" }`) | 1 | `AssertionError: infra must declare exactly compatibility: { date: "2026-05-25", flags: ["legacy_module_registry"] },` |
+| control 2: a `new_module_registry` literal added to the code | 1 | `AssertionError: new_module_registry must not be opted into in infra` |
+| restored | 0 | passed |
+
+### Computed compatibility per stage (from the provider's own `getCompatibility`)
+
+The offline harness from attempt 2 dumped every stage on beta.72 (base tree) and on beta.84 (`f32ece1` tree). Exit codes were 0 for all eight runs, with no credentials and the network blocked. Each dumped `Api` props (`main`, `isExternal`, `bundle`, `compatibility`) were then passed to that version's own `Workers/Compatibility.ts` `getCompatibility`:
+
+| Stage | beta.72 (deployed today) | beta.84 + opt-out |
+| --- | --- | --- |
+| staging | `{"date":"2026-05-25","flags":["nodejs_compat"]}` | `{"date":"2026-05-25","flags":["legacy_module_registry","nodejs_compat"]}` |
+| production | same | same |
+| pr-42 | same | same |
+| preview | same | same |
+
+That is beta.72's flags plus only `legacy_module_registry`. `nodejs_compat` is present in both, added by the providers' defaults, not by `alchemy.run.ts`. `new_module_registry` is absent.
+
+Resource dump, beta.72 vs beta.84, for all four stages: the only `diff` hunk is at line 19, where `"date": "2026-05-25"` becomes `"date": "2026-05-25", "flags": ["legacy_module_registry"]`. Resource kinds, logical IDs, FQNs, physical names, removal policies, bindings, `crons: []`, assets, observability and outputs are otherwise byte-identical.
+
+### Gates (on the `f32ece1` tree, exit codes checked directly)
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `nix shell nixpkgs#shellcheck -c bash -c 'DEVENV_ROOT=/x PATH="/tmp/stubbin:$PWD/node_modules/.bin:$PATH" vp run verify'` | 0 | `19/19 successful`. Bun suite `Test Files 92 passed (92)`, `Tests 764 passed \| 4 skipped (768)`. workerd suite `Test Files 25 passed (25)`, `Tests 137 passed (137)`. `effect-diagnostics: ok (2 excepted finding(s), 1 registry entries)`, so no new exception |
+| `vp run e2e` with `node_modules/.bun/wrangler@4.120.0/node_modules/.bin` on PATH | 0 | `6 passed` |
+| `node node_modules/vitest/vitest.mjs run -c vitest.workers.config.ts apps/worker/src/handlers/navToClient.live.test.ts` (WS-0020, file unmodified) | 0 | `Tests 6 passed (6)` |
+| `cd infra && npx tsc --noEmit` | 0 | |
+| `cd infra && bun install --frozen-lockfile` | 0 | |
+| pre-commit hook (`vp run policy`) on `f32ece1` | 0 | `7/7 successful` |
+
+### Still changed relative to beta.72 (reviewed, not avoidable by props)
+
+- **Durable Object upload.** beta.84 sends an `exports` map instead of tagged `migrations` (`WorkerProvider.ts:5517`, comments at `:3484-3489` and `:3773`). The `SourceLease` → `SourceLeaseObject` namespace identity is unchanged.
+- **D1 replace.** It gains `deleteFirst` for an explicit, unchanged name. That is inert for us, because no name changes.
+
+### Rollback: fix-forward
+
+After any beta.84 deploy, nobody has shown that a rollback to beta.72 works, because the Durable Object upload has moved to `exports`. To roll back: revert the code, then redeploy with beta.84 and the previous app code. `pr-<n>` stages are disposable. Pass A deploys neither staging nor production.
+
+### Open items
+
+- **P0 (required before merge):** the owner runs, from the repository root inside `devenv shell`, after `vp run setup` on this branch:
+
+  ```sh
+  cd infra
+  ALCHEMY_STAGE=staging    bun run alchemy plan --stage staging
+  ALCHEMY_STAGE=production bun run alchemy plan --stage production
+  ```
+
+  Environment variables, by name only:
+  - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, or an `alchemy login` profile.
+  - The same optional secret bindings the last deploy carried: `NAV_API_TOKEN`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `OTLP_ENDPOINT`, `OTLP_AUTH_HEADER`. An unset one is omitted from the plan.
+
+  `ALCHEMY_STAGE` must equal `--stage`. Accept only changes to `Api`: the added `legacy_module_registry` flag and the Durable Object `exports` declaration. Any replace or delete, a name change, or a change to `Db`, `TypeScriptDb` or the email binding means stop.
+- **CI:** the `pull request preview` workflow must deploy `pr-<n>` with this `infra/` and pass its smoke test on the PR.
+- **Unverified here:** what a plan against live state shows, the live Worker's current flags, and whether Cloudflare accepts `legacy_module_registry` on date 2026-05-25. The CI preview deploy is the first real upload.
+- **Follow-ups (r4):** adopt `new_module_registry` deliberately in its own ticket. Move `infra/` to effect ~4.1 once an Alchemy release includes alchemy-run/alchemy#2754. Check the assumption that "`nodejs_compat` is not enabled" against the live Worker (both versions send it).
