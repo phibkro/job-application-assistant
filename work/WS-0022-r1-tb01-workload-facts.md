@@ -2,7 +2,7 @@
 
 - ID: WS-0022
 - Revision: 1
-- Status: **Proposed**. Needs owner approval. Starts only after WS-0021@3 lands (`effect ~4.1`).
+- Status: **Approved with lead amendments L1–L4** (owner gate 2026-11-01). Starts only after WS-0021@3 lands (`effect ~4.1`).
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2**: additive schema (new tables), a new internal port shape, and an additive public field. No canonical-ID change, which TB-02 handles (R3).
 - Roles: implementer at the `complex-reasoning` tier; independent reviewer at the `complex-reasoning` tier.
@@ -45,4 +45,11 @@ No canonical-ID or identity change (TB-02), no second source, no public exposure
 
 ## Rollback
 
-Revert the commit. The additive migration's tables can be dropped, because observations are rebuildable from the source and nothing existing reads them yet.
+Revert the commit and drop the additive tables. This is safe because nothing existing reads them yet. **The as-of history collected since deployment is lost**, because NAV's detail endpoint returns only the newest version, so observations are not fully rebuildable from the source (L2).
+
+## Lead amendments (approved with the WorkScope)
+
+- **L1. Thin layers.** The conformance suite covers only this slice's guarantees: replay is a no-op, closure is visible, no fabricated workload, evidence is present on every `Fact`. The quirk catalogue holds only NAV facts already verified in WS-0020/WS-0024 evidence. Wider guarantees wait for TB-02.
+- **L2. Rollback honesty.** See Rollback.
+- **L3. Trigger probe is a stop gate.** If D1 rejects `CREATE TRIGGER`, stop and report. The owner then chooses between application-level enforcement and an R3 alternative.
+- **L4. Provisional hydration default.** Ship a conservative, configurable N labelled provisional in the quirk catalogue and evidence. The real default is set from the first staging measurement.
