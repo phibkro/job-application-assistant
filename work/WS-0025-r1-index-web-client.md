@@ -2,7 +2,7 @@
 
 - ID: WS-0025
 - Revision: 1
-- Status: **Proposed**. Needs owner approval. It may run **in parallel with WS-0022** (owner decision), after WS-0021@4 and WS-0026 land, in its own worktree.
+- Status: **Approved** (owner gate 2026-11-01). It may run **in parallel with WS-0022** (owner decision), after WS-0021@4 and WS-0026 land, in its own worktree.
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2**: a new app, a new owner-scoped table (presets: personal data), and anonymous auth configuration.
 - Roles: implementer at the `complex-reasoning` tier (Foldkit skills loaded); reviewer at the `complex-reasoning` tier.
