@@ -1,0 +1,701 @@
+diff --git a/apps/web/package.json b/apps/web/package.json
+index d13f671..9750e19 100644
+--- a/apps/web/package.json
++++ b/apps/web/package.json
+@@ -11,10 +11,11 @@
+     "build": "vite build"
+   },
+   "dependencies": {
+-    "@foldkit/ui": "0.139.0",
++    "@effect/platform-browser": "4.1.0",
++    "@foldkit/ui": "0.170.0",
+     "@job-index/domain": "workspace:*",
+     "clsx": "2.1.1",
+-    "foldkit": "0.139.0"
++    "foldkit": "0.170.0"
+   },
+   "devDependencies": {
+     "@tailwindcss/vite": "4.3.3",
+diff --git a/apps/web/src/Client.ts b/apps/web/src/Client.ts
+index 29b8e6b..89117c5 100644
+--- a/apps/web/src/Client.ts
++++ b/apps/web/src/Client.ts
+@@ -1,7 +1,7 @@
+ import * as Option from "effect/Option";
+-import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
+-import * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
++import * as HttpApiClient from "effect/http-api/HttpApiClient";
++import * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientRequest from "effect/http/HttpClientRequest";
+ // Api.ts is the frozen worker/interface seam (see apps/worker/src/Api.ts). It is
+ // reached by a relative import, not the `@job-index/worker/*` bare specifier,
+ // because the root tsconfig only wires path resolution for `@job-index/domain/*`
+diff --git a/apps/worker/src/Api.ts b/apps/worker/src/Api.ts
+index 8202929..613436d 100644
+--- a/apps/worker/src/Api.ts
++++ b/apps/worker/src/Api.ts
+@@ -1,10 +1,10 @@
+ import * as Schema from "effect/Schema";
+-import * as HttpApi from "effect/unstable/httpapi/HttpApi";
+-import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
+-import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
+-import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
+-import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
+-import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
++import * as HttpApi from "effect/http-api/HttpApi";
++import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
++import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
++import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
++import * as HttpApiSecurity from "effect/http-api/HttpApiSecurity";
++import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
+ import * as Context from "effect/Context";
+ import type { PrincipalId, ProfileId } from "@job-index/domain/Ids";
+ import {
+diff --git a/apps/worker/src/db/repositories/Proposals.ts b/apps/worker/src/db/repositories/Proposals.ts
+index 3c05ae0..3017fd2 100644
+--- a/apps/worker/src/db/repositories/Proposals.ts
++++ b/apps/worker/src/db/repositories/Proposals.ts
+@@ -1,5 +1,5 @@
+ import * as Effect from "effect/Effect";
+-import * as VariantSchema from "effect/unstable/schema/VariantSchema";
++import * as VariantSchema from "effect/schema/VariantSchema";
+ import { Proposal } from "@job-index/domain/Proposals";
+ import type { ProfileId, ProposalId } from "@job-index/domain/Ids";
+ import { Database } from "../../services/Database.ts";
+diff --git a/apps/worker/src/handlers/account.ts b/apps/worker/src/handlers/account.ts
+index 0626365..64b7171 100644
+--- a/apps/worker/src/handlers/account.ts
++++ b/apps/worker/src/handlers/account.ts
+@@ -1,6 +1,6 @@
+ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+ import { api, CurrentPrincipal } from "../Api.ts";
+ import { Database } from "../services/Database.ts";
+ import { purgeWritesFor } from "../db/Erase.ts";
+diff --git a/apps/worker/src/handlers/applications.ts b/apps/worker/src/handlers/applications.ts
+index 981d618..baf2efb 100644
+--- a/apps/worker/src/handlers/applications.ts
++++ b/apps/worker/src/handlers/applications.ts
+@@ -1,6 +1,6 @@
+ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+ import { isHydrated } from "@job-index/domain/Job";
+ import type {
+   CustomLabelMissing,
+diff --git a/apps/worker/src/handlers/corpus.ts b/apps/worker/src/handlers/corpus.ts
+index 72e00fc..38bb851 100644
+--- a/apps/worker/src/handlers/corpus.ts
++++ b/apps/worker/src/handlers/corpus.ts
+@@ -1,5 +1,5 @@
+ import * as Effect from "effect/Effect";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+ import type { AcquisitionTier } from "@job-index/domain/Source";
+ import { api, NotFound } from "../Api.ts";
+ import { Corpus, type JobFilter } from "../services/Corpus.ts";
+diff --git a/apps/worker/src/handlers/documents.ts b/apps/worker/src/handlers/documents.ts
+index 0fdbec6..88f284b 100644
+--- a/apps/worker/src/handlers/documents.ts
++++ b/apps/worker/src/handlers/documents.ts
+@@ -2,7 +2,7 @@ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+ import * as Option from "effect/Option";
+ import * as Schema from "effect/Schema";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+ import {
+   CONSENT_OFF_MESSAGE,
+   ConsentRequired,
+diff --git a/apps/worker/src/handlers/feed.ts b/apps/worker/src/handlers/feed.ts
+index 32839f1..9f58cb3 100644
+--- a/apps/worker/src/handlers/feed.ts
++++ b/apps/worker/src/handlers/feed.ts
+@@ -1,5 +1,5 @@
+ import * as Effect from "effect/Effect";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+ import { matchedJob, rankMatchedJobs } from "@job-index/domain/Match";
+ import { api, CurrentPrincipal, Gone, NotFound } from "../Api.ts";
+ import { Corpus } from "../services/Corpus.ts";
+diff --git a/apps/worker/src/handlers/navToClient.live.test.ts b/apps/worker/src/handlers/navToClient.live.test.ts
+index 74c6aff..3b650f5 100644
+--- a/apps/worker/src/handlers/navToClient.live.test.ts
++++ b/apps/worker/src/handlers/navToClient.live.test.ts
+@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
+ import { env } from "cloudflare:workers";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+-import * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
++import * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientResponse from "effect/http/HttpClientResponse";
+ import {
+   make as makeNavAdapter,
+   makePrivateNavCredential,
+diff --git a/apps/worker/src/handlers/profile.ts b/apps/worker/src/handlers/profile.ts
+index c3a3886..acca872 100644
+--- a/apps/worker/src/handlers/profile.ts
++++ b/apps/worker/src/handlers/profile.ts
+@@ -1,6 +1,6 @@
+ import * as Effect from "effect/Effect";
+ import * as Schema from "effect/Schema";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+ import { QuestionKey } from "@job-index/domain/Answer";
+ import { fromJson, toJson, toMarkdown } from "@job-index/domain/Profile";
+ import { historyToJson, historyToMarkdown } from "@job-index/domain/Applications";
+diff --git a/apps/worker/src/handlers/proposals.ts b/apps/worker/src/handlers/proposals.ts
+index a284145..ac8d08c 100644
+--- a/apps/worker/src/handlers/proposals.ts
++++ b/apps/worker/src/handlers/proposals.ts
+@@ -2,7 +2,7 @@ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+ import * as Option from "effect/Option";
+ import * as Schema from "effect/Schema";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+ import type { Experience } from "@job-index/domain/Profile";
+ import type { Profile } from "@job-index/domain/Profile";
+ import { Proposal, targetOf } from "@job-index/domain/Proposals";
+diff --git a/apps/worker/src/handlers/status.ts b/apps/worker/src/handlers/status.ts
+index 6881bf3..a73b3d7 100644
+--- a/apps/worker/src/handlers/status.ts
++++ b/apps/worker/src/handlers/status.ts
+@@ -1,6 +1,6 @@
+ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+ import { NAV_PLATFORM_ID } from "@job-index/adapters/nav";
+ import { api } from "../Api.ts";
+ import * as IngestionStatus from "../db/repositories/IngestionStatus.ts";
+diff --git a/apps/worker/src/handlers/testSupport.ts b/apps/worker/src/handlers/testSupport.ts
+index ed90fb2..4bfec73 100644
+--- a/apps/worker/src/handlers/testSupport.ts
++++ b/apps/worker/src/handlers/testSupport.ts
+@@ -1,10 +1,10 @@
+ import * as Context from "effect/Context";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+-import * as HttpRouter from "effect/unstable/http/HttpRouter";
+-import * as Etag from "effect/unstable/http/Etag";
+-import * as HttpPlatform from "effect/unstable/http/HttpPlatform";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
++import * as HttpRouter from "effect/http/HttpRouter";
++import * as Etag from "effect/http/Etag";
++import * as HttpPlatform from "effect/http/HttpPlatform";
+ import * as FileSystem from "effect/FileSystem";
+ import * as Path from "effect/Path";
+ import { api } from "../Api.ts";
+diff --git a/apps/worker/src/index.ts b/apps/worker/src/index.ts
+index a52a80f..1e5600e 100644
+--- a/apps/worker/src/index.ts
++++ b/apps/worker/src/index.ts
+@@ -1,8 +1,8 @@
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+-import * as HttpRouter from "effect/unstable/http/HttpRouter";
+-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
++import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
++import * as HttpRouter from "effect/http/HttpRouter";
++import * as HttpServerResponse from "effect/http/HttpServerResponse";
+ import { api } from "./Api.ts";
+ import * as Handlers from "./handlers/index.ts";
+ import { decodeEnv, type Env } from "./runtime/Env.ts";
+diff --git a/apps/worker/src/runtime/Layers.test.ts b/apps/worker/src/runtime/Layers.test.ts
+index c9badc3..d51d85f 100644
+--- a/apps/worker/src/runtime/Layers.test.ts
++++ b/apps/worker/src/runtime/Layers.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, expect, it } from "vitest";
+ import * as Effect from "effect/Effect";
+-import * as HttpRouter from "effect/unstable/http/HttpRouter";
++import * as HttpRouter from "effect/http/HttpRouter";
+ import type { PlatformId, SourceId } from "@job-index/domain/Ids";
+ import type { RawListing } from "@job-index/domain/Job";
+ import { makeFakeD1 } from "../db/FakeD1.ts";
+diff --git a/apps/worker/src/runtime/Layers.ts b/apps/worker/src/runtime/Layers.ts
+index a53fd0b..24b2a60 100644
+--- a/apps/worker/src/runtime/Layers.ts
++++ b/apps/worker/src/runtime/Layers.ts
+@@ -1,7 +1,7 @@
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+-import * as HttpClient from "effect/unstable/http/HttpClient";
++import * as FetchHttpClient from "effect/http/FetchHttpClient";
++import * as HttpClient from "effect/http/HttpClient";
+ import {
+   make as makeNavAdapter,
+   makePrivateNavCredential,
+diff --git a/apps/worker/src/runtime/Platform.ts b/apps/worker/src/runtime/Platform.ts
+index b460755..0d9da00 100644
+--- a/apps/worker/src/runtime/Platform.ts
++++ b/apps/worker/src/runtime/Platform.ts
+@@ -1,8 +1,8 @@
+ import * as FileSystem from "effect/FileSystem";
+ import * as Layer from "effect/Layer";
+ import * as Path from "effect/Path";
+-import * as Etag from "effect/unstable/http/Etag";
+-import * as HttpPlatform from "effect/unstable/http/HttpPlatform";
++import * as Etag from "effect/http/Etag";
++import * as HttpPlatform from "effect/http/HttpPlatform";
+ 
+ /**
+  * The platform services `HttpApiBuilder` asks for, in an environment that has
+diff --git a/apps/worker/src/runtime/Telemetry.ts b/apps/worker/src/runtime/Telemetry.ts
+index 8c5f5d1..da260b8 100644
+--- a/apps/worker/src/runtime/Telemetry.ts
++++ b/apps/worker/src/runtime/Telemetry.ts
+@@ -1,6 +1,6 @@
+ import * as Layer from "effect/Layer";
+-import * as Otlp from "effect/unstable/observability/Otlp";
+-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
++import * as Otlp from "effect/observability/Otlp";
++import * as FetchHttpClient from "effect/http/FetchHttpClient";
+ 
+ /**
+  * Where this service's logs, metrics, and traces go.
+diff --git a/bun.lock b/bun.lock
+index 17f5039..a5e4e6c 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -5,7 +5,7 @@
+     "": {
+       "name": "@job-index/root",
+       "dependencies": {
+-        "effect": "4.0.0-rc.108",
++        "effect": "4.1.0",
+         "unpdf": "1.8.1",
+       },
+       "devDependencies": {
+@@ -26,10 +26,11 @@
+       "name": "@job-index/web",
+       "version": "0.0.0",
+       "dependencies": {
+-        "@foldkit/ui": "0.139.0",
++        "@effect/platform-browser": "4.1.0",
++        "@foldkit/ui": "0.170.0",
+         "@job-index/domain": "workspace:*",
+         "clsx": "2.1.1",
+-        "foldkit": "0.139.0",
++        "foldkit": "0.170.0",
+       },
+       "devDependencies": {
+         "@tailwindcss/vite": "4.3.3",
+@@ -54,7 +55,7 @@
+       },
+       "peerDependencies": {
+         "better-auth": "^1.6.26",
+-        "effect": "4.0.0-rc.108",
++        "effect": "4.1.0",
+       },
+     },
+     "packages/domain": {
+@@ -137,7 +138,7 @@
+ 
+     "@cspotcode/source-map-support": ["@cspotcode/source-map-support@0.8.1", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.9" } }, "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw=="],
+ 
+-    "@effect/platform-browser": ["@effect/platform-browser@4.0.0-beta.103", "", { "dependencies": { "multipasta": "^0.2.8" }, "peerDependencies": { "effect": "^4.0.0-beta.103" } }, "sha512-3GXGzjv+dB5E9sCCj/JhPVyNB2NrBquGY2tYQ8VQqGK4uOpME6I5oLqRt+MmB7BWqWYPXUqvXj0wvMJRlQC4fw=="],
++    "@effect/platform-browser": ["@effect/platform-browser@4.1.0", "", { "peerDependencies": { "effect": "^4.1.0" } }, "sha512-IEyaPzejKozHDupOUSjQIgQYGv2C0I828up8z7/nvQTHzmQHUS2/tGMEwXX/FwAvnrWZ0H9MhlhTl18ZgCHQiQ=="],
+ 
+     "@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
+ 
+@@ -199,7 +200,7 @@
+ 
+     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
+ 
+-    "@foldkit/ui": ["@foldkit/ui@0.139.0", "", { "dependencies": { "@floating-ui/dom": "^1.7.6" }, "peerDependencies": { "effect": "4.0.0-beta.103", "foldkit": "^0" } }, "sha512-6Bhu1/vHrhyg8W2qxmIDC60ZXHvagcsRiQnvniY7ycf5gaKoDDnb2mkWKRn1fEPuhX3NdzHxNcek4dTuUE16QQ=="],
++    "@foldkit/ui": ["@foldkit/ui@0.170.0", "", { "dependencies": { "@floating-ui/dom": "^1.8.0" }, "peerDependencies": { "effect": "~4.1.0", "foldkit": ">=0.167.0" } }, "sha512-OU6eDVwweFCUA8wsURIBoUptvohD1J7Xs+n+kRJT7h1vmqwajf8h6yu5PljntNrpi6QiRohjqR/sZt3fWSC65A=="],
+ 
+     "@img/colour": ["@img/colour@1.1.0", "", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
+ 
+@@ -275,18 +276,6 @@
+ 
+     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+ 
+-    "@msgpackr-extract/msgpackr-extract-darwin-arm64": ["@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4", "", { "os": "darwin", "cpu": "arm64" }, "sha512-LCkGo6JDfaBhgST7UpPWgNgLINpcpabaHfyz5OBx75nUYxBsaEPxjnyNjWpeb/xBup/682QnBfRBy2/LvPutZQ=="],
+-
+-    "@msgpackr-extract/msgpackr-extract-darwin-x64": ["@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.4", "", { "os": "darwin", "cpu": "x64" }, "sha512-zExlW9zUJKZH/tOtVMttwjKa4Xm/3KcNjnE3dPN92uCktwavMxpgCA3MoJK/DOnTWsQgo224OaST27/mPNAf+w=="],
+-
+-    "@msgpackr-extract/msgpackr-extract-linux-arm": ["@msgpackr-extract/msgpackr-extract-linux-arm@3.0.4", "", { "os": "linux", "cpu": "arm" }, "sha512-Tg3yX65f5GbtXLkrYEHE5oibZG9epyYWas7FogTTEJeDEF9JlXJzKgXaNhT3UXlTOeA+AfZpYZYZ0uPj7Cfquw=="],
+-
+-    "@msgpackr-extract/msgpackr-extract-linux-arm64": ["@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-dgX0P/9wGPJeHFBG+ZmhgE6bmtMt7NP5CRBGyyktpopdk/mW4POnrpQsSLtKI1dwpc+pPLuXHDh6vvskyQE/sw=="],
+-
+-    "@msgpackr-extract/msgpackr-extract-linux-x64": ["@msgpackr-extract/msgpackr-extract-linux-x64@3.0.4", "", { "os": "linux", "cpu": "x64" }, "sha512-8TNXMEjJc3QEy7R/x1INhgiU+XakDAFUzBhaz7+Rbrs8NH5UQeHQxxmzsSBJGyV6I1jW79undiQm8tOI+D+8FQ=="],
+-
+-    "@msgpackr-extract/msgpackr-extract-win32-x64": ["@msgpackr-extract/msgpackr-extract-win32-x64@3.0.4", "", { "os": "win32", "cpu": "x64" }, "sha512-CmCXPQrkbwExx3j946/PtHWHbYJiCRBRDl4BlkRQcJB/YOwQxJRTpoo7aTsortjgoJ1x7opzTSxn7C+ASSLVjQ=="],
+-
+     "@noble/ciphers": ["@noble/ciphers@2.2.0", "", {}, "sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA=="],
+ 
+     "@noble/hashes": ["@noble/hashes@2.3.0", "", {}, "sha512-oN+QwyX7VSHotibwubG3kpzbwKrfnyR6OOO+3Nk/53ADL7FmgHHz4TgrbaYKvvOw09u6QTx0oiH1cNCIOuN0CQ=="],
+@@ -509,12 +498,14 @@
+ 
+     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
+ 
+-    "effect": ["effect@4.0.0-rc.108", "", { "dependencies": { "@standard-schema/spec": "^1.1.0", "fast-check": "^4.9.0", "kubernetes-types": "^1.30.0", "msgpackr": "^2.0.4", "uuid": "^14.0.1" } }, "sha512-KmI3DlKZWPvCL4QQ2FMaPOuxMt/7DrKMENCY/gQ+MkDR5QYw25wgU5Zmh/wVLboNjIci1gNOgNCFe4xqgxli3A=="],
++    "effect": ["effect@4.1.0", "", {}, "sha512-lGx2MJJyrXA8RZb2UpQ/0Nkb5Utaimby7oD92+18noBxLPE85IFOvptdzau8dvcxAOwfwHo9iqapbKeFzqQM/Q=="],
+ 
+     "electron-to-chromium": ["electron-to-chromium@1.5.402", "", {}, "sha512-/oOpMaPT6Yg+6/1XQhyIPlzgj7Ye9zf+nNM2Uh6OcE2G2oNptWazFa+qB2Pdqqbsc9KnIDzgAntoYN0dbwOXwA=="],
+ 
+     "enhanced-resolve": ["enhanced-resolve@5.24.5", "", { "dependencies": { "graceful-fs": "^4.2.4", "tapable": "^2.3.3" } }, "sha512-L1l8TNvomm6UVW5B253AGxQagSQr+vGwhMlrrfRS2qmhx46AMpMVJKQYLvWYbysTMY8VoicOvzHzoHMbyzB+4A=="],
+ 
++    "entities": ["entities@9.0.0", "", {}, "sha512-oJFNDJg3kTPwAD1cNn2+WmUq4wFoo09npc3Ydf1D7ED4smRiWrsKnaLxykrTWgyGEcusc87P5dxlAleol9kpkg=="],
++
+     "error-stack-parser-es": ["error-stack-parser-es@1.0.5", "", {}, "sha512-5qucVt2XcuGMcEGgWI7i+yZpmpByQ8J1lHhcL7PwqCwu9FPP3VUXzT4ltHe5i2z9dePwEHcDVOAfSnHsOlCXRA=="],
+ 
+     "es-module-lexer": ["es-module-lexer@2.3.1", "", {}, "sha512-shc1dbU90Yl/xq1QrC7QRtfcwURZuVRfPhZbDoldJ1cn1gzDvBaBWlv0eFolj5+0znnPJz5TXLxsN77X/12KTA=="],
+@@ -531,7 +522,7 @@
+ 
+     "fdir": ["fdir@6.5.0", "", { "peerDependencies": { "picomatch": "^3 || ^4" }, "optionalPeers": ["picomatch"] }, "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg=="],
+ 
+-    "foldkit": ["foldkit@0.139.0", "", { "peerDependencies": { "@effect/platform-browser": "4.0.0-beta.103", "effect": "4.0.0-beta.103" } }, "sha512-3aU/EliW/3iqUJ+5MtGMR1uMX6aB78dp6ZdzC2OuvOiWDbj7vo7ZiuuNKsjqVmEXz8Lrn4HWqQitqQnVTFoAZA=="],
++    "foldkit": ["foldkit@0.170.0", "", { "dependencies": { "parse5": "^8.0.1" }, "peerDependencies": { "@effect/platform-browser": "~4.1.0", "effect": "~4.1.0" } }, "sha512-H/MRQe/IZ/LqpgPi+Zy1S1OXQ8o12e2S/6U+phQu3WmoHSm7Vase/dEnOvrq9YZfqxK44/oVq6wE9oqXzEIaig=="],
+ 
+     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
+ 
+@@ -561,8 +552,6 @@
+ 
+     "kleur": ["kleur@4.1.5", "", {}, "sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ=="],
+ 
+-    "kubernetes-types": ["kubernetes-types@1.30.0", "", {}, "sha512-Dew1okvhM/SQcIa2rcgujNndZwU8VnSapDgdxlYoB84ZlpAD43U6KLAFqYo17ykSFGHNPrg0qry0bP+GJd9v7Q=="],
+-
+     "kysely": ["kysely@0.29.4", "", {}, "sha512-y5mVgQNkMbs1eK9Xyc0pmNdabN2wHhRYY/5r4W5HrUT1rYCEPeVNSj1RUJeSDKT3U0p+mXCvLgkrFuIafYI6BA=="],
+ 
+     "lightningcss": ["lightningcss@1.33.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.33.0", "lightningcss-darwin-arm64": "1.33.0", "lightningcss-darwin-x64": "1.33.0", "lightningcss-freebsd-x64": "1.33.0", "lightningcss-linux-arm-gnueabihf": "1.33.0", "lightningcss-linux-arm64-gnu": "1.33.0", "lightningcss-linux-arm64-musl": "1.33.0", "lightningcss-linux-x64-gnu": "1.33.0", "lightningcss-linux-x64-musl": "1.33.0", "lightningcss-win32-arm64-msvc": "1.33.0", "lightningcss-win32-x64-msvc": "1.33.0" } }, "sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA=="],
+@@ -601,18 +590,10 @@
+ 
+     "ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
+ 
+-    "msgpackr": ["msgpackr@2.0.5", "", { "optionalDependencies": { "msgpackr-extract": "^3.0.4" } }, "sha512-cef05H/dSYpLpqp3sj/qyZh5vhUYCalnaLO7j1yOmpsR0y/XwLVtK7r5gn+U/F7CTEfMowcGhlUQJDLcLf7jcA=="],
+-
+-    "msgpackr-extract": ["msgpackr-extract@3.0.4", "", { "dependencies": { "node-gyp-build-optional-packages": "5.2.2" }, "optionalDependencies": { "@msgpackr-extract/msgpackr-extract-darwin-arm64": "3.0.4", "@msgpackr-extract/msgpackr-extract-darwin-x64": "3.0.4", "@msgpackr-extract/msgpackr-extract-linux-arm": "3.0.4", "@msgpackr-extract/msgpackr-extract-linux-arm64": "3.0.4", "@msgpackr-extract/msgpackr-extract-linux-x64": "3.0.4", "@msgpackr-extract/msgpackr-extract-win32-x64": "3.0.4" }, "bin": { "download-msgpackr-prebuilds": "bin/download-prebuilds.js" } }, "sha512-4kmO/MdyUIkLIvTPr8VHLil4AtoKIoniWPIEk5+CDy0xnWC84azhSFmuJ7PxZdsYtiP5kEeQsORAVIeMgxT+Hw=="],
+-
+-    "multipasta": ["multipasta@0.2.8", "", {}, "sha512-ZPWuMKyv0cSO29f7hozp+k6+crZbQijV8ipMvxNxRf2SwtYGTX1ZX89Kd20VV4H9Znonx+EQn+iy1wGQsJ+b+Q=="],
+-
+     "nanoid": ["nanoid@3.3.17", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g=="],
+ 
+     "nanostores": ["nanostores@1.4.2", "", {}, "sha512-Wxv8Roefr2nqtiRG0bnaFlpYqpIVtOEeJZHaH+4nGgOK1/7n6OHOuHCb/bhqrNQgZM8fyd0s1PqhdrJc9Ib44g=="],
+ 
+-    "node-gyp-build-optional-packages": ["node-gyp-build-optional-packages@5.2.2", "", { "dependencies": { "detect-libc": "^2.0.1" }, "bin": { "node-gyp-build-optional-packages": "bin.js", "node-gyp-build-optional-packages-optional": "optional.js", "node-gyp-build-optional-packages-test": "build-test.js" } }, "sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw=="],
+-
+     "node-releases": ["node-releases@2.0.53", "", {}, "sha512-D9UOmYG3UH1V+ENW56t5QXBwJw1YEY18ruVeus89Rw+SyIgjPkCO84bRzO3uNIYosJbNwiabWVn48o3uJLjxFQ=="],
+ 
+     "obug": ["obug@2.1.4", "", {}, "sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA=="],
+@@ -621,6 +602,8 @@
+ 
+     "oxlint": ["oxlint@1.77.0", "", { "optionalDependencies": { "@oxlint/binding-android-arm-eabi": "1.77.0", "@oxlint/binding-android-arm64": "1.77.0", "@oxlint/binding-darwin-arm64": "1.77.0", "@oxlint/binding-darwin-x64": "1.77.0", "@oxlint/binding-freebsd-x64": "1.77.0", "@oxlint/binding-linux-arm-gnueabihf": "1.77.0", "@oxlint/binding-linux-arm-musleabihf": "1.77.0", "@oxlint/binding-linux-arm64-gnu": "1.77.0", "@oxlint/binding-linux-arm64-musl": "1.77.0", "@oxlint/binding-linux-ppc64-gnu": "1.77.0", "@oxlint/binding-linux-riscv64-gnu": "1.77.0", "@oxlint/binding-linux-riscv64-musl": "1.77.0", "@oxlint/binding-linux-s390x-gnu": "1.77.0", "@oxlint/binding-linux-x64-gnu": "1.77.0", "@oxlint/binding-linux-x64-musl": "1.77.0", "@oxlint/binding-openharmony-arm64": "1.77.0", "@oxlint/binding-win32-arm64-msvc": "1.77.0", "@oxlint/binding-win32-ia32-msvc": "1.77.0", "@oxlint/binding-win32-x64-msvc": "1.77.0" }, "peerDependencies": { "oxlint-tsgolint": ">=7.0.2001", "vite-plus": "*" }, "optionalPeers": ["oxlint-tsgolint", "vite-plus"], "bin": { "oxlint": "bin/oxlint" } }, "sha512-qnGh8XJHaQ0dprrDXNQZgS0FgjI6v+V3+X8DwmaV++5Aamy6jGKfDdQ1TUvhUxtmKFAbEf4/WeO5QZX+5WSngg=="],
+ 
++    "parse5": ["parse5@8.1.0", "", { "dependencies": { "entities": "^9.0.0" } }, "sha512-sq3qBFpee5jeocbFbO48VHlGr8sT7mbXS0vxlKN6sottBtJzrOG3998sr0llSZcQAGgfpdmEYAIZE0P9z0dE8w=="],
++
+     "path-to-regexp": ["path-to-regexp@6.3.0", "", {}, "sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ=="],
+ 
+     "pathe": ["pathe@2.0.3", "", {}, "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w=="],
+@@ -685,8 +668,6 @@
+ 
+     "update-browserslist-db": ["update-browserslist-db@1.2.3", "", { "dependencies": { "escalade": "^3.2.0", "picocolors": "^1.1.1" }, "peerDependencies": { "browserslist": ">= 4.21.0" }, "bin": { "update-browserslist-db": "cli.js" } }, "sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w=="],
+ 
+-    "uuid": ["uuid@14.0.1", "", { "bin": { "uuid": "dist-node/bin/uuid" } }, "sha512-6ZxzVpzDXDa3bJWaHilVayA+BH/1zmxCJoVgvmqJnid/gPoKHxUrS/aC/T6LGQtNHT+XHG9fXPJB4d+IrU30Ew=="],
+-
+     "vite": ["vite@8.2.1", "", { "dependencies": { "lightningcss": "^1.33.0", "picomatch": "^4.0.5", "postcss": "^8.5.25", "rolldown": "~1.2.1", "tinyglobby": "^0.2.17" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^20.19.0 || >=22.12.0", "@vitejs/devtools": "^0.4.0", "esbuild": "^0.27.0 || ^0.28.0", "jiti": ">=1.21.0", "less": "^4.0.0", "sass": "^1.70.0", "sass-embedded": "^1.70.0", "stylus": ">=0.54.8", "sugarss": "^5.0.0", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "@vitejs/devtools", "esbuild", "jiti", "less", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-EU/eS7BH3XROHh2YnBefjM6DBKA6ZeMZEYQbj7NLWg5wHYlhB8B/Mayd5XsgWq+NFYccDOTemRpdETWR6Ka/lw=="],
+ 
+     "vitest": ["vitest@4.1.10", "", { "dependencies": { "@vitest/expect": "4.1.10", "@vitest/mocker": "4.1.10", "@vitest/pretty-format": "4.1.10", "@vitest/runner": "4.1.10", "@vitest/snapshot": "4.1.10", "@vitest/spy": "4.1.10", "@vitest/utils": "4.1.10", "es-module-lexer": "^2.0.0", "expect-type": "^1.3.0", "magic-string": "^0.30.21", "obug": "^2.1.1", "pathe": "^2.0.3", "picomatch": "^4.0.3", "std-env": "^4.0.0-rc.1", "tinybench": "^2.9.0", "tinyexec": "^1.0.2", "tinyglobby": "^0.2.15", "tinyrainbow": "^3.1.0", "vite": "^6.0.0 || ^7.0.0 || ^8.0.0", "why-is-node-running": "^2.3.0" }, "peerDependencies": { "@edge-runtime/vm": "*", "@opentelemetry/api": "^1.9.0", "@types/node": "^20.0.0 || ^22.0.0 || >=24.0.0", "@vitest/browser-playwright": "4.1.10", "@vitest/browser-preview": "4.1.10", "@vitest/browser-webdriverio": "4.1.10", "@vitest/coverage-istanbul": "4.1.10", "@vitest/coverage-v8": "4.1.10", "@vitest/ui": "4.1.10", "happy-dom": "*", "jsdom": "*" }, "optionalPeers": ["@edge-runtime/vm", "@opentelemetry/api", "@types/node", "@vitest/browser-playwright", "@vitest/browser-preview", "@vitest/browser-webdriverio", "@vitest/coverage-istanbul", "@vitest/coverage-v8", "@vitest/ui", "happy-dom", "jsdom"], "bin": { "vitest": "./vitest.mjs" } }, "sha512-R9jUTe5S4Qb0HCd4TNqpC7oGcrMssMRGXLW80ubjWsW9VH5GF8y1Y0SFLY9AbqSk6nt0PnOx4H4WNJYZ13GUPw=="],
+diff --git a/package.json b/package.json
+index 2ec3c0b..64d1026 100644
+--- a/package.json
++++ b/package.json
+@@ -29,7 +29,7 @@
+     "qualification": "python3 scripts/qualify.py"
+   },
+   "dependencies": {
+-    "effect": "4.0.0-rc.108",
++    "effect": "4.1.0",
+     "unpdf": "1.8.1"
+   },
+   "devDependencies": {
+diff --git a/packages/adapters/jsonld/src/index.test.ts b/packages/adapters/jsonld/src/index.test.ts
+index 2079bc6..5304c3d 100644
+--- a/packages/adapters/jsonld/src/index.test.ts
++++ b/packages/adapters/jsonld/src/index.test.ts
+@@ -1,8 +1,8 @@
+ import { describe, expect, it } from "vitest";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+-import * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
++import * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientResponse from "effect/http/HttpClientResponse";
+ import type { PlatformId } from "../../../domain/src/Ids.ts";
+ import { SourceAdapter } from "../../src/SourceAdapter.ts";
+ import { make } from "./index.ts";
+diff --git a/packages/adapters/jsonld/src/index.ts b/packages/adapters/jsonld/src/index.ts
+index 81a8571..2d4d5a8 100644
+--- a/packages/adapters/jsonld/src/index.ts
++++ b/packages/adapters/jsonld/src/index.ts
+@@ -1,6 +1,6 @@
+ import * as Effect from "effect/Effect";
+-import type * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
++import type * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientRequest from "effect/http/HttpClientRequest";
+ import type { PlatformId } from "../../../domain/src/Ids.ts";
+ import type { SourceId } from "../../../domain/src/Ids.ts";
+ import { SourceUnavailable } from "../../../domain/src/Failure.ts";
+diff --git a/packages/adapters/nav/src/credential.test.ts b/packages/adapters/nav/src/credential.test.ts
+index edab3c6..c4a75d5 100644
+--- a/packages/adapters/nav/src/credential.test.ts
++++ b/packages/adapters/nav/src/credential.test.ts
+@@ -1,7 +1,7 @@
+ import { describe, expect, it } from "vitest";
+ import * as Effect from "effect/Effect";
+-import * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
++import * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientResponse from "effect/http/HttpClientResponse";
+ import {
+   makeNavCredential,
+   makePrivateNavCredential,
+diff --git a/packages/adapters/nav/src/credential.ts b/packages/adapters/nav/src/credential.ts
+index 15ef30c..c422974 100644
+--- a/packages/adapters/nav/src/credential.ts
++++ b/packages/adapters/nav/src/credential.ts
+@@ -1,7 +1,7 @@
+ import * as Effect from "effect/Effect";
+ import * as Exit from "effect/Exit";
+-import type * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
++import type * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientRequest from "effect/http/HttpClientRequest";
+ import { SourceUnavailable } from "../../../domain/src/Failure.ts";
+ import { NAV_SOURCE_ID } from "./decode.ts";
+ 
+diff --git a/packages/adapters/nav/src/index.test.ts b/packages/adapters/nav/src/index.test.ts
+index 6aad3aa..bbc3f61 100644
+--- a/packages/adapters/nav/src/index.test.ts
++++ b/packages/adapters/nav/src/index.test.ts
+@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
+ import { describe, expect, it } from "vitest";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+-import * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
++import * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientResponse from "effect/http/HttpClientResponse";
+ import type { PlatformId } from "../../../domain/src/Ids.ts";
+ import { SourceAdapter } from "../../src/SourceAdapter.ts";
+ import { makePrivateNavCredential, type NavCredential } from "./credential.ts";
+diff --git a/packages/adapters/nav/src/index.ts b/packages/adapters/nav/src/index.ts
+index 05d246b..b18ccc2 100644
+--- a/packages/adapters/nav/src/index.ts
++++ b/packages/adapters/nav/src/index.ts
+@@ -1,7 +1,7 @@
+ import * as Effect from "effect/Effect";
+-import type * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+-import type * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
++import type * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientRequest from "effect/http/HttpClientRequest";
++import type * as HttpClientResponse from "effect/http/HttpClientResponse";
+ import { SourceUnavailable } from "../../../domain/src/Failure.ts";
+ import type { AcquiredPage, HydrateOutcome, SourceAdapter } from "../../src/SourceAdapter.ts";
+ import {
+diff --git a/packages/adapters/src/Registry.test.ts b/packages/adapters/src/Registry.test.ts
+index ad57223..e582495 100644
+--- a/packages/adapters/src/Registry.test.ts
++++ b/packages/adapters/src/Registry.test.ts
+@@ -1,8 +1,8 @@
+ import { readFileSync } from "node:fs";
+ import { describe, expect, it } from "vitest";
+ import * as Effect from "effect/Effect";
+-import * as HttpClient from "effect/unstable/http/HttpClient";
+-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
++import * as HttpClient from "effect/http/HttpClient";
++import * as HttpClientResponse from "effect/http/HttpClientResponse";
+ import type { PlatformId } from "@job-index/domain/Ids";
+ import { make as makeNavAdapter, makePrivateNavCredential } from "@job-index/adapters/nav";
+ import type { SourceAdapter } from "./SourceAdapter.ts";
+diff --git a/packages/better-auth-effect-adapter/package.json b/packages/better-auth-effect-adapter/package.json
+index f2cb24e..0ba0bb4 100644
+--- a/packages/better-auth-effect-adapter/package.json
++++ b/packages/better-auth-effect-adapter/package.json
+@@ -14,6 +14,6 @@
+   },
+   "peerDependencies": {
+     "better-auth": "^1.6.26",
+-    "effect": "4.0.0-rc.108"
++    "effect": "4.1.0"
+   }
+ }
+diff --git a/packages/better-auth-effect-adapter/sql-client/src/index.ts b/packages/better-auth-effect-adapter/sql-client/src/index.ts
+index b876fa1..375aeae 100644
+--- a/packages/better-auth-effect-adapter/sql-client/src/index.ts
++++ b/packages/better-auth-effect-adapter/sql-client/src/index.ts
+@@ -1,5 +1,5 @@
+ import * as Effect from "effect/Effect";
+-import type { SqlClient } from "effect/unstable/sql/SqlClient";
++import type { SqlClient } from "effect/sql/SqlClient";
+ import type { Executor } from "../../src/Executor.ts";
+ 
+ /**
+diff --git a/packages/better-auth-effect-adapter/src/Schema.ts b/packages/better-auth-effect-adapter/src/Schema.ts
+index f33efde..fc6153c 100644
+--- a/packages/better-auth-effect-adapter/src/Schema.ts
++++ b/packages/better-auth-effect-adapter/src/Schema.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ 
+ /**
+  * The four tables Better Auth's core (not a plugin) reads and writes,
+diff --git a/packages/domain/src/Access.ts b/packages/domain/src/Access.ts
+index 851dd99..9a7ea69 100644
+--- a/packages/domain/src/Access.ts
++++ b/packages/domain/src/Access.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { PrincipalId, ProfileId } from "./Ids.ts";
+ 
+ /**
+diff --git a/packages/domain/src/Answer.ts b/packages/domain/src/Answer.ts
+index f5fced7..11b1410 100644
+--- a/packages/domain/src/Answer.ts
++++ b/packages/domain/src/Answer.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { ProfileId } from "./Ids.ts";
+ 
+ /**
+diff --git a/packages/domain/src/Applications.ts b/packages/domain/src/Applications.ts
+index 064ef75..7a0948d 100644
+--- a/packages/domain/src/Applications.ts
++++ b/packages/domain/src/Applications.ts
+@@ -1,6 +1,6 @@
+ import * as Option from "effect/Option";
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import {
+   ApplicationId,
+   CanonicalJobId,
+diff --git a/packages/domain/src/Delivery.ts b/packages/domain/src/Delivery.ts
+index b816928..26a51a5 100644
+--- a/packages/domain/src/Delivery.ts
++++ b/packages/domain/src/Delivery.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { AnswerShape, QuestionKey } from "./Answer.ts";
+ import { DeliveryPlatformId, ProfileId, SubmissionId } from "./Ids.ts";
+ 
+diff --git a/packages/domain/src/Documents.ts b/packages/domain/src/Documents.ts
+index c1d3b32..be5d0fa 100644
+--- a/packages/domain/src/Documents.ts
++++ b/packages/domain/src/Documents.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { DocumentId, ProfileId, SavedJobId } from "./Ids.ts";
+ import { JobSnapshot } from "./Job.ts";
+ 
+diff --git a/packages/domain/src/Freshness.ts b/packages/domain/src/Freshness.ts
+index e9c9b5d..0de38aa 100644
+--- a/packages/domain/src/Freshness.ts
++++ b/packages/domain/src/Freshness.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { CanonicalJobId, ProfileId, Sequence } from "./Ids.ts";
+ 
+ /**
+diff --git a/packages/domain/src/Ingestion.ts b/packages/domain/src/Ingestion.ts
+index 1860c61..31c00f9 100644
+--- a/packages/domain/src/Ingestion.ts
++++ b/packages/domain/src/Ingestion.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { PlatformId, Sequence, SourceId } from "./Ids.ts";
+ 
+ /**
+diff --git a/packages/domain/src/Job.ts b/packages/domain/src/Job.ts
+index 44eb61b..7f895c4 100644
+--- a/packages/domain/src/Job.ts
++++ b/packages/domain/src/Job.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { CanonicalJobId, OccurrenceId, PlatformId, Sequence, SourceId } from "./Ids.ts";
+ 
+ /** A vacancy as a source published it, before identity is derived. */
+diff --git a/packages/domain/src/Principal.ts b/packages/domain/src/Principal.ts
+index a30afc4..96ddaa8 100644
+--- a/packages/domain/src/Principal.ts
++++ b/packages/domain/src/Principal.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { PrincipalId, ProfileId } from "./Ids.ts";
+ 
+ /**
+diff --git a/packages/domain/src/Profile.ts b/packages/domain/src/Profile.ts
+index ce5d1b3..cf343af 100644
+--- a/packages/domain/src/Profile.ts
++++ b/packages/domain/src/Profile.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { ProfileId } from "./Ids.ts";
+ import { Erasure } from "./Access.ts";
+ 
+diff --git a/packages/domain/src/Proposals.ts b/packages/domain/src/Proposals.ts
+index 40b7851..afe49a6 100644
+--- a/packages/domain/src/Proposals.ts
++++ b/packages/domain/src/Proposals.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { ProfileId, ProposalId } from "./Ids.ts";
+ 
+ /**
+diff --git a/packages/domain/src/Source.ts b/packages/domain/src/Source.ts
+index 3a6606a..b624d2d 100644
+--- a/packages/domain/src/Source.ts
++++ b/packages/domain/src/Source.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { PlatformId } from "./Ids.ts";
+ 
+ /**
+diff --git a/packages/domain/src/Subscription.ts b/packages/domain/src/Subscription.ts
+index d56d85b..d86cad4 100644
+--- a/packages/domain/src/Subscription.ts
++++ b/packages/domain/src/Subscription.ts
+@@ -1,5 +1,5 @@
+ import * as Schema from "effect/Schema";
+-import * as Model from "effect/unstable/schema/Model";
++import * as Model from "effect/schema/Model";
+ import { ProfileId } from "./Ids.ts";
+ 
+ /**
