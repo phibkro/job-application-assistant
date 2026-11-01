@@ -31,15 +31,15 @@ Steps:
 
 Owner prerequisites. Each is a capability grant or a fact about the Cloudflare account that agents cannot make up:
 
-| # | Prerequisite | Why |
+| # | Prerequisite | Status (2026-11-01) |
 | --- | --- | --- |
-| P1 | A Cloudflare Zero Trust organisation exists. The owner supplies its team domain. | Access applications live inside a Zero Trust organisation. |
-| P2 | The rule for who may sign in, e.g. one email or an Access group. Kept in a GitHub **variable** or an Alchemy input, never committed. | The policy identity is personal data (`AGENTS.md`). |
-| P3 | An Access **service token** for the CI smoke test, stored as GitHub secrets in the `pr-preview` environment. | CI must call the preview URL through Access. |
-| P4 | The `CLOUDFLARE_API_TOKEN` used by `pr-preview` gains Access-app edit permission, or a separate scoped token. | Alchemy creates and deletes the Access application. |
+| P1 | A Zero Trust organisation | **Met.** Team domain `phibkro.cloudflareaccess.com`. |
+| P2 | Who may sign in | **Decided:** the *Cloudflare Account Member* selector, using the Cloudflare identity provider. No email address is stored anywhere. The owner checks that the Cloudflare IdP is enabled; organisations created before 2026-06-18 keep their older login methods. |
+| P3 | An Access **service token** for the CI smoke test | Owner action: create `ci-pr-preview` and store it as the `pr-preview` environment secrets `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`. |
+| P4 | An API token that can edit Access apps | **Likely not needed.** Since 2026-08-14, Access can attach to the Worker itself, covering every domain and preview URL, with a previews-only option. Prefer that, enabled once by the owner, over declaring an Access app in Alchemy: adopt before build. P4 applies only if the implementer shows that the Worker-level setting can't cover our previews. |
 
 Scope:
-1. Declare the Workers Preview (`preview: { of }` or the pinned version's equivalent), the shared seeded `preview` D1, and the Access application with its policy. Re-declare the `SourceLeaseObject` binding for previews, never in production-only settings.
+1. Declare the Workers Preview (`preview: { of }` or the pinned version's equivalent) and the shared seeded `preview` D1. Access protection comes from the Worker-level setting, previews only, with a Service Auth rule for the CI token. A CI test asserts that an unauthenticated request is denied, so drift in the dashboard setting fails the build. Re-declare the `SourceLeaseObject` binding for previews, never in production-only settings.
 2. Replace the per-PR stage scripts with the Alchemy Preview deploy and teardown in `pr-preview.yml`.
 3. Inventory the leftover `job-index-preview` Worker and any `pr-<n>` resources, and recommend what to delete. **Deleting them needs the owner's approval.**
 
