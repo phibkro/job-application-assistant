@@ -81,6 +81,11 @@ infra_code = re.sub(r"(^|[^:])//.*$", r"\1", infra_code, flags=re.MULTILINE)
 assert "migrationsDir" not in infra_code, (
     "Alchemy must not apply migrations; the deploy establishes the snapshot first"
 )
+# WS-0029@4: Alchemy beta.84 renamed the D1 prop to `migrations` and applies
+# pending migrations on every deploy (@alchemy.run/cloudflare D1/Database.ts).
+assert not re.search(r"\bmigrations\s*:", infra_code), (
+    "Alchemy must not apply migrations (`migrations:` prop); the deploy establishes the snapshot first"
+)
 
 # The deploy paths must establish the snapshot, apply ordered migrations, and
 # seed the catalogue. Otherwise a new relation can exist beside an old parent

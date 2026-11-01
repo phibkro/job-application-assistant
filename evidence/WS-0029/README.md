@@ -2,6 +2,27 @@
 
 Contracts: [WS-0029@2](../../work/WS-0029-r2-infra-alchemy-previews.md), then [WS-0029@3](../../work/WS-0029-r3-infra-alchemy-previews.md), then [WS-0029@4](../../work/WS-0029-r4-infra-alchemy-previews.md) for pass A. Branch `ws29`.
 
+> **Integration note (lead).** PR #28 carries this work on `claude/clever-heisenberg-lwui1b`:
+> - `ws29` `f32ece1` became `21b4709` (same tree, per review round 1);
+> - `287cc81` became `81baf42`;
+> - `a242f8e` became `db2d3d7`.
+>
+> Follow-up commits: `c696e21` (`alchemy state read`, CI-found), plus the round-1 M1 fix that guards the `migrations:` prop.
+>
+> P0 was run by the owner on `db2d3d7`:
+> - staging: `1 to update · 2 no change`; only `Api` updates, and its bindings are unchanged;
+> - production: `3 to create`; production has not been deployed.
+>
+> The first CI pr-28 deploy (run 41357548035) created the Worker and the D1 database with `legacy_module_registry` accepted. It then failed at the removed `alchemy state get`.
+>
+> The review is archived in [review-pass-a-r1.md](review-pass-a-r1.md). Follow-ups:
+> - L1: the guard should check computed flags, not one literal (a second Worker, `bundle: false`);
+> - L2: override `@effect/sql-d1` to 4.0.7;
+> - L3: check that the staging token can list DO namespaces;
+> - L4: the first staging apply is the first migrations-to-exports conversion;
+> - L5: never log `state read` output (it prints Redacted secrets);
+> - production: check which `job-index-production*` resources already exist before the first apply.
+
 **Current state: pass A attempt 3 (r4 attempt 1) is implemented in `f32ece1`. See "Pass A attempt 3" at the end. P0 is still open.** Attempts 1 and 2, below, are kept as recorded.
 
 ## Pass A
