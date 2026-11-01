@@ -22,6 +22,7 @@
 - **Refresh:** no deployed trigger (see techContext); TB-05.
 - **Public exposure:** no public API docs or rate limits yet; planned in TB-01/TB-04.
 - **Presets:** anonymous owner-scoped presets were split out of WS-0025 (after WS-0029/WS-0028).
+- **`infra/` upgrade (WS-0029 pass A):** stopped; Alchemy beta.84 adds the `new_module_registry` compatibility flag and moves Durable Objects to `exports`. Waiting on an owner decision and P0 ([evidence](../evidence/WS-0029/README.md)).
 - **OpenAPI:** `openapi/job-index-v1.json` is not generated from `Api.ts`.
 - **Administrative routes:** principal administration and corpus maintenance were not ported (WS-0006/0008/0009).
 
