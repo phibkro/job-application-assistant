@@ -73,10 +73,10 @@ One Ticket is active at a time. Each later Ticket gets the next free WorkScope I
 | Ticket | Status | Risk | Falsifier | Must hold before scoping |
 | --- | --- | --- | --- | --- |
 | TB-00 · WS-0020@1 | **Done:** `b601267`, review ACCEPT WITH NITS (`evidence/WS-0020/review.md`) | R1 | Identical replay moves `sequence`; returned record lacks its source | — |
-| WS-0024 JVM stack spike | **Done**: `450103c`; recommendation adopted (stay on TS, port the model); reproducibility review pending | spike | The TS path does as well or better on the same falsifiers | — |
+| WS-0024 JVM stack spike | **Done**: `450103c`; review REPRODUCES WITH NITS (`evidence/WS-0024/review.md`); recommendation adopted | spike | The TS path does as well or better on the same falsifiers | — |
 | WS-0021@3 effect ~4.1 + legacy web freeze | **Approved, next**: the Foldkit app leaves the workspace, pinned at rc.108 with a vendored domain copy | R2 (dependency) | Any test assertion changes, or a semantic difference appears | — |
 | TB-01 workload facts (WS-0022) | **Proposed** ([draft](../../../work/WS-0022-r1-tb01-workload-facts.md)); starts after WS-0021@3 lands | R2 (additive schema + API field) | An advert with no stated percentage is excluded as full-time, or 40–80% is reported as exactly 50% | D06 field spec; TB-00 evidence |
-| TB-02 second-source identity | Blocked | R3 (canonical IDs, saved snapshots) | Two same-title NAV requisitions stay merged after the change, or a saved job is orphaned | D05 strategy; D04 fixture-only |
+| TB-02 second-source identity | Blocked | R3 (canonical IDs, saved snapshots) | Two same-title NAV requisitions stay merged after the change, or a saved job is orphaned; a same-source `sameAs` link merges (WS-0024 review: guard needs its own test + control); transitive `sameAs` merges two NAV openings via a third source (WS-0024 C4c) | D05 strategy; D04 fixture-only |
 | TB-03 change/retraction | Queued | R2 | A closed vacancy still matches an active query via the changes cursor | Stable identity contract (TB-02) |
 | TB-04 query AST | Queued | R2 (public contract) | Web and API return different IDs/order for the same AST; an unsupported operator compiles | TB-01 |
 | TB-05 independent refresh | Queued; **gates any personal-route retirement** (A2) | R2 + staging release gate | Corpus goes stale with zero personal-feed traffic | D10 design; staging tick evidence (cron dispatch previously failed) |

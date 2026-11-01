@@ -273,3 +273,10 @@ Not changed: `apps/`, `packages/`, `infra/`, `db/`, lockfiles, CI, fixtures,
 and the memory bank. The WorkScope restricts writes to the two directories
 above. The lead should update `memory-bank/activeContext.md` and `progress.md`
 when gating this spike.
+
+## Review follow-ups (lead, 2026-11-01)
+
+- Independent reproducibility review: **REPRODUCES WITH NITS** (`review.md`). Counts reproduced exactly (17/48/0; controls 10/10). The reviewer's own valid-time mutation was caught by F3 and F6.
+- **Untested guard (carried into TB-02):** the `[(not= ?sa ?sb)]` within-source guard in `store.clj:113` is dead under the suite; removing it leaves all tests green. TB-02 must add a same-source `link!` test plus a control that drops the guard.
+- **Datomic Local licence:** Apache 2.0, per Datomic's release announcement (https://blog.datomic.com/2023/08/datomic-local-is-released.html). The Maven POM carries no `<license>` element.
+- **TS LOC paths:** the 848 comparable lines are `apps/worker/src/corpus/{decide,rows,identity,close,sql,observe}.ts` and `packages/adapters/nav/src/{decode,schema}.ts`.
