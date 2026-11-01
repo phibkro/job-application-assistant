@@ -144,10 +144,13 @@ assert "Production requires a NAV-issued private consumer token" in deploy
 assert "smoke-production.sh" in deploy
 assert "JOB_INDEX_DEV_VARS_FILE" in deploy
 assert "bootstrap-publish" in deploy
-# WS-0021@4 retired the legacy apps/web interface (owner-authorized), so the
-# deploy builds no web artifact; guard against the step coming back.
-assert "web-build" not in deploy
+# WS-0021@4 retired the legacy apps/web interface (owner-authorized); guard
+# against it coming back. WS-0025@2 added the index client, whose build is the
+# Worker's asset directory, so it must be built fresh before publication.
 assert "apps/web" not in deploy
+assert "run_logged web-build" not in deploy
+assert "run_logged index-web-build bash scripts/build-index-web.sh" in deploy
+assert deploy.index("run_logged index-web-build") < deploy.index("deploy_stack 0")
 assert "run_logged worker-build bun build apps/worker/src/index.ts" in deploy
 assert deploy.index("run_logged worker-build") < deploy.index("deploy_stack 0")
 # The two-phase production publication: a first version before the database

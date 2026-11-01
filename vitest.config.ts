@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url"
-import { defaultExclude, defineConfig } from "vitest/config"
+import { coverageConfigDefaults, defaultExclude, defineConfig } from "vitest/config"
 
 const from = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
@@ -100,7 +100,11 @@ export default defineConfig({
         // `Binding.test.ts` on pure functions, `Sqlite.test.ts` on
         // `bun:sqlite` itself, `Live.test.ts` on `Live.ts`'s call shape.
         "apps/worker/src/db/{D1,Sql,Binding,Sqlite,Live,FakeD1,index}.ts",
+        // The index client (WS-0025). `entry.ts` only boots the runtime in a
+        // browser, which the e2e suite covers; nothing here can import it.
+        "apps/index-web/src/**",
       ],
+      exclude: [...coverageConfigDefaults.exclude, "apps/index-web/src/entry.ts"],
       /**
        * A floor, not a target. Coverage says which lines ran, never whether
        * the assertion meant anything — so this exists to catch whole modules

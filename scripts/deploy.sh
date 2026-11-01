@@ -160,6 +160,7 @@ fi
 # immediately before publication, so a deploy cannot reuse files left by an
 # earlier preview or checkout.
 echo "Building deployment artifacts..."
+run_logged index-web-build bash scripts/build-index-web.sh
 mkdir -p .preview
 run_logged worker-build bun build apps/worker/src/index.ts \
   --outfile=.preview/worker.js \

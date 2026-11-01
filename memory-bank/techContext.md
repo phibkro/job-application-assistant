@@ -5,7 +5,7 @@
 | Language/runtime | TypeScript 5, Bun (package manager, test runner) |
 | Effects/schema/API | `effect ~4.1.0`, resolved **4.1.1**, across the root workspace (WS-0021@4). `infra/` stays on rc.108 (separate ticket). `HttpApi` in `apps/worker/src/Api.ts` |
 | Runtime | Cloudflare Workers + D1 + Durable Objects (`SourceLeaseObject`); Alchemy v2 (`infra/alchemy.run.ts`) |
-| Client | **None yet.** The Worker serves `dev/static-placeholder/`. The legacy `apps/web` UI was retired in WS-0021@4 (recoverable at `35e93e1`; `/apps/web/` is git-ignored for leftovers). **Planned:** `apps/index-web` (Foldkit 0.170, `@foldkit/ui`, Tailwind, better-auth anonymous accounts; WS-0025) |
+| Client | `apps/index-web` (WS-0025@2): Foldkit 0.170, `@foldkit/ui`, Tailwind; browse, detail, filters with URL sync over `/api/v1/jobs`, via the Worker's `HttpApi` client. The Worker serves `apps/index-web/dist` (built by `scripts/build-index-web.sh`). No auth yet: anonymous presets wait for WS-0029 (`nodejs_compat`) and WS-0028 (secret). Legacy `apps/web` retired in WS-0021@4 (recoverable at `35e93e1`) |
 | Toolchain | devenv (`devenv.nix`, `devenv.lock`: devenv-nixpkgs `760b852`) + Vite+ 1.4.0: `vp check` (oxfmt/oxlint), `vp run <task>` (`vite.config.ts`). Tests stay on Vitest 4 (WS-0027@2) |
 | Quality | oxfmt, oxlint, vitest 4, fast-check, Playwright + Axe; `@effect/language-service` 0.87.5 in `vp run verify` via `effect:check`; exceptions in `tools/quality/effect-exceptions.json` (WS-0026) |
 | Agent docs | `AGENTS.md` ("Effect for agents", "Foldkit for agents"); Foldkit skills in `.claude/skills/` with a git-ignored `repos/foldkit` checkout pinned to `foldkit@0.170.0` by `scripts/setup.sh` (`vp run setup`) (WS-0026) |
@@ -14,8 +14,7 @@
 
 ```text
 apps/worker/       routes, ingestion, corpus, db (Effect at the edge)
-dev/static-placeholder/  served until apps/index-web exists
-apps/index-web/    planned market-index client (WS-0025)
+apps/index-web/    market-index client (Foldkit; WS-0025)
 packages/domain/   canonical identity, Fact/IR, pure passes
 packages/adapters/ source importers (NAV live; JSON-LD fixture-only)
 infra/             Alchemy declaration; db/ generated schema + catalog seed
