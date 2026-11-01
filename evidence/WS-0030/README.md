@@ -57,3 +57,39 @@ All run locally on the `ws30` worktree (HEAD contains both pass commits; the wor
 | 8 | policy plant | `vp run deploy` | 1 | same |
 
 The stub `wrangler` log held only `--version` lines (9 in total: one per run, 1 clean run plus 8 controls); no other invocation was recorded, and `scripts/deploy.sh` did not start in any control (0 log mentions). Earlier, before the nix shell was available, controls 1-3 were also run as bare suite commands (rc=1 each), which agrees with these.
+
+## P1: Cachix push to the `phibkro` cache
+
+Change (commit `87e2b20` locally, `67e9588` on PR #25): one `cachix/cachix-action` step per job (pinned `97e5ff84d02b3b4f9936339f767e17f03c9252ed`) with `name: phibkro`, `extraPullNames: devenv`, `authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}`. Documented in the pinned README (Options: `name`, `extraPullNames`; Security: fork PRs get no secrets and only read). With an empty token `dist/index.js` skips `cachix authtoken`, sets `hasPushTokens=false`, and the post step logs "Pushing is disabled." and "Missing a Cachix auth token" without failing, so fork PRs stay green. This degradation was read from the action source and was not exercised on a fork PR.
+
+### Samples
+
+`quality` run 41347235956 on PR #25 head 67e9588, attempts 1-5 (reruns via the API only; the preview workflow was not touched). All succeeded.
+
+| Attempt | Verify job ID | Wall (s) | devenv install (s) | `bun install` (s) | Verify step (s) | Cachix post step (s) | Paths pushed | Note |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 124969569288 | 187 | 48 | 23 | 102 | 1 | 7 (604 skipped) | first run, pushes |
+| 2 | 124970435467 | 146 | 40 | 20 | 71 | 2 | 0 | warm |
+| 3 | 124971131630 | 145 | 38 | 17 | 75 | 2 | 0 | warm |
+| 4 | 124971792215 | 148 | 41 | 20 | 75 | 2 | 0 | warm |
+| 5 | 124972453884 | 165 | 46 | 21 | 83 | 2 | 0 | warm |
+
+P2-only comparison samples (same workflow without P1): run 41346471745 verify job 124967243883 = 181 s (devenv install 44, bun 22, Verify 101); main push run 41347044335 (085b57d) verify job 124969005495 = 138 s (devenv install 37, bun 18, Verify 71). n=2, median 159.5 s.
+
+| Metric | P2-only (n=2) | P1 first run | P1 warm (attempts 2-5) median / p90 | P1 all 5 median / p90 |
+|---|---|---|---|---|
+| verify wall (s) | 159.5 (181, 138) | 187 | 147 / 159.9 | 148 / 178.2 |
+| devenv install (s) | 40.5 (44, 37) | 48 | 40.5 / 44.5 | 41 / 47.2 |
+| Cachix post step (s) | 0 | 1 | 2 / 2 | 2 / 2 |
+
+### What was pushed
+
+The first run pushed 7 paths and skipped 604 ("Skipping /nix/store/..." lines): `devenv-files-cleanup`, `devenv-container-copy`, `tasks.json`, `devenv-enterShell`, `devenv-profile` and similar small derivations produced by `devenv shell` evaluation. Warm runs pushed nothing. Zero paths were fetched from `phibkro.cachix.org` in the devenv install of warm runs (0 `copying path ... phibkro` lines); the install still fetched the same 68 paths (139.6 MiB) from `devenv.cachix.org`/`cache.nixos.org`. This is the daemon-mode limit documented in the action README: Nix does not run the post-build hook for substituted paths, and the expensive devenv install is entirely substituted.
+
+### Decision: REVERT P1
+
+The nominal wall median (148 s vs 159.5 s) is below the P2-only median, but it is not attributable to the cache: the devenv install step is unchanged (40.5 s warm median vs 40.5 s), nothing is fetched from `phibkro`, and the 11.5 s difference sits in the Verify step (71-102 s in both groups), which P1 does not touch. The P2-only baseline is n=2 with a 43 s spread, so 12 s is within noise. Almost nothing is pushed and nothing is reused, so the pass has no mechanism for speedup and adds a secret dependency plus about 2 s of post-step cost. The cache remains harmless; reverting avoids carrying a no-effect change.
+
+### Owner decision, not enabled
+
+Store scan mode (`useDaemon: false`) pushes substituted paths too, so the 68 devenv-install paths could be served from `phibkro`. The README warns it is "not a safe method for multi-user stores" (it can upload paths built by other users); GitHub-hosted runners are single-job VMs, but this is a security trade-off. Also, those paths are already served from public Cachix/nixos caches at runner speed, so expected gain is small and unproven. Not enabled; the owner decides whether to measure it.
