@@ -54,13 +54,6 @@
 | 3 | A **short gap** on `job-index.phibkro.org` during cutover is acceptable. |
 | 4 | **P2 starts in staging now**, in parallel with P1. |
 
-## Original questions
-
-1. **NAV redistribution.** Planning so far assumed acceptance ("act as if NAV accepted"). Does a public **production** launch also proceed on that assumption, or does it wait for NAV's written answer?
-2. **Refresh schedule and budget.** Proposed: every 6 hours, with the hydration cap N set from the first staging measurement (WS-0022 L4). Alternatives are hourly or daily.
-3. **Cutover window.** Is a short gap on `job-index.phibkro.org` acceptable? The alternative is a zero-downtime swap, if Cloudflare custom domains allow one; P4 must show whether they do.
-4. **Order of P1 and P2.** P2 can start in staging now, in parallel with P1. Proposed: yes.
-
 ## Rollback
 
 - **P2:** remove the schedule; ingestion goes back to "no trigger".

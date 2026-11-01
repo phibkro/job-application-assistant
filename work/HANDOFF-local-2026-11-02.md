@@ -71,7 +71,7 @@ Implement TB-05, pass P2 of WS-0031.
    - Test from mobile data whether `media.home.phibkro.org` or `audio.home.phibkro.org` answer.
    - Close any router port forwards to the LAN host behind those names.
    - Delete the four records and use Tailscale MagicDNS (recommended), or repoint them to the server's `100.x` address.
-2. **Cloudflare cleanup (approved 2026-11-02):** delete the `home` tunnel; delete `ACORN` if it has no routes; retire `projects-origin` and `projects-mcp` (DNS records plus their `nori-station` local-config routes, with a backup first and a restart check of the other routes). **Do not** delete `job-index-preview` or `job-index-preview-db`: they serve `job-index.phibkro.org` until WS-0031 P4/P5.
+2. **Cloudflare cleanup (approved by the owner in the cloud lead session on 2026-11-02 as "ok to delete"; owner-run, outside any WorkScope):** delete the `home` tunnel; delete `ACORN` if it has no routes; retire `projects-origin` and `projects-mcp` (DNS records plus their `nori-station` local-config routes, with a backup first and a restart check of the other routes). **Do not** delete `job-index-preview` or `job-index-preview-db`: they serve `job-index.phibkro.org` until WS-0031 P4/P5.
 3. **Account-wide "Access for all Workers" (previews only) is optional.**
    - If enabled, keep only the "Cloudflare account" Allow rule.
    - Do not add `ci-pr-preview` there; it already has its own app policy.
@@ -91,16 +91,24 @@ mkdir -p ~/.config/sops/age && nix shell nixpkgs#age -c age-keygen -o ~/.config/
 nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt
 ```
 
-CI production key: create it, put its contents in the GitHub `production` environment secret `SOPS_AGE_KEY`, note the public key, then shred the file.
+CI production key: generate it in a private temporary directory. `age-keygen` prints the public key on stderr, and the file also holds it as a `# public key:` comment. Put the file's contents in the GitHub `production` environment secret `SOPS_AGE_KEY`, then shred it.
 
 ```bash
-nix shell nixpkgs#age -c age-keygen -o /tmp/ci-prod.key
+d=$(mktemp -d) && (umask 077 && nix shell nixpkgs#age -c age-keygen -o "$d/ci-prod.key") && grep 'public key' "$d/ci-prod.key"
 ```
 
-Claude cloud key (preview and staging only): put its contents in the cloud environment's settings as `SOPS_AGE_KEY`, note the public key, then shred the file.
+```bash
+shred -u "$d/ci-prod.key" && rmdir "$d"
+```
+
+Claude cloud key (preview and staging only): same pattern. Put its contents in the cloud environment's settings as `SOPS_AGE_KEY`, then shred it.
 
 ```bash
-nix shell nixpkgs#age -c age-keygen -o /tmp/claude-cloud.key
+d=$(mktemp -d) && (umask 077 && nix shell nixpkgs#age -c age-keygen -o "$d/claude-cloud.key") && grep 'public key' "$d/claude-cloud.key"
+```
+
+```bash
+shred -u "$d/claude-cloud.key" && rmdir "$d"
 ```
 
 Give the implementer **only the three public keys** (`age1…`). Back up `keys.txt`.

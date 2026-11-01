@@ -23,7 +23,8 @@
 - **Public exposure:** no public API docs or rate limits yet; planned in TB-01/TB-04.
 - **Presets:** anonymous owner-scoped presets were split out of WS-0025 (after WS-0029/WS-0028).
 - **`infra/` upgrade (WS-0029@4 pass A):** merged in #28 (`f00ccb5`).
-- **PR previews (WS-0029@2 pass B):** Worker Previews behind Access on PR #29, with the review round 1 fixes in `9c0fa48`. verify and e2e pass, and 27 controls fail as intended. Waiting on the owner's first host deploy (from the PR branch) and the Access toggle, then the PR's CI run ([evidence](../evidence/WS-0029/README.md#pass-b-attempt-2-review-round-1-fixes)). The leftover `job-index-preview` Worker and `job-index-preview-db` are inventoried; deleting them needs the owner's approval. Follow-ups: L1, L4, I1, I2, I4, I5.
+- **PR previews (WS-0029@2 pass B):** merged in #29 (`4c08a97`). Worker Previews of `job-index-pr-previews` sit behind Access and share the D1 `job-index-pr-previews-typescript-db`. Real-PR evidence: an unauthenticated request got a 302 to Access, the service token got 200 with seeded data, and after teardown the URL returned 404 ([evidence](../evidence/WS-0029/README.md#pass-b-real-pr-results-pr-29-merged-as-4c08a97)). The legacy `job-index-preview` serves `job-index.phibkro.org` until WS-0031 P4/P5. Follow-ups: L1, L4, R2-L1..L3, I1, I2, I4, I5.
+- **Production path + TB-05 (WS-0031):** approved 2026-11-02 ([WorkScope](../work/WS-0031-r1-production-path-and-refresh.md)). P2 is not started and P1 is waiting on the owner's keys. Production has never been deployed.
 - **OpenAPI:** `openapi/job-index-v1.json` is not generated from `Api.ts`.
 - **Administrative routes:** principal administration and corpus maintenance were not ported (WS-0006/0008/0009).
 
