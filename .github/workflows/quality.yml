@@ -25,8 +25,9 @@ jobs:
         run: devenv shell -- bun install --frozen-lockfile
       - name: Vite+ static checks
         run: devenv shell -- vp check
-      - name: Tests (both Vitest 4 suites)
-        run: devenv shell -- vp run test
       # Setup, policy gates, vp check, imports/types/Effect diagnostics, schema/catalog/bundle, coverage-gated tests.
+      # This is the only test execution (WS-0030 P2): the `coverage` sub-task runs both Vitest 4 suites (Bun-hosted
+      # unit, then workerd pool) with --coverage thresholds. A failure is attributable from the `vp run` task name in
+      # the log: `coverage` is the tests, `policy`/`typecheck`/`effect:check`/... are the static gates before it.
       - name: Verify
         run: devenv shell -- vp run verify
