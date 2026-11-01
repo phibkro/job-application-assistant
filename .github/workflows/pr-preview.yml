@@ -27,13 +27,6 @@ jobs:
           name: devenv
       - name: Install pinned devenv CLI
         run: nix profile add github:cachix/devenv/b904dcb51fe48c30db250038241507f60752f222
-      - name: Cache Bun install
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
       - run: devenv shell -- bun install --frozen-lockfile
       - run: devenv shell -- vp run setup
       - run: devenv shell -- vp run verify
@@ -60,13 +53,6 @@ jobs:
           name: devenv
       - name: Install pinned devenv CLI
         run: nix profile add github:cachix/devenv/b904dcb51fe48c30db250038241507f60752f222
-      - name: Cache Bun install
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
       - run: devenv shell -- bun install --frozen-lockfile
       - run: devenv shell -- vp run setup
       - name: Destroy isolated preview
