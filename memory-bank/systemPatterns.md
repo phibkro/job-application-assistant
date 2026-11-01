@@ -1,19 +1,24 @@
 # System patterns
 
-## Product patterns
+## Data
 
-- Source occurrence and canonical vacancy are separate identities.
-- Canonical changes receive a monotonic sequence.
-- Saved searches retain the last evaluated sequence.
-- Deduplication is deterministic-first and conservative.
-- Provenance accompanies every canonical field and result.
-- Raw observations are replayable inputs; derived projections can be rebuilt.
+- Source occurrence `(sourceId, externalId)` and vacancy are separate identities; never merge within one source.
+- **Homogeneous shape, heterogeneous content:** every source fills the same closed `Fact<T>` attribute set (schema.org names); variance lives in `state`, evidence and authority.
+- *(Target, lands in WS-0022)* Observations are append-only (enforced by triggers) and content-addressed, carrying valid and recorded time; projections are rebuildable.
+- Canonical changes get a monotonic sequence; replaying identical input is a no-op.
 
-## Lifecycle patterns
+## Code (adopted design; enforcement lands per ticket)
 
-- WorkScope → immutable revision → execution run → bounded attempts → evidence proposal → configured gate.
-- Agents propose state transitions; gates decide them.
-- Human authority is the default for intent, acceptance, capabilities, integration, and release.
-- Workgraph is canonical work truth; Flow coordinates; Chatlog retains evidence and curated memory; Pagu enforces capabilities.
+- **Effect at the edge, pure core.** Domain, passes and query algebra are plain functions, enforced by a boundary test and scoped immutability lint.
+- **Event-driven ingestion:** `Triggered` → pure `decide(state, event) → {state, commands}` → thin Effect interpreter.
+- Explicit state machines via `TransitionSystem`; XState v6 + `@xstate/effect` only per machine, with a recorded reason.
+- Adapters are importers onto one port; a shared conformance suite has broken twins; source quirks are kept as data.
+- Contracts start **experimental** and are promoted on evidence (fitness functions).
 
-Detailed lifecycle: [`docs/internal/lifecycle/adlc.md`](../docs/internal/lifecycle/adlc.md)
+## Lifecycle
+
+- WorkScope → immutable revision → bounded attempts → evidence → independent review → human gate.
+- Agents propose; humans approve scope, integration and release.
+- Delegate by capability tier (`AGENTS.md`).
+
+Detail: [ADLC](../docs/internal/lifecycle/adlc.md), [lead handoff](../docs/internal/product/market-index-lead-handoff.md).

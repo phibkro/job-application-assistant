@@ -1,5 +1,7 @@
 # Product vision
 
+> **Superseded as the product boundary** (owner decision 2026-11-01, RFC 0016 amendment A3). The governing mission is now [RFC 0016: read-only Norwegian Job Market Index](../rfcs/0016-read-only-norwegian-market-index.md). This document is kept as history. The personal-workflow API routes it describes are kept as **legacy** (data and routes retained, no new features, UI retired by WS-0021@4) and are destined for the `job-hunting` client.
+
 > **Working product name:** Job Application Assistant. Repository and package
 > identifiers remain `job-index` until a separate rename decision.
 

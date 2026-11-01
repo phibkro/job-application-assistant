@@ -9,7 +9,7 @@
 - Review owners: Human product owner; independent architecture and data-policy reviewers
 - Tracking issue: Not yet assigned
 - Implementation PR: Not yet assigned
-- Supersedes on acceptance: Product boundary in [current vision](../product/vision.md), and conflicting parts of prior application-focused RFCs; exact supersession list to be decided at acceptance
+- Supersedes: the product boundary in [vision.md](../product/vision.md) (resolved under A3, 2026-11-01). Earlier application-focused RFCs stay in force only for the retained legacy personal API routes.
 - Superseded by: None
 
 ## Summary
@@ -180,6 +180,7 @@ Proposal review → accepted RFC → approved first tracer → additive schema/A
 
 - **A1. Current vision governs existing features.** [`vision.md`](../product/vision.md) and the accepted application-focused RFCs stay authoritative for existing implemented behavior until a migration WorkScope is approved. This RFC governs new market-index work only.
 - **A2. Independent refresh precedes personal-route retirement.** On `main`, the only deployed acquisition trigger is `armsGate` in `apps/worker/src/index.ts`. It arms lazy ingestion by path only on the personal read routes (`/api/v1/me/feed`, `/api/v1/me/matches/*`), after the response, via `waitUntil`, **including unauthenticated (401) requests** (WS-0020 T6, `index.ts:206–211`). Separately, the public `GET /api/v1/jobs/:id` fetches NAV detail and writes D1 on unhydrated jobs, without advancing `sequence` (WS-0020 T5). Both are read-initiated acquisition, and both are recorded deviations from invariant 6 until TB-05 and TB-01's bounded hydration replace them. TB-05 (independent refresh) must therefore pass its gate before any personal route is retired or moved. Until then, the read-armed gate is a recorded, accepted deviation from invariant 6.
+- **A3 resolution (2026-11-01).** At the legacy-UI retirement, the owner superseded `vision.md`'s product boundary. The retained personal API routes and data are legacy: no new features, destined for `job-hunting`.
 - **A3. Supersession is decided at migration time.** The exact list of superseded vision sections and RFCs is set by the migration WorkScope, not by this acceptance.
 - **A2 correction (2026-11-01).** Amended after WS-0020 evidence: the gate is path-based, not authentication-based, and the public detail read also acquires.
 - **A4. Source policy for the tracer program (D04).** NAV is the only live source for TB-00 to TB-04. A second source is fixture-only until a per-source access, redistribution and retention review is recorded. FINN is excluded from the shared index; job-hunting's personal-scale watcher grants no shared-index permission.
