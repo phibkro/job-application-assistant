@@ -1,0 +1,152 @@
+
+==== C1 -> f1-ingested-nav-vacancy-is-queryable-with-its-source-reference
+     broken: source reference read from the feed item `id` instead of `_feed_entry.uuid`
+
+FAIL in (f1-ingested-nav-vacancy-is-queryable-with-its-source-reference) (falsifiers_test.clj:26)
+source reference = (source, NAV uuid) plus the posting URL
+expected: (= [{:source "nav", :external-id "active-vacancy-1", :url posting-url, :status "ACTIVE"}] (map (fn* [p1__10346#] (dissoc p1__10346# :observations)) (:sources v)))
+  actual: (not (= [{:source "nav", :external-id "active-vacancy-1", :url "https://arbeidsplassen.nav.no/stillinger/stilling/active-vacancy-1", :status "ACTIVE"}] ({:source "nav", :external-id "entry-1", :url "https://arbeidsplassen.nav.no/stillinger/stilling/entry-1", :status "ACTIVE"})))
+
+FAIL in (f1-ingested-nav-vacancy-is-queryable-with-its-source-reference) (falsifiers_test.clj:32)
+the INACTIVE entry is recorded, not dropped, and is not active
+expected: (= #{"inactive-vacancy-2"} (set (for [v view :when (not (:active? v)) src (:sources v)] (:external-id src))))
+  actual: (not (= #{"inactive-vacancy-2"} #{"entry-2"}))
+
+==== C2 -> f2-identical-replay-is-a-semantic-no-op
+     broken: observation id includes a receipt nonce (not content-addressed)
+
+FAIL in (f2-identical-replay-is-a-semantic-no-op) (falsifiers_test.clj:44)
+replay asserts no datom besides the transaction's own
+expected: (zero? (:datoms-added replay))
+  actual: (not (zero? 318))
+
+FAIL in (f2-identical-replay-is-a-semantic-no-op) (falsifiers_test.clj:45)
+the query result is unchanged
+expected: (= view-1 (s/view *impl* conn {}))
+  actual: (not (= [{:vacancy #{"nav|active-vacancy-1"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "active-vacancy-1", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("1d676d6c4c080b3bd44fa8d8277a54e28466500e621029ceae7ca6709369c9a2@4882664348068" "fdb964972163cbf0eafa786ecebf8be5a8baee440ffea57d190913f4e8e0bf4f@4882625456639")}], :workload {:state :unknown, :class :undetermined}} {:vacancy #{"nav|inactive-vacancy-2"}, :active? false, :title nil, :employer nil, :location "Bergen", :sources [{:source "nav", :external-id "inactive-vacancy-2", :url "https://arbeidsplassen.nav.no/stillinger/stilling/inactive-vacancy-2", :status "INACTIVE", :observations ("7b8defae793c597aa2632e1e64ce00162ed9faacd7dc1e3c99d567be66270f8c@4882634780152")}], :workload {:state :temp-unknown, :class :undetermined}}] [{:vacancy #{"nav|active-vacancy-1"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "active-vacancy-1", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("1d676d6c4c080b3bd44fa8d8277a54e28466500e621029ceae7ca6709369c9a2@4882664348068" "1d676d6c4c080b3bd44fa8d8277a54e28466500e621029ceae7ca6709369c9a2@4882725989967" "fdb964972163cbf0eafa786ecebf8be5a8baee440ffea57d190913f4e8e0bf4f@4882625456639" "fdb964972163cbf0eafa786ecebf8be5a8baee440ffea57d190913f4e8e0bf4f@4882713442685")}], :workload {:state :unknown, :class :undetermined}} {:vacancy #{"nav|inactive-vacancy-2"}, :active? false, :title nil, :employer nil, :location "Bergen", :sources [{:source "nav", :external-id "inactive-vacancy-2", :url "https://arbeidsplassen.nav.no/stillinger/stilling/inactive-vacancy-2", :status "INACTIVE", :observations ("7b8defae793c597aa2632e1e64ce00162ed9faacd7dc1e3c99d567be66270f8c@4882634780152" "7b8defae793c597aa2632e1e64ce00162ed9faacd7dc1e3c99d567be66270f8c@4882718619701")}], :workload {:state :temp-unknown, :class :undetermined}}]))
+
+FAIL in (f2-identical-replay-is-a-semantic-no-op) (falsifiers_test.clj:46)
+a change-cursor client resuming after the first run sees nothing
+expected: (empty? (s/changed-occurrences-since conn (:t first-run)))
+  actual: (not (empty? #{["nav|inactive-vacancy-2"] ["nav|active-vacancy-1"]}))
+
+==== C3 -> f3-inactive-entry-propagates-as-visible-closure
+     broken: status = 'ever seen ACTIVE' (closure never propagates)
+
+FAIL in (f3-inactive-entry-propagates-as-visible-closure) (falsifiers_test.clj:57)
+now: closed
+expected: (false? (status {}))
+  actual: (not (false? true))
+
+==== C4a -> f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs
+     broken: occurrence identity = title/employer/location (today's TS canonical key)
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:89)
+D05: different externalId within NAV stays two vacancies
+expected: (not= (:vacancy (ids "active-vacancy-1")) (:vacancy (ids "active-vacancy-1-second-requisition")))
+  actual: (not (not= nil nil))
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:91)
+D05: different externalId within NAV stays two vacancies
+expected: (= 1 (count (:vacancy (ids "active-vacancy-1"))))
+  actual: (not (= 1 0))
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:93)
+cross-source sameAs closes transitively: nav ~ board ~ ats
+expected: (= #{"nav|x-nav" "fixture-board|b-1" "fixture-ats|c-1"} (:vacancy (ids "x-nav")))
+  actual: (not (= #{"nav|x-nav" "fixture-board|b-1" "fixture-ats|c-1"} nil))
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:95)
+an ambiguous candidate is not linked, and nothing merges within a source
+expected: (= #{"fixture-board|b-2"} (:vacancy (ids "b-2")))
+  actual: (not (= #{"fixture-board|b-2"} #{"technical support specialist example technology as oslo"}))
+
+==== C4b -> f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs
+     broken: same-vacancy rule without its recursive clause
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:86)
+vacancies partition the occurrences: no occurrence is in two vacancies
+expected: (apply distinct? (mapcat :vacancy view))
+  actual: (not (apply #object[clojure.core$distinct_QMARK_ 0x46262fc3 "clojure.core$distinct_QMARK_@46262fc3"] ("fixture-board|b-2" "nav|active-vacancy-1" "nav|active-vacancy-1-second-requisition" "fixture-board|b-1" "fixture-ats|c-1" "nav|x-nav" "fixture-board|b-1" "nav|x-nav" "fixture-board|b-1" "fixture-ats|c-1")))
+
+==== C4c -> f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs
+     broken: candidate generator links ambiguous candidates (transitive within-source merge)
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:89)
+D05: different externalId within NAV stays two vacancies
+expected: (not= (:vacancy (ids "active-vacancy-1")) (:vacancy (ids "active-vacancy-1-second-requisition")))
+  actual: (not (not= #{"nav|active-vacancy-1-second-requisition" "fixture-board|b-2" "nav|active-vacancy-1"} #{"nav|active-vacancy-1-second-requisition" "fixture-board|b-2" "nav|active-vacancy-1"}))
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:91)
+D05: different externalId within NAV stays two vacancies
+expected: (= 1 (count (:vacancy (ids "active-vacancy-1"))))
+  actual: (not (= 1 3))
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:95)
+an ambiguous candidate is not linked, and nothing merges within a source
+expected: (= #{"fixture-board|b-2"} (:vacancy (ids "b-2")))
+  actual: (not (= #{"fixture-board|b-2"} #{"nav|active-vacancy-1-second-requisition" "fixture-board|b-2" "nav|active-vacancy-1"}))
+
+FAIL in (f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs) (falsifiers_test.clj:96)
+an ambiguous candidate is not linked, and nothing merges within a source
+expected: (empty? (s/within-source-merges *impl* (datomic.client.api/db conn)))
+  actual: (not (empty? #{["nav|active-vacancy-1-second-requisition" "nav|active-vacancy-1"] ["nav|active-vacancy-1" "nav|active-vacancy-1-second-requisition"]}))
+
+==== C5a -> f5-workload-query-separates-the-seven-fact-states
+     broken: missing workload treated as Stated 100%
+
+FAIL in (f5-workload-query-separates-the-seven-fact-states) (falsifiers_test.clj:105)
+bbd5b990-b2f0-4599-994b-57d1da77a6dc
+expected: (= expected (select-keys (:workload (ids xid)) (keys expected)))
+  actual: (not (= {:state :unsupported, :schedule :part-time, :class :undetermined} {:state :stated, :schedule :part-time, :class :outside}))
+
+FAIL in (f5-workload-query-separates-the-seven-fact-states) (falsifiers_test.clj:105)
+wl-nothing
+expected: (= expected (select-keys (:workload (ids xid)) (keys expected)))
+  actual: (not (= {:state :unknown, :class :undetermined} {:state :stated, :class :outside}))
+
+FAIL in (f5-workload-query-separates-the-seven-fact-states) (falsifiers_test.clj:105)
+wl-temp
+expected: (= expected (select-keys (:workload (ids xid)) (keys expected)))
+  actual: (not (= {:state :temp-unknown, :class :undetermined} {:state :stated, :class :outside}))
+
+FAIL in (f5-workload-query-separates-the-seven-fact-states) (falsifiers_test.clj:106)
+expected: (= #{:conflicting :negotiable :unknown :temp-unknown :stated :derived :unsupported} (set (map (fn* [p1__10474#] (get-in (ids p1__10474#) [:workload :state])) (keys fx/workload-cases))))
+  actual: (not (= #{:conflicting :negotiable :unknown :temp-unknown :stated :derived :unsupported} #{:conflicting :negotiable :stated :derived}))
+
+==== C5b -> f5-workload-query-separates-the-seven-fact-states
+     broken: interval collapsed to its midpoint (40–80% reported as one value)
+
+FAIL in (f5-workload-query-separates-the-seven-fact-states) (falsifiers_test.clj:105)
+wl-40-80
+expected: (= expected (select-keys (:workload (ids xid)) (keys expected)))
+  actual: (not (= {:state :derived, :fte [0.4 0.8], :class :overlaps} {:state :derived, :fte [0.4 0.8], :class :outside}))
+
+==== C6a -> f6-as-of-result-is-reproducible-after-later-observations
+     broken: as-of ignored (reads the current database)
+
+FAIL in (f6-as-of-result-is-reproducible-after-later-observations) (falsifiers_test.clj:136)
+as-of t1 equals what was answered at t1
+expected: (= at-t1 (s/view *impl* conn {:recorded-t t1}))
+  actual: (not (= [{:vacancy #{"nav|active-vacancy-1"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "active-vacancy-1", :url "https://arbeidsplassen.nav.no/stillinger/stilling/active-vacancy-1", :status "ACTIVE", :observations ("fdb964972163cbf0eafa786ecebf8be5a8baee440ffea57d190913f4e8e0bf4f")}], :workload {:state :temp-unknown, :class :undetermined}} {:vacancy #{"nav|inactive-vacancy-2"}, :active? false, :title nil, :employer nil, :location "Bergen", :sources [{:source "nav", :external-id "inactive-vacancy-2", :url "https://arbeidsplassen.nav.no/stillinger/stilling/inactive-vacancy-2", :status "INACTIVE", :observations ("7b8defae793c597aa2632e1e64ce00162ed9faacd7dc1e3c99d567be66270f8c")}], :workload {:state :temp-unknown, :class :undetermined}} {:vacancy #{"nav|wl-100"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-100", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("ca6943e1b4e2e26420892a8f6397cc6c0614393917e225e1e50d44e26dd7c76a")}], :workload {:state :stated, :fte [1.0 1.0], :schedule :full-time, :class :outside}} {:vacancy #{"nav|wl-40-80"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-40-80", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("2cd271294ef8c957ee72459f719ef203b82fbd06efbefa79a5365b3d6450bfba")}], :workload {:state :derived, :fte [0.4 0.8], :class :overlaps}} {:vacancy #{"nav|wl-50"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-50", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("0fde37f913f658267addace1320a3a653c45776e35ef8273e588206b5ecbbb62")}], :workload {:state :derived, :fte [0.5 0.5], :class :within}} {:vacancy #{"nav|wl-negotiable"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-negotiable", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("e7512a3ed61a7125ad35e194eca37a70cd0308bd7ef59e298b2f5f315fa1b640")}], :workload {:state :negotiable, :class :undetermined}}] [{:vacancy #{"nav|active-vacancy-1"}, :active? false, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "active-vacancy-1", :url "https://arbeidsplassen.nav.no/stillinger/stilling/active-vacancy-1", :status "INACTIVE", :observations ("4b1f730393a17d4aed1056d92b4a5c89b7bd382b4e9bcf55f2a9c12876e51ec6" "fdb964972163cbf0eafa786ecebf8be5a8baee440ffea57d190913f4e8e0bf4f")}], :workload {:state :temp-unknown, :class :undetermined}} {:vacancy #{"nav|bbd5b990-b2f0-4599-994b-57d1da77a6dc"}, :active? true, :title "Vi søker pålitelige renholdere til rengjøring av hytter og ferieboliger", :employer "Perfekt Effekt Service As", :location "HJARTDAL", :sources [{:source "nav", :external-id "bbd5b990-b2f0-4599-994b-57d1da77a6dc", :url "https://arbeidsplassen.nav.no/stillinger/stilling/bbd5b990-b2f0-4599-994b-57d1da77a6dc", :status "ACTIVE", :observations ("fb471f121e92f1599b8a7400b42dc410c15325e8b878803c07c60352b797825b")}], :workload {:state :unsupported, :schedule :part-time, :class :undetermined}} {:vacancy #{"nav|inactive-vacancy-2"}, :active? false, :title nil, :employer nil, :location "Bergen", :sources [{:source "nav", :external-id "inactive-vacancy-2", :url "https://arbeidsplassen.nav.no/stillinger/stilling/inactive-vacancy-2", :status "INACTIVE", :observations ("7b8defae793c597aa2632e1e64ce00162ed9faacd7dc1e3c99d567be66270f8c")}], :workload {:state :temp-unknown, :class :undetermined}} {:vacancy #{"nav|wl-100"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-100", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("ca6943e1b4e2e26420892a8f6397cc6c0614393917e225e1e50d44e26dd7c76a")}], :workload {:state :stated, :fte [1.0 1.0], :schedule :full-time, :class :outside}} {:vacancy #{"nav|wl-40-80"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-40-80", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("2cd271294ef8c957ee72459f719ef203b82fbd06efbefa79a5365b3d6450bfba")}], :workload {:state :derived, :fte [0.4 0.8], :class :overlaps}} {:vacancy #{"nav|wl-50"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-50", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("0fde37f913f658267addace1320a3a653c45776e35ef8273e588206b5ecbbb62" "baa925cbe2dc0701e03732b0d78271ee47d0e94646ee51faf2399d7343aef5d7")}], :workload {:state :derived, :fte [0.4 0.8], :class :overlaps}} {:vacancy #{"nav|wl-conflict"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-conflict", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("56c3d15f4b4aaef72c04bd8e9a7ab0f654b495e847a9bb91952166b1759da864")}], :workload {:state :conflicting, :class :undetermined}} {:vacancy #{"nav|wl-negotiable"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-negotiable", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("e7512a3ed61a7125ad35e194eca37a70cd0308bd7ef59e298b2f5f315fa1b640")}], :workload {:state :negotiable, :class :undetermined}} {:vacancy #{"nav|wl-nothing"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-nothing", :url "https://careers.example/jobs/100?utm_source=nav", :status "ACTIVE", :observations ("16db8211258f93c9584a0f8b956c065554297404a012849b0dea74b9d25ac207")}], :workload {:state :unknown, :class :undetermined}} {:vacancy #{"nav|wl-temp"}, :active? true, :title "Technical Support Specialist", :employer "Example Technology AS", :location "Oslo", :sources [{:source "nav", :external-id "wl-temp", :url "https://arbeidsplassen.nav.no/stillinger/stilling/wl-temp", :status "ACTIVE", :observations ("37647360afc66abcb75e2e129352ddf2dc127c1300b8d93ef2cdf85a025daffc")}], :workload {:state :temp-unknown, :class :undetermined}}]))
+
+==== C6b -> f6-late-arriving-older-observation-does-not-override-newer
+     broken: status by arrival (transaction) order, last write wins
+
+FAIL in (f6-late-arriving-older-observation-does-not-override-newer) (falsifiers_test.clj:144)
+the newer source state wins
+expected: (false? (:active? (first (s/view *impl* conn {}))))
+  actual: (not (false? true))
+
+WS24 CONTROLS
+  C1   f1-ingested-nav-vacancy-is-queryable-with-its-source-reference           fail=2 error=0 => FAILED as intended
+  C2   f2-identical-replay-is-a-semantic-no-op                                  fail=3 error=0 => FAILED as intended
+  C3   f3-inactive-entry-propagates-as-visible-closure                          fail=1 error=0 => FAILED as intended
+  C4a  f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs     fail=4 error=0 => FAILED as intended
+  C4b  f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs     fail=1 error=0 => FAILED as intended
+  C4c  f4-identity-same-source-stays-split-cross-source-is-recursive-sameAs     fail=4 error=0 => FAILED as intended
+  C5a  f5-workload-query-separates-the-seven-fact-states                        fail=4 error=0 => FAILED as intended
+  C5b  f5-workload-query-separates-the-seven-fact-states                        fail=1 error=0 => FAILED as intended
+  C6a  f6-as-of-result-is-reproducible-after-later-observations                 fail=1 error=0 => FAILED as intended
+  C6b  f6-late-arriving-older-observation-does-not-override-newer               fail=1 error=0 => FAILED as intended
+WS24 CONTROLS SUMMARY controls=10 failed_as_intended=10 wall_ms=1940

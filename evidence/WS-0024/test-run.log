@@ -1,0 +1,10 @@
+
+Testing ws24.falsifiers-test
+
+Testing ws24.shape-test
+
+Testing ws24.laws-test
+
+Ran 17 tests containing 48 assertions.
+0 failures, 0 errors.
+WS24 SUMMARY tests=17 assertions=48 fail=0 error=0 wall_ms=7216
