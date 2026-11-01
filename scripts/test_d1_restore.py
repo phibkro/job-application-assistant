@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = (ROOT / "scripts/restore-d1.py").read_text(encoding="utf-8")
-JUSTFILE = (ROOT / "justfile").read_text(encoding="utf-8")
+VITE_CONFIG = (ROOT / "vite.config.ts").read_text(encoding="utf-8")
 
 assert "argparse.ArgumentParser" in SCRIPT
 assert "--confirm" in SCRIPT
@@ -30,7 +30,8 @@ assert "target_database" in SCRIPT
 assert "provider_limitations" in SCRIPT
 assert "profile-qualification" in SCRIPT
 assert "arbeidsplassen-nav" in SCRIPT
-assert "d1-restore source target:" in JUSTFILE
-assert "_d1-restore source target: _setup" in JUSTFILE
+# `vp run d1-restore <source> <target>`: the confirmation flag is part of the
+# task, the names are the operator's explicit arguments (WS-0027@2).
+assert '"d1-restore": { command: "python3 scripts/restore-d1.py --confirm"' in VITE_CONFIG
 
 print("D1 restore policy checks passed.")

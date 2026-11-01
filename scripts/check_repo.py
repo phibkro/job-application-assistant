@@ -19,13 +19,23 @@ NOT_OUR_SOURCE = {
     ".artifacts",
     ".alchemy",
     ".direnv",
+    ".devenv",
     ".preview",
     "__pycache__",
 }
 
 
 def ours(path: Path) -> bool:
-    return not any(part in NOT_OUR_SOURCE for part in path.parts)
+    parts = path.relative_to(ROOT).parts
+    # Tag-pinned Foldkit checkout fetched by scripts/setup.sh (git-ignored),
+    # anchored at the repository root only (WS-0026 review N1).
+    if parts[:1] == ("repos",):
+        return False
+    # Upstream Foldkit agent skills, copied unmodified. The repo-owned
+    # PROVENANCE.md beside them is still checked (WS-0026 review N1).
+    if parts[:2] == (".claude", "skills") and parts[2:] != ("PROVENANCE.md",):
+        return False
+    return not any(part in NOT_OUR_SOURCE for part in parts)
 
 
 REQUIRED = [
@@ -44,11 +54,11 @@ REQUIRED = [
     "policy/authority.json",
     "docs/internal/rfcs/README.md",
     "templates/rfc.md",
-    "flake.nix",
-    "flake.lock",
-    "justfile",
-    "bootstrap",
-    "deploy",
+    "devenv.nix",
+    "devenv.yaml",
+    "devenv.lock",
+    "vite.config.ts",
+    ".vite-hooks/pre-commit",
     "VERSION",
     "RELEASE-MANIFEST.json",
     "docs/internal/rfcs/0007-reliable-ingestion-control.md",
@@ -65,8 +75,6 @@ REQUIRED = [
     "scripts/capture-nav-fixture.sh",
     "scripts/setup.sh",
     "scripts/configure-nav-key.sh",
-    "scripts/dispatch.sh",
-    "scripts/test_bootstrap.sh",
     "scripts/deploy.sh",
     "scripts/soak.py",
     "scripts/qualify.py",
@@ -212,7 +220,7 @@ release_manifest_path = ROOT / "RELEASE-MANIFEST.json"
 if release_manifest_path in parsed and isinstance(parsed[release_manifest_path], dict):
     manifest = parsed[release_manifest_path]
     expected = {
-        "entrypoint": "./deploy",
+        "entrypoint": "vp run deploy",
         "compatibility_date": "2026-05-25",
     }
     for field, value in expected.items():
@@ -227,9 +235,8 @@ if release_manifest_path in parsed and isinstance(parsed[release_manifest_path],
             )
 
 for executable in [
-    "bootstrap", "deploy", "deploy-production", "scripts/setup.sh",
-    "scripts/dispatch.sh", "scripts/test_bootstrap.sh", "scripts/deploy.sh",
-    "scripts/soak.py", "scripts/qualify.py",
+    "scripts/setup.sh", "scripts/deploy.sh", "scripts/soak.py", "scripts/qualify.py",
+    ".vite-hooks/pre-commit",
 ]:
     path = ROOT / executable
     if path.is_file() and not path.stat().st_mode & 0o111:
@@ -242,72 +249,51 @@ if setup_path.is_file():
         if forbidden_fragment in setup_text:
             errors.append(f"setup must not reject legitimate source changes: {forbidden_fragment!r}")
 
-justfile_path = ROOT / "justfile"
-if justfile_path.is_file():
-    justfile_text = justfile_path.read_text(encoding="utf-8")
-    for public_recipe in ["setup:", "check:", "verify:", "preview:", "deploy:", "clean:"]:
-        if public_recipe not in justfile_text:
-            errors.append(f"justfile missing public recipe {public_recipe!r}")
-    if "./scripts/dispatch.sh" not in justfile_text:
-        errors.append("public just recipes must transparently dispatch through the Nix environment")
-
 source_manifest = ROOT / "SOURCE-MANIFEST.sha256"
 if source_manifest.exists():
     errors.append("source checksum manifests must not gate editable source releases")
 
-bootstrap_path = ROOT / "bootstrap"
-if bootstrap_path.is_file():
-    bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
-    for required_fragment in [
-        'develop',
-        '--extra-experimental-features',
-        'nix-command flakes',
-        'JOB_INDEX_NIX_SHELL',
-        '--no-write-lock-file',
-    ]:
-        if required_fragment not in bootstrap_text:
-            errors.append(f"bootstrap must enter the Nix flake; missing {required_fragment!r}")
-    for forbidden_fragment in ['rustup-init', 'cargo install just', '--no-modify-path']:
-        if forbidden_fragment in bootstrap_text:
-            errors.append(f"bootstrap must not install user-level tooling: {forbidden_fragment!r}")
+# WS-0027@2: devenv declares the toolchain and Vite+ runs the tasks. The retired
+# glue (Nix flake, ./bootstrap, justfile, dispatch wrapper) must not come back
+# beside them, or two entry points would drift apart again.
+for retired in ["flake.nix", "flake.lock", "bootstrap", "justfile", "scripts/dispatch.sh", "scripts/check.sh"]:
+    if (ROOT / retired).exists():
+        errors.append(f"retired toolchain glue is back: {retired} (devenv + vp run replace it)")
 
-flake_lock_path = ROOT / "flake.lock"
-if flake_lock_path.is_file():
+devenv_path = ROOT / "devenv.nix"
+if devenv_path.is_file():
+    devenv_text = devenv_path.read_text(encoding="utf-8")
+    for package in ["pkgs.bun", "pkgs.nodejs_24", "pkgs.wrangler", "pkgs.python3", "pkgs.shellcheck", "pkgs.sqlite"]:
+        if package not in devenv_text:
+            errors.append(f"devenv.nix missing declared development dependency: {package}")
+    for forbidden_fragment in ["rust-overlay", "rust-bin", "worker-build", "cargo-audit", "pkgs.just"]:
+        if forbidden_fragment in devenv_text:
+            errors.append(f"devenv.nix must not carry retired tooling: {forbidden_fragment}")
+
+devenv_lock_path = ROOT / "devenv.lock"
+if devenv_lock_path.is_file():
     try:
-        flake_lock = json.loads(flake_lock_path.read_text(encoding="utf-8"))
+        devenv_lock = json.loads(devenv_lock_path.read_text(encoding="utf-8"))
     except Exception as exc:
-        errors.append(f"invalid flake.lock: {exc}")
+        errors.append(f"invalid devenv.lock: {exc}")
     else:
-        nodes = flake_lock.get("nodes", {})
-        expected_revisions = {
-            "nixpkgs": "9e57802f3e12163dde815353165ae89e14a585f0",
-        }
+        nodes = devenv_lock.get("nodes", {})
+        # Every root input is locked to an exact revision: the shell is pinned.
+        for name in devenv_lock.get("nodes", {}).get("root", {}).get("inputs", {}):
+            if not nodes.get(name, {}).get("locked", {}).get("rev"):
+                errors.append(f"devenv.lock input {name!r} is not pinned to a revision")
+        expected_revisions = {"nixpkgs": "760b85220489f69855e6df78a6d1dad5873f8bf6"}
         for node, revision in expected_revisions.items():
             actual = nodes.get(node, {}).get("locked", {}).get("rev")
             if actual != revision:
-                errors.append(f"flake.lock {node} revision mismatch: {actual!r}")
+                errors.append(f"devenv.lock {node} revision mismatch: {actual!r}")
 
-flake_path = ROOT / "flake.nix"
-if flake_path.is_file():
-    flake_text = flake_path.read_text(encoding="utf-8")
-    for required_fragment in [
-        'bun',
-        'wrangler',
-        'just',
-        'shellcheck',
-        '9e57802f3e12163dde815353165ae89e14a585f0',
-    ]:
-        if required_fragment not in flake_text:
-            errors.append(f"flake.nix missing declared development dependency: {required_fragment}")
-    for forbidden_fragment in ['rust-overlay', 'rust-bin', 'worker-build', 'cargo-audit']:
-        if forbidden_fragment in flake_text:
-            errors.append(f"flake.nix must not carry the retired Rust toolchain: {forbidden_fragment}")
-    # `nodejs` alongside `bun` makes Vitest's worker pool resolve to Node for
-    # any test importing `bun:sqlite`, failing every apps/worker/src/db-
-    # adjacent live/repository test — reproduced with and without Node on
-    # PATH in this exact devShell. Nothing here invokes `node` directly.
-    if 'nodejs' in flake_text:
-        errors.append("flake.nix must not add nodejs: it breaks bun:sqlite tests under `nix develop`")
+vite_config_path = ROOT / "vite.config.ts"
+if vite_config_path.is_file():
+    vite_text = vite_config_path.read_text(encoding="utf-8")
+    for task in ["setup:", "policy:", "verify:", "test:", "coverage:", "dev:", "deploy:", '"deploy-production":']:
+        if task not in vite_text:
+            errors.append(f"vite.config.ts missing public task {task!r}")
 
 # Memory bank remains intentionally small.
 for path in sorted((ROOT / "memory-bank").glob("*.md")):

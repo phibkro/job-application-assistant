@@ -21,7 +21,7 @@ NAV asks production consumers to accept the API terms and request registration a
 After NAV issues the private bearer token, configure it without placing it in shell history:
 
 ```sh
-just nav-key
+vp run nav-key
 ```
 
 The command:
@@ -40,13 +40,13 @@ NAV's implementation allows a private token to omit the expiry claim. Such a tok
 A normal verified deployment automatically uploads a locally configured private key:
 
 ```sh
-./deploy
+vp run deploy
 ```
 
 To rotate the key on an already deployed Worker without a complete application deployment:
 
 ```sh
-just nav-key-cloudflare
+vp run nav-key-cloudflare
 ```
 
 This requires a successful prior deployment and updates the `NAV_API_TOKEN` Worker secret. The secret value is passed to Wrangler over standard input and is not written to deployment logs.
@@ -54,7 +54,7 @@ This requires a successful prior deployment and updates the `NAV_API_TOKEN` Work
 ## Non-interactive configuration
 
 ```sh
-NAV_PRIVATE_API_TOKEN="$TOKEN" just nav-key
+NAV_PRIVATE_API_TOKEN="$TOKEN" vp run nav-key
 ```
 
 Do not place the literal token in committed files, command examples, CI logs, or issue reports. Use the CI platform's secret store when automating this command.

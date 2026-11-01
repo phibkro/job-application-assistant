@@ -20,16 +20,22 @@ jobs:
     timeout-minutes: 30
     environment: pr-preview
     steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/determinate-nix-action@v3
-      - run: ./bootstrap setup
-      - run: ./bootstrap verify
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+      - uses: cachix/cachix-action@97e5ff84d02b3b4f9936339f767e17f03c9252ed # v16
+        with:
+          name: devenv
+      - name: Install pinned devenv CLI
+        run: nix profile add github:cachix/devenv/b904dcb51fe48c30db250038241507f60752f222
+      - run: devenv shell -- bun install --frozen-lockfile
+      - run: devenv shell -- vp run setup
+      - run: devenv shell -- vp run verify
       - name: Deploy isolated seeded preview
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CI: "1"
-        run: nix develop -c ./scripts/deploy-preview.sh "${{ github.event.pull_request.number }}"
+        run: devenv shell -- ./scripts/deploy-preview.sh "${{ github.event.pull_request.number }}"
 
   destroy:
     if: >-
@@ -40,12 +46,18 @@ jobs:
     timeout-minutes: 15
     environment: pr-preview
     steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/determinate-nix-action@v3
-      - run: ./bootstrap setup
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+      - uses: cachix/cachix-action@97e5ff84d02b3b4f9936339f767e17f03c9252ed # v16
+        with:
+          name: devenv
+      - name: Install pinned devenv CLI
+        run: nix profile add github:cachix/devenv/b904dcb51fe48c30db250038241507f60752f222
+      - run: devenv shell -- bun install --frozen-lockfile
+      - run: devenv shell -- vp run setup
       - name: Destroy isolated preview
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CI: "1"
-        run: nix develop -c ./scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"
+        run: devenv shell -- ./scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"

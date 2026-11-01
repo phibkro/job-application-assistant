@@ -20,15 +20,13 @@ const from = (path: string) => fileURLToPath(new URL(path, import.meta.url));
  * second. A single `vitest` invocation runs in one JS runtime for its whole
  * process lifetime, so one config file cannot ask for "this project under
  * Bun, that project under Node" — only two separate invocations can, which
- * is why `package.json`'s `test:workers`/`coverage:workers` scripts run this
- * file through `nix shell nixpkgs#nodejs -c node …` rather than through Bun.
+ * is why the `test:workers` and `coverage` tasks in `vite.config.ts` run this
+ * file through `node node_modules/vitest/vitest.mjs …` rather than through Bun.
  *
- * Node is reached for *only that one subprocess* — not added to the shared
- * Nix dev shell — because `flake.nix` already documents why a `node` on the
- * ambient `PATH` breaks Vitest's default pool for the Bun-run project
- * (`bun:sqlite` resolution fails once Node is available to be picked
- * instead). This keeps that fix intact: Node exists only for the literal
- * duration of the workers-project subprocess, nowhere else.
+ * Node comes from the devenv shell (`devenv.nix`, `nodejs_24`), which Vite+
+ * needs as well. The old flake kept Node off PATH, claiming it broke the
+ * Bun-run project's `bun:sqlite` resolution; that did not reproduce with
+ * Node on PATH (evidence/WS-0027, r2 §2).
  */
 export default defineConfig({
   resolve: {

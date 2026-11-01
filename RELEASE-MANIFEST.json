@@ -1,21 +1,20 @@
 {
   "name": "job-index",
   "version": "0.1.0-demo.12",
-  "release_type": "source-only-nix",
-  "entrypoint": "./deploy",
-  "production_entrypoint": "./deploy-production",
-  "nixpkgs_revision": "9e57802f3e12163dde815353165ae89e14a585f0",
-  "wrangler_version": "4.93.0",
+  "release_type": "source-only-devenv",
+  "entrypoint": "vp run deploy",
+  "production_entrypoint": "vp run deploy-production",
+  "devenv_nixpkgs_revision": "760b85220489f69855e6df78a6d1dad5873f8bf6",
   "source_integrity": "editable-source-no-runtime-checksum",
   "compatibility_date": "2026-05-25",
   "commands": [
-    "just nav-key",
-    "just check",
-    "just verify",
-    "just preview",
-    "just deploy-staging",
-    "just deploy-production",
-    "just soak"
+    "vp run nav-key",
+    "vp run policy",
+    "vp run verify",
+    "vp run dev",
+    "vp run deploy",
+    "vp run deploy-production",
+    "vp run soak"
   ],
   "license": "proprietary",
   "features": [

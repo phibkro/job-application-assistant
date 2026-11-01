@@ -13,11 +13,11 @@ Before each production release, compare the bounded workload settings and observ
 ## Local qualification
 
 ```sh
-just verify
-just qualification
+vp run verify
+vp run qualification
 ```
 
-`just qualification` creates a clean database from `db/schema.sql`, seeds
+`vp run qualification` creates a clean database from `db/schema.sql`, seeds
 50,000 deterministic vacancies with provenance and representative Saved and
 application history, and asserts the indexes used by current feed, browse,
 detail, label, and history queries. It records seven timing samples per query,
@@ -27,13 +27,13 @@ probe against the restored database.
 
 The machine-readable report is
 `.artifacts/qualification/report.json`. Override the corpus size only for a
-quick local diagnostic: `just qualification 5000`. Release evidence must use
+quick local diagnostic: `vp run qualification --rows 5000`. Release evidence must use
 the default 50,000 rows.
 
 ## Staging soak
 
 ```sh
-just soak https://<staging-worker> 604800 60
+vp run soak https://<staging-worker> --duration 604800 --interval 60
 ```
 
 This runs for seven days at a 60-second interval and writes JSONL evidence plus a summary to `.artifacts/soak/`. It reads `ops/slo.json` and fails when API availability or NAV feed-lag p95 misses the declared targets, when no lag samples are available, or when the source reports consecutive failures.

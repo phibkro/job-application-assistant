@@ -53,19 +53,52 @@ Stop and request a gate decision when:
 
 ## Executable gates
 
-Use repository commands rather than reproducing their internals manually:
+Use repository commands rather than reproducing their internals manually. Enter the pinned toolchain with `devenv shell` (declared in `devenv.nix`, pinned by `devenv.lock`; the first shell installs `node_modules`), then:
 
 ```text
-./bootstrap setup   enter the Nix flake and install project-local tooling/hooks
-./bootstrap check   format, lint, policy, migration, Wasm, and Wrangler bundle gates
-./bootstrap verify  check plus unit tests and a clean local D1 HTTP smoke run
-./bootstrap dev     run the interactive local D1 demo
-./bootstrap deploy  verify, provision, migrate, deploy, and remote-smoke the Worker
+vp run setup              install workspace and infra dependencies, the git hook dispatcher, the pinned Foldkit checkout
+vp check                  format (packages/, apps/) and lint
+vp run test               both Vitest 4 suites: the Bun-hosted unit suite and the workerd pool
+vp run policy             repository, credential, migration and script gates (also the pre-commit hook)
+vp run verify             setup + policy + vp check + imports, types, Effect diagnostics, schema, catalog, bundle, coverage-gated tests
+vp run dev                the local stack on workerd with a seeded local D1
+vp run deploy             verify, then provision, migrate, deploy and smoke staging (deploy-production: production)
 ```
 
-Inside `nix develop`, the equivalent `just ...` commands are permitted.
+One command from outside the shell: `devenv shell -- vp run verify`. The deploy tasks refuse to run outside `devenv shell`. In a clone made before WS-0027 (`core.hooksPath` still `.githooks`), run `vp hooks enable` once; `vp config` does not replace another hooks path. Every task is declared in `vite.config.ts` (`run.tasks`). Tests stay on Vitest 4 on purpose (Vite+ bundles Vitest 5; see WS-0027@2), so `vp test` is not used.
 
-A deployment claim is invalid when `./bootstrap verify` did not pass for the same source revision.
+A deployment claim is invalid when `vp run verify` did not pass for the same source revision.
+
+## Effect for agents
+
+The workspace is on `effect ~4.1.0` (resolved 4.1.1). Most public Effect material and most model training data describe v3, and mixing the two is a known failure here.
+
+- **Authoritative docs for the 4.x line:** `node_modules/effect/AGENTS.md` and `node_modules/effect/ai-docs/` (shipped with the installed version), and `LLMS.md` in the Effect v4 repository: <https://github.com/Effect-TS/effect-smol/blob/main/LLMS.md> (tracks `main`, so check it against the installed source). `effect.website/llms.txt` was not verified against 4.x; do not prefer it over these.
+- **v3 vs v4 drift:** v3 names fail or mislead on 4.x. Example: v3 `Effect.catchAll` is `Effect.catch` in v4. Do not write an Effect API from memory.
+- **Read the source first:** before using any Effect API, read it in `node_modules/effect/src` (`packages/effect/src` in the repository) and match the installed version's signature.
+- **Diagnostics:** `vp run effect:check` (part of `vp run verify`) runs `@effect/language-service` and fails on errors and warnings, including floating Effects and v3-only APIs (`outdatedApi`). Exceptions live in `tools/quality/effect-exceptions.json`; do not add one without an owner decision.
+
+## Foldkit for agents
+
+Foldkit's official agent skills are installed under `.claude/skills/` (`foldkit`, `generate-program`, `audit-program`); provenance is in `.claude/skills/PROVENANCE.md`. Use them for `apps/index-web`; do not copy their content here.
+
+- The skills read the Foldkit source at `repos/foldkit/`. It is a git-ignored shallow checkout pinned to the tag **`foldkit@0.170.0`**, fetched by `scripts/setup.sh` via `vp run setup` (a no-op when already at the tag, a warning when offline).
+- Keep the tag equal to the installed `foldkit` version: when `apps/index-web` bumps `foldkit`, change `FOLDKIT_TAG` in `scripts/setup.sh`, this section, and the skills' provenance together.
+- `generate-program` offers to add a git subtree at `repos/foldkit`. Do not: the owner chose the git-ignored checkout (WS-0026).
+
+## Merge delegation (owner, 2026-11-01)
+
+The owner pre-approves merging a PR into `main` when all of these hold:
+
+1. **CI is green on the current head commit.**
+2. **An independent review round** (a reviewer that did not author the change) has run on that head.
+3. **Severity rule by round:**
+   - **Rounds 1–3:** merge only when the latest round finds **nothing at medium or above**.
+   - **Rounds 4–5:** merge when **nothing above high** remains. Open medium and high findings are recorded as follow-ups, never dropped.
+   - **Critical always blocks.**
+4. **Hard cap:** if round 5 still leaves a blocking finding, stop and ask the owner.
+
+A round is one review pass plus any fix pushed in response. This delegates the **merge** gate only. Deploys, releases, production changes and capability grants keep their own human gates.
 
 ## Delegation capability tiers
 

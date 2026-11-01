@@ -1,7 +1,7 @@
 # Run the local preview
 
 RFC 0015 retired the Rust worker this tutorial used to describe (the
-`just dev` demo UI, its NAV-lifecycle fixture buttons, and the destructive
+`vp run dev` demo UI, its NAV-lifecycle fixture buttons, and the destructive
 staging smoke suite are gone with it). This is the tutorial for what
 currently runs: the TypeScript/Effect service, served locally against a
 seeded database.
@@ -9,30 +9,30 @@ seeded database.
 ## 1. Prepare NAV authentication
 
 The Worker obtains NAV's public token at runtime when no private secret is
-configured. `just setup` checks the toolchain and does not persist a public
+configured. `vp run setup` installs dependencies and does not persist a public
 token in `.dev.vars`.
 
 A NAV-issued private consumer key can be configured instead:
 
 ```sh
-just nav-key
+vp run nav-key
 ```
 
 ## 2. Verify locally
 
 ```sh
-nix shell nixpkgs#bun -c bun run check
-nix develop --command just check
+devenv shell -- vp check
+devenv shell -- vp run policy
 ```
 
-`bun run check` runs the TypeScript workspace's own gates (format, lint,
-typecheck, `db/schema.sql` drift, bundle, tests). `just check` runs the
-repository, credential, and script gates. `just verify` runs both together.
+`vp check` formats and lints the TypeScript workspace. `vp run policy` runs the
+repository, credential, and script gates. `vp run verify` runs them together
+with types, Effect diagnostics, schema drift, bundle and the test suites.
 
 ## 3. Serve the whole stack
 
 ```sh
-nix develop --command just preview
+devenv shell -- vp run dev
 ```
 
 This bundles the interface, bundles the Worker for workerd, applies the
@@ -66,7 +66,7 @@ shows the current application state and its next human action.
 ## 5. Deploy the preview stage
 
 ```sh
-nix develop --command just deploy-preview
+devenv shell -- vp run deploy-preview
 ```
 
 This command deploys the same TypeScript bundle to an independent Cloudflare
