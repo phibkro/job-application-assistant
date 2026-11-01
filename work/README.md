@@ -9,7 +9,8 @@ Store immutable or versioned work-scope instances here. Do not use ad hoc task n
 - [Tracer program](../docs/internal/architecture/market-index-tracers.md) is a roadmap, not bulk implementation authority.
 - [Coding-agent handoff](HANDOFF-market-index.md) provides a scoped, copyable entry point.
 - [WS-0020@1](WS-0020-r1-market-index-baseline.md) and its [execution plan](WS-0020-r1-execution-plan.md) are the **approved** first bounded characterization Ticket (owner gate 2026-11-01, lead amendments L1–L4). Later tracers need their own approved WorkScopes. WS-0020 is done (`b601267`, independent review ACCEPT WITH NITS).
-- [WS-0021@2](WS-0021-r2-effect-4-1-and-foldkit.md): Effect 4.1.0 + foldkit 0.170.0, approved and next (supersedes [r1](WS-0021-r1-effect-4-1-upgrade.md)).
+- [WS-0021@2](WS-0021-r2-effect-4-1-and-foldkit.md): Effect 4.1.0 + foldkit 0.170.0, **postponed** pending WS-0024 (supersedes [r1](WS-0021-r1-effect-4-1-upgrade.md)).
+- [WS-0024@1](WS-0024-r1-jvm-stack-spike.md): Clojure + XTDB/Datomic stack spike, **approved, next**.
 
 ## Current work
 
