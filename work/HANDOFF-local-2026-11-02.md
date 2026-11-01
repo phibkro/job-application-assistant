@@ -67,9 +67,9 @@ Implement TB-05, pass P2 of WS-0031.
 
 ## Owner-only actions outstanding
 
-1. **`*.home` DNS resolves to a public IP (`193.168.158.139`): highest risk.**
+1. **`*.home` DNS resolves to the owner's public home IP: highest risk.** The addresses are in the workstation hardening agent's local evidence (`cf-dns-tunnel-details.md`), not in this public repo.
    - Test from mobile data whether `media.home.phibkro.org` or `audio.home.phibkro.org` answer.
-   - Close any router port forwards to `192.168.1.225`.
+   - Close any router port forwards to the LAN host behind those names.
    - Delete the four records and use Tailscale MagicDNS (recommended), or repoint them to the server's `100.x` address.
 2. **Cloudflare cleanup (approved 2026-11-02):** delete the `home` tunnel; delete `ACORN` if it has no routes; retire `projects-origin` and `projects-mcp` (DNS records plus their `nori-station` local-config routes, with a backup first and a restart check of the other routes). **Do not** delete `job-index-preview` or `job-index-preview-db`: they serve `job-index.phibkro.org` until WS-0031 P4/P5.
 3. **Account-wide "Access for all Workers" (previews only) is optional.**
