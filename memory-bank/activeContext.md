@@ -3,7 +3,7 @@
 ## Now
 
 - **Merged to `main` under the delegation:** #23–#27. The latest is #27 `bbd9b4c` (WS-0022 TB-01: IR v0, append-only observation store, workload pass). #26 `9565d91` was WS-0025@2 (the index-web client).
-- **WS-0029@4 pass A:** upgrade `infra/` to Alchemy beta.84 on effect 4.0.7, opting out of the new `new_module_registry` default with `legacy_module_registry`. The owner's local `alchemy plan` is required before merge. Pass B prerequisites P1–P3 are met ([r4](../work/WS-0029-r4-infra-alchemy-previews.md)).
+- **WS-0029@4 pass A merged** (#28 `f00ccb5`): `infra/` is on Alchemy beta.84 with effect 4.0.7 and the `legacy_module_registry` opt-out. Follow-ups L1–L6 are in `evidence/WS-0029/`. **Next: pass B** (Workers Previews behind Access). Its prerequisites P1–P3 are met.
 - **Fork safety:** PRs from external contributors need the owner's approval to run CI. The policy gate and the preview same-repo guard also apply.
 
 ## Next

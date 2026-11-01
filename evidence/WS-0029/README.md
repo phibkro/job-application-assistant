@@ -23,7 +23,7 @@ Contracts: [WS-0029@2](../../work/WS-0029-r2-infra-alchemy-previews.md), then [W
 > - L5: never log `state read` output (it prints Redacted secrets);
 > - production: check which `job-index-production*` resources already exist before the first apply.
 
-**Current state: pass A attempt 3 (r4 attempt 1) is implemented in `f32ece1`. See "Pass A attempt 3" at the end. P0 is still open.** Attempts 1 and 2, below, are kept as recorded.
+**Current state: pass A merged in PR #28 (`f00ccb5`), with CI green on `70611d2`. Review round 2 found nothing at medium or above; L6 (quoted-key and shorthand `migrations` spellings) was added to the follow-ups. P0 was run by the owner.** Attempts 1 and 2, below, are kept as recorded.
 
 ## Pass A
 
