@@ -4,14 +4,10 @@
 > Rust worker retired by RFC 0015's cutover. The TypeScript service has no
 > principal system; see `memory-bank/progress.md` for the current gap list.
 
-Generate and register a principal against local, staging, or production:
-
-```sh
-export ADMIN_SYNC_TOKEN=<administrator-token>
-just principal-key https://<worker-url> "My client" member 20
-```
-
-The generated API key is written to ignored `.principal.env` with mode `0600`. The Worker stores only its SHA-256 hash.
+The Rust-era command that generated and registered a principal no longer
+exists (no current task replaces it). It wrote the generated API key to
+ignored `.principal.env` with mode `0600`; the Worker stored only its SHA-256
+hash.
 
 Administrative routes:
 

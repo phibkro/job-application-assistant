@@ -18,6 +18,7 @@ vp run qualification      # 50k current-schema plans plus local backup/restore
 vp run dev                # the whole stack served locally, for a real-journey proof
 vp run deploy             # verify + staging acceptance
 vp run deploy-production  # verify + non-destructive production acceptance
+vp hooks enable           # once, in a clone made before WS-0027 (old .githooks path)
 ```
 
 ## Test layers

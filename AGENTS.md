@@ -65,7 +65,7 @@ vp run dev                the local stack on workerd with a seeded local D1
 vp run deploy             verify, then provision, migrate, deploy and smoke staging (deploy-production: production)
 ```
 
-One command from outside the shell: `devenv shell -- vp run verify`. Every task is declared in `vite.config.ts` (`run.tasks`). Tests stay on Vitest 4 on purpose (Vite+ bundles Vitest 5; see WS-0027@2), so `vp test` is not used.
+One command from outside the shell: `devenv shell -- vp run verify`. The deploy tasks refuse to run outside `devenv shell`. In a clone made before WS-0027 (`core.hooksPath` still `.githooks`), run `vp hooks enable` once; `vp config` does not replace another hooks path. Every task is declared in `vite.config.ts` (`run.tasks`). Tests stay on Vitest 4 on purpose (Vite+ bundles Vitest 5; see WS-0027@2), so `vp test` is not used.
 
 A deployment claim is invalid when `vp run verify` did not pass for the same source revision.
 

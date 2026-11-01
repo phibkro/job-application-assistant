@@ -60,7 +60,9 @@ vp run qualification    # 50k query plans plus backup/restore (append --rows N)
 vp run dev              # the whole stack, served locally
 ```
 
-Tasks are declared in `vite.config.ts`.
+Tasks are declared in `vite.config.ts`. In a clone made before devenv and Vite+
+(WS-0027), run `vp hooks enable` once: the old `.githooks` path is gone, and
+`vp config` leaves another `core.hooksPath` alone.
 
 ## Deploy
 

@@ -2,7 +2,16 @@
 set -euo pipefail
 
 # Run as `vp run setup` inside `devenv shell`, which provides the toolchain
-# (devenv.nix); `vp run setup` then installs the git hook dispatcher.
+# (devenv.nix); `vp run setup` then installs the git hook dispatcher. Outside
+# devenv, fail here rather than at deploy time when a tool is missing.
+required=(bun node wrangler python3 curl jq shellcheck)
+for command in "${required[@]}"; do
+  command -v "${command}" >/dev/null 2>&1 || {
+    echo "Missing '${command}': run inside the pinned toolchain (devenv shell -- vp run setup)." >&2
+    exit 1
+  }
+done
+
 bun install --frozen-lockfile
 
 bun install --cwd infra --frozen-lockfile --force
