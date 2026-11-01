@@ -60,7 +60,7 @@ source_code_url="${JOB_INDEX_SOURCE_CODE_URL:-$(read_dev_var SOURCE_CODE_URL || 
 if [ "${environment}" = "production" ]; then
   if [ -z "${private_nav_token}" ]; then
     echo "Production requires a NAV-issued private consumer token." >&2
-    echo "Run just nav-key or provide NAV_PRIVATE_API_TOKEN." >&2
+    echo "Run vp run nav-key or provide NAV_PRIVATE_API_TOKEN." >&2
     exit 1
   fi
   if ! python3 - "${private_nav_token}" <<'PYTOKEN'

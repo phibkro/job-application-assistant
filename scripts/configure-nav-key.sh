@@ -160,7 +160,7 @@ kept = []
 for raw in lines:
     stripped = raw.strip()
     if stripped in {
-        "# NAV-issued private consumer token; managed by just nav-key.",
+        "# NAV-issued private consumer token; managed by vp run nav-key.",
     }:
         continue
     if stripped and not stripped.startswith("#") and "=" in stripped:
@@ -173,7 +173,7 @@ while kept and not kept[-1].strip():
 if kept:
     kept.append("")
 kept.extend([
-    "# NAV-issued private consumer token; managed by just nav-key.",
+    "# NAV-issued private consumer token; managed by vp run nav-key.",
     f"NAV_TOKEN_SOURCE=private",
     f"NAV_API_TOKEN={token}",
 ])

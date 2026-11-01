@@ -4,13 +4,13 @@
 > maintenance, and webhook items remain explicit gaps rather than being
 > inferred from unrelated qualification evidence.
 
-- [ ] `bun run check` and `just verify` pass from a clean checkout.
+- [ ] `vp run verify` passes from a clean checkout.
 - [ ] Production account plan and current Workers/D1 limits reviewed against observed staging usage.
 - [ ] Pinned Wrangler version and compatibility date reviewed against current Cloudflare releases.
-- [ ] `db/schema.sql` matches the domain models (`bun run schema:check`).
+- [ ] `db/schema.sql` matches the domain models (`vp run schema:check`).
 - [ ] Staging deployment evidence attached.
 - [ ] Seven-day soak satisfies `ops/slo.json`.
-- [ ] `just qualification` report uses the expected indexes at 50,000 vacancies.
+- [ ] `vp run qualification` report uses the expected indexes at 50,000 vacancies.
 - [ ] Local backup/restore report preserves fingerprints, integrity, foreign keys, and query plans.
 - [ ] NAV credential rotated successfully.
 - [x] The retired `ADMIN_SYNC_TOKEN` deployment requirement is removed; the current TypeScript service has no administrator route.

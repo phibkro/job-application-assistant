@@ -26,10 +26,15 @@
     pkgs.cacert
   ];
 
+  # A fresh clone has no node_modules yet, so the first shell installs them (frozen lockfile) to make `vp` exist;
+  # later shells skip it. `vp run setup` does the full setup (infra install, hooks, Foldkit checkout).
   # The workspace's own binaries (`vp`, `tsc`, `oxlint`) are on PATH inside the shell, so `vp check` and
   # `vp run <task>` work as documented without `bunx`. workerd verifies TLS against SSL_CERT_FILE, which Nix
   # leaves out of the exported environment (the same reason as in vektorprogrammet-reimagined's devenv.nix).
   enterShell = ''
+    if [ ! -x "$DEVENV_ROOT/node_modules/.bin/vp" ]; then
+      (cd "$DEVENV_ROOT" && bun install --frozen-lockfile)
+    fi
     export PATH="$DEVENV_ROOT/node_modules/.bin:$PATH"
     export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
   '';

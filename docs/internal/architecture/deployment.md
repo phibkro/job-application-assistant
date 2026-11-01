@@ -25,12 +25,13 @@ but they do not share configuration or database identity.
 The source ZIP exposes two remote entrypoints:
 
 ```sh
-./deploy             # disposable staging
-./deploy-production  # explicit production
+vp run deploy             # disposable staging
+vp run deploy-production  # explicit production
 ```
 
-Both enter the pinned Nix flake and execute the same compiler, policy, migration,
-bundle, unit, and local integration gates before any remote mutation.
+Both run inside the pinned devenv shell and execute `vp run verify` (policy,
+format, lint, types, Effect diagnostics, schema, catalog, bundle and the
+coverage-gated test suites) before any remote mutation.
 
 ## Configuration boundary
 
@@ -56,7 +57,7 @@ job-index-production    + job-index-production-db
 ## Test and staging behavior
 
 The test environment points `NAV_BASE_URL` at a loopback standard-library HTTP
-stub. `just verify` starts the stub and the real Wrangler Worker, applies all D1
+stub. `vp run verify` starts the stub and the real Wrangler Worker, applies all D1
 migrations to a fresh state directory, and executes both deterministic fixture
 smoke and adversarial NAV contract smoke.
 

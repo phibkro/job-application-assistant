@@ -53,19 +53,21 @@ Stop and request a gate decision when:
 
 ## Executable gates
 
-Use repository commands rather than reproducing their internals manually:
+Use repository commands rather than reproducing their internals manually. Enter the pinned toolchain with `devenv shell` (declared in `devenv.nix`, pinned by `devenv.lock`; the first shell installs `node_modules`), then:
 
 ```text
-./bootstrap setup   enter the Nix flake and install project-local tooling/hooks
-./bootstrap check   format, lint, policy, migration, Wasm, and Wrangler bundle gates
-./bootstrap verify  check plus unit tests and a clean local D1 HTTP smoke run
-./bootstrap dev     run the interactive local D1 demo
-./bootstrap deploy  verify, provision, migrate, deploy, and remote-smoke the Worker
+vp run setup              install workspace and infra dependencies, the git hook dispatcher, the pinned Foldkit checkout
+vp check                  format (packages/, apps/) and lint
+vp run test               both Vitest 4 suites: the Bun-hosted unit suite and the workerd pool
+vp run policy             repository, credential, migration and script gates (also the pre-commit hook)
+vp run verify             setup + policy + vp check + imports, types, Effect diagnostics, schema, catalog, bundle, coverage-gated tests
+vp run dev                the local stack on workerd with a seeded local D1
+vp run deploy             verify, then provision, migrate, deploy and smoke staging (deploy-production: production)
 ```
 
-Inside `nix develop`, the equivalent `just ...` commands are permitted.
+One command from outside the shell: `devenv shell -- vp run verify`. Every task is declared in `vite.config.ts` (`run.tasks`). Tests stay on Vitest 4 on purpose (Vite+ bundles Vitest 5; see WS-0027@2), so `vp test` is not used.
 
-A deployment claim is invalid when `./bootstrap verify` did not pass for the same source revision.
+A deployment claim is invalid when `vp run verify` did not pass for the same source revision.
 
 ## Effect for agents
 
@@ -74,13 +76,13 @@ The workspace is on `effect ~4.1.0` (resolved 4.1.1). Most public Effect materia
 - **Authoritative docs for the 4.x line:** `node_modules/effect/AGENTS.md` and `node_modules/effect/ai-docs/` (shipped with the installed version), and `LLMS.md` in the Effect v4 repository: <https://github.com/Effect-TS/effect-smol/blob/main/LLMS.md> (tracks `main`, so check it against the installed source). `effect.website/llms.txt` was not verified against 4.x; do not prefer it over these.
 - **v3 vs v4 drift:** v3 names fail or mislead on 4.x. Example: v3 `Effect.catchAll` is `Effect.catch` in v4. Do not write an Effect API from memory.
 - **Read the source first:** before using any Effect API, read it in `node_modules/effect/src` (`packages/effect/src` in the repository) and match the installed version's signature.
-- **Diagnostics:** `bun run effect:check` (part of `bun run check`) runs `@effect/language-service` and fails on errors and warnings, including floating Effects and v3-only APIs (`outdatedApi`). Exceptions live in `tools/quality/effect-exceptions.json`; do not add one without an owner decision.
+- **Diagnostics:** `vp run effect:check` (part of `vp run verify`) runs `@effect/language-service` and fails on errors and warnings, including floating Effects and v3-only APIs (`outdatedApi`). Exceptions live in `tools/quality/effect-exceptions.json`; do not add one without an owner decision.
 
 ## Foldkit for agents
 
 Foldkit's official agent skills are installed under `.claude/skills/` (`foldkit`, `generate-program`, `audit-program`); provenance is in `.claude/skills/PROVENANCE.md`. Use them for `apps/index-web`; do not copy their content here.
 
-- The skills read the Foldkit source at `repos/foldkit/`. It is a git-ignored shallow checkout pinned to the tag **`foldkit@0.170.0`**, fetched by `scripts/setup.sh` (a no-op when already at the tag, a warning when offline).
+- The skills read the Foldkit source at `repos/foldkit/`. It is a git-ignored shallow checkout pinned to the tag **`foldkit@0.170.0`**, fetched by `scripts/setup.sh` via `vp run setup` (a no-op when already at the tag, a warning when offline).
 - Keep the tag equal to the installed `foldkit` version: when `apps/index-web` bumps `foldkit`, change `FOLDKIT_TAG` in `scripts/setup.sh`, this section, and the skills' provenance together.
 - `generate-program` offers to add a git subtree at `repos/foldkit`. Do not: the owner chose the git-ignored checkout (WS-0026).
 

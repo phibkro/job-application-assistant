@@ -13,7 +13,7 @@ a private NAV token.
 Production requires a NAV-issued private consumer token:
 
 ```sh
-just nav-key
+vp run nav-key
 ```
 
 The NAV credential must be a usable JWT. The deploy script checks it before
@@ -23,8 +23,7 @@ route, so deployment does not create or bind an unused administrator token.
 ## Deploy staging
 
 ```sh
-./deploy
-# equivalent: just deploy
+vp run deploy
 ```
 The entry point runs the full repository verification gate before
 `scripts/deploy.sh` can change Cloudflare.
@@ -45,8 +44,7 @@ Staging schedules remain disabled.
 ## Deploy production
 
 ```sh
-./deploy-production
-# equivalent: just deploy-production
+vp run deploy-production
 ```
 The entry point runs the same verification gate before deployment.
 

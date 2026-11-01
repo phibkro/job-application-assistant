@@ -167,7 +167,7 @@ No private documents, contact details, applicant profile or subjective suitabili
 
 ## Evidence and measurement
 
-- Current integration baseline: `just preview`, `bun run check`, `just verify`, `just qualification` **as applicable to the pinned revision**; distinguish local tests from production evidence.
+- Current integration baseline: `vp run dev`, `vp check`, `vp run verify`, `vp run qualification` **as applicable to the pinned revision**; distinguish local tests from production evidence.
 - Data fidelity: lossless source provenance where permitted, correct handling of updated and retracted fields, stable identity across fetch replay, explicit unknown.
 - Incremental correctness: compare targeted projection with rebuild across generated and hand-labeled cases.
 - Coverage: per-source unique relevant listings and marginal value, confidence and freshness.

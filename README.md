@@ -32,45 +32,49 @@ production, administrative-route, and generated OpenAPI evidence remains open.
 
 ## Run it
 
-Prerequisite: a NixOS or Linux machine with Nix installed and network access.
-No Git checkout, npm, or globally installed Bun/Node is required.
+Prerequisite: a Linux machine with Nix and [devenv](https://devenv.sh) installed,
+and network access. No globally installed Bun/Node is required: `devenv.nix`
+declares the toolchain and `devenv.lock` pins it.
 
 ```sh
 git clone <repository> job-index
 cd job-index
-nix develop --command just preview
+devenv shell -- vp run dev
 ```
 
-`just preview` builds the interface and Worker, creates a clean local D1,
+`vp run dev` builds the interface and Worker, creates a clean local D1,
 applies the schema, migrations, source catalog, and demo seed, then serves the
 whole stack. Sign in with `demo-token`. Use **Saved** to exercise the complete
 save-to-submission-confirmation journey.
 
 ## Local development
 
+Inside `devenv shell` (or prefix each with `devenv shell --`):
+
 ```sh
-nix shell nixpkgs#bun -c bun run check   # TypeScript workspace: format, lint, typecheck, schema, catalog, bundle, tests
-nix develop --command just check          # repository, credential, and script gates
-nix develop --command just verify         # just check + bun run check
-nix develop --command just qualification  # 50k query plans plus backup/restore
-nix develop --command just preview        # the whole stack, served locally
+vp check                # format (packages/, apps/) and lint
+vp run test             # both Vitest 4 suites (Bun-hosted unit, workerd pool)
+vp run policy           # repository, credential, and script gates
+vp run verify           # setup + policy + vp check + types, Effect diagnostics, schema, catalog, bundle, coverage
+vp run qualification    # 50k query plans plus backup/restore (append --rows N)
+vp run dev              # the whole stack, served locally
 ```
 
-Without a host `just`, use `./bootstrap <command>`.
+Tasks are declared in `vite.config.ts`.
 
 ## Deploy
 
 ```sh
-just nav-key
-./deploy
+vp run nav-key
+vp run deploy
 ```
 
-`./deploy` deploys the disposable staging environment after `just verify`.
+`vp run deploy` deploys the disposable staging environment after `vp run verify`.
 Production is always explicit:
 
 ```sh
-just nav-key
-./deploy-production
+vp run nav-key
+vp run deploy-production
 ```
 
 Both commands use the TypeScript Worker declared in `infra/alchemy.run.ts`.
