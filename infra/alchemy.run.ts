@@ -1,5 +1,5 @@
 import * as Alchemy from "alchemy";
-import * as Cloudflare from "alchemy/Cloudflare";
+import * as Cloudflare from "@alchemy.run/cloudflare";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 
@@ -210,7 +210,12 @@ export default Alchemy.Stack(
         notFoundHandling: "single-page-application",
         runWorkerFirst: ["/api/*"],
       },
-      compatibility: { date: "2026-05-25" },
+      // WS-0029@4: Alchemy beta.84 adds `new_module_registry` to every JS
+      // Worker unless `legacy_module_registry` is set
+      // (@alchemy.run/cloudflare-runtime src/core/internal/constants.ts
+      // `withDefaultFlags`). The opt-out keeps the runtime beta.72 deployed.
+      // Adopting the new registry is its own ticket.
+      compatibility: { date: "2026-05-25", flags: ["legacy_module_registry"] },
       // The workers.dev URL stays on alongside the custom domain: it is what
       // the smoke checks hit, and it keeps working if DNS is mid-change.
       workersDev: true,

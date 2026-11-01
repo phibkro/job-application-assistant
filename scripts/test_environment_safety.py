@@ -57,6 +57,18 @@ assert not cron_pattern.search(infra_code_for_crons), (
     "cron-looking schedule literal found in infra; no stage may declare a trigger"
 )
 
+# WS-0029@4: Alchemy beta.84 adds `new_module_registry` to every JS Worker
+# unless `legacy_module_registry` is declared. Pin the exact opt-out (and
+# today's date) so the runtime module registry cannot change silently;
+# adopting the new registry is its own ticket.
+COMPATIBILITY_LITERAL = 'compatibility: { date: "2026-05-25", flags: ["legacy_module_registry"] },'
+assert infra_code_for_crons.count(COMPATIBILITY_LITERAL) == 1, (
+    "infra must declare exactly " + COMPATIBILITY_LITERAL
+)
+assert "new_module_registry" not in infra_code_for_crons, (
+    "new_module_registry must not be opted into in infra"
+)
+
 # Every stage starts from one generated snapshot. Ordered TypeScript-era
 # migrations then preserve databases created by an earlier snapshot. Alchemy
 # must not apply them: it provisions the resource before the deploy script can
