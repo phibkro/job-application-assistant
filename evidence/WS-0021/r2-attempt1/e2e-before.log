@@ -1,0 +1,10 @@
+$ playwright test --config e2e/playwright.config.ts
+
+Running 4 tests using 1 worker
+
+  ✓  1 [chromium] › e2e/document-studio.spec.ts:31:1 › drafts, edits, targets, regenerates, copies, and deletes studio documents (10.1s)
+  ✓  2 [chromium] › e2e/privacy.spec.ts:26:1 › shows visible consent disclosure, distinct privacy card, export, and signed-out deletion notice (12.4s)
+  ✓  3 [chromium] › e2e/profile-import.spec.ts:47:1 › imports a pasted document, reviews proposals per field, and merges accepted values (12.7s)
+  ✓  4 [chromium] › e2e/shortlist.spec.ts:20:1 › edits preferences and uses the explainable shortlist (6.5s)
+
+  4 passed (43.8s)

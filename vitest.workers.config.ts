@@ -85,6 +85,7 @@ export default defineConfig({
       "apps/worker/src/ingestion/SourceLeaseObject.test.ts",
       "apps/worker/src/corpus/live.test.ts",
       "apps/worker/src/handlers/corpus.live.test.ts",
+      "apps/worker/src/handlers/navToClient.live.test.ts",
       "apps/worker/src/hydration/live.test.ts",
     ],
     setupFiles: ["./apps/worker/src/testSupport/workersSetup.ts"],

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as HttpClient from "effect/unstable/http/HttpClient";
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import type { PlatformId } from "../../../domain/src/Ids.ts";
 import { SourceAdapter } from "../../src/SourceAdapter.ts";
 import { make } from "./index.ts";

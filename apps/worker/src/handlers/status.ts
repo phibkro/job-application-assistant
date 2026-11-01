@@ -1,6 +1,6 @@
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { NAV_PLATFORM_ID } from "@job-index/adapters/nav";
 import { api } from "../Api.ts";
 import * as IngestionStatus from "../db/repositories/IngestionStatus.ts";

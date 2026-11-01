@@ -1,5 +1,7 @@
 # WS-0014@1 execution plan: qualification closeout
 
+> **Superseded (owner decision 2026-11-01).** The soak, lazy-gate and dispatch path is replaced by the TB-05 event loop and the legacy-UI retirement. Reusable evidence is kept: Gate 1 staging provenance (`dfa0fe3`), the Gate 3 restore drill, and the 50k qualification. A new production gate is defined after TB-05. NAV private-token rotation stays an operator task.
+
 Execution plan only. It sequences and evidences the remaining external
 production-acceptance gates on top of the current staged candidate; it
 implements nothing. Governing scope: WS-0011@1 (production qualification

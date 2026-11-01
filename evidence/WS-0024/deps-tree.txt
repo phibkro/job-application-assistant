@@ -1,0 +1,105 @@
+org.clojure/clojure 1.12.3
+  . org.clojure/spec.alpha 0.5.238
+  . org.clojure/core.specs.alpha 0.4.74
+org.clojure/data.json 2.5.2
+com.datomic/local 1.0.301
+  . com.datomic/client 1.0.146
+    . com.cognitect/anomalies 0.1.12
+    . com.datomic/client-api 1.0.72
+    . com.datomic/client-impl-shared 1.0.113
+      . com.cognitect/hmac-authn 0.1.211
+        . commons-codec/commons-codec 1.16.0 :newer-version
+        . com.cognitect/anomalies 0.1.12
+        . org.clojure/core.async 1.6.681
+      X com.cognitect/http-client 1.0.148 :excluded
+      . com.cognitect/transit-clj 1.0.333
+        . com.cognitect/transit-java 1.0.371
+          X com.fasterxml.jackson.core/jackson-core 2.14.2 :excluded
+          . org.msgpack/msgpack 0.6.12
+            . com.googlecode.json-simple/json-simple 1.1.1
+            . org.javassist/javassist 3.18.1-GA
+          . javax.xml.bind/jaxb-api 2.4.0-b180830.0359
+            . javax.activation/javax.activation-api 1.2.0
+    . com.datomic/query-support 0.8.31
+    . org.clojure/core.async 1.6.681
+  . com.cognitect/anomalies 0.1.12
+  . com.datomic/query-support 0.8.31
+  . org.clojure/core.async 1.6.681
+    . org.clojure/tools.analyzer.jvm 1.2.3
+  . org.clojure/tools.analyzer.jvm 1.2.3
+    . org.clojure/tools.analyzer 1.1.1
+    . org.clojure/core.memoize 1.0.253
+    . org.ow2.asm/asm 9.2
+    . org.clojure/tools.reader 1.3.6
+  . org.clojure/tools.analyzer 1.1.1
+  . org.clojure/core.memoize 1.0.253
+    . org.clojure/core.cache 1.0.225
+  . org.clojure/core.cache 1.0.225
+    . org.clojure/data.priority-map 1.1.0
+  . org.clojure/data.priority-map 1.1.0
+  . org.ow2.asm/asm 9.2
+  . org.clojure/tools.reader 1.3.6
+  X org.clojure/spec.alpha 0.2.176 :older-version
+  X org.clojure/core.specs.alpha 0.2.44 :older-version
+  . com.datomic/client-impl-shared 1.0.113
+    . com.cognitect/anomalies 0.1.12
+    . org.clojure/core.async 1.6.681
+  . commons-io/commons-io 2.15.1
+  . com.datomic/query-stats 1.0.12
+  . com.cognitect.aws/api 0.8.686
+    X org.clojure/data.json 2.4.0 :use-top
+    . org.clojure/tools.logging 1.2.4
+    . org.clojure/data.xml 0.2.0-alpha8
+    X org.clojure/core.async 1.6.673 :older-version
+  X org.clojure/data.json 2.4.0 :use-top
+  . org.clojure/tools.logging 1.2.4
+  . org.clojure/data.xml 0.2.0-alpha8
+  . com.cognitect.aws/endpoints 1.1.12.504
+  . org.clojure/data.fressian 1.0.0
+    X org.fressian/fressian 0.6.6 :older-version
+  . com.cognitect.aws/s3 848.2.1413.0
+  . com.cognitect.aws/dynamodb 848.2.1413.0
+  . com.amazonaws/aws-java-sdk-s3 1.12.564
+    . com.amazonaws/aws-java-sdk-kms 1.12.564
+    . com.amazonaws/aws-java-sdk-core 1.12.564
+    . com.amazonaws/jmespath-java 1.12.564
+  . com.amazonaws/aws-java-sdk-kms 1.12.564
+    . com.amazonaws/aws-java-sdk-core 1.12.564
+    . com.amazonaws/jmespath-java 1.12.564
+  . com.amazonaws/aws-java-sdk-core 1.12.564
+    . commons-logging/commons-logging 1.1.3
+    . commons-codec/commons-codec 1.15
+    . org.apache.httpcomponents/httpclient 4.5.13
+    . software.amazon.ion/ion-java 1.0.2
+    . com.fasterxml.jackson.core/jackson-databind 2.12.7.1
+    . com.fasterxml.jackson.dataformat/jackson-dataformat-cbor 2.12.6
+    . joda-time/joda-time 2.8.1
+  X commons-logging/commons-logging 1.1.3 :superseded
+  X commons-codec/commons-codec 1.15 :superseded
+  . org.apache.httpcomponents/httpclient 4.5.13
+    . org.apache.httpcomponents/httpcore 4.4.13
+    . commons-logging/commons-logging 1.2 :newer-version
+    X commons-codec/commons-codec 1.11 :older-version
+  . org.apache.httpcomponents/httpcore 4.4.13
+  . software.amazon.ion/ion-java 1.0.2
+  . com.fasterxml.jackson.core/jackson-databind 2.12.7.1
+    . com.fasterxml.jackson.core/jackson-annotations 2.12.7
+    . com.fasterxml.jackson.core/jackson-core 2.12.7
+  . com.fasterxml.jackson.core/jackson-annotations 2.12.7
+  . com.fasterxml.jackson.core/jackson-core 2.12.7
+  . com.fasterxml.jackson.dataformat/jackson-dataformat-cbor 2.12.6
+    X com.fasterxml.jackson.core/jackson-databind 2.12.6 :older-version
+    X com.fasterxml.jackson.core/jackson-core 2.12.6 :older-version
+  . joda-time/joda-time 2.8.1
+  . com.amazonaws/jmespath-java 1.12.564
+    . com.fasterxml.jackson.core/jackson-databind 2.12.7.1
+  . org.fressian/fressian 0.6.8
+  . com.github.ben-manes.caffeine/caffeine 2.8.1
+    . org.checkerframework/checker-qual 3.1.0
+    . com.google.errorprone/error_prone_annotations 2.3.4
+  . org.checkerframework/checker-qual 3.1.0
+  . com.google.errorprone/error_prone_annotations 2.3.4
+  . com.datomic/io-stats 1.0.12
+  . com.datomic/client-api 1.0.72
+    . org.clojure/core.async 1.6.681
+org.clojure/test.check 1.1.3

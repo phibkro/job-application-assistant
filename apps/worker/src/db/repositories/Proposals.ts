@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import * as VariantSchema from "effect/unstable/schema/VariantSchema";
+import * as VariantSchema from "effect/schema/VariantSchema";
 import { Proposal } from "@job-index/domain/Proposals";
 import type { ProfileId, ProposalId } from "@job-index/domain/Ids";
 import { Database } from "../../services/Database.ts";

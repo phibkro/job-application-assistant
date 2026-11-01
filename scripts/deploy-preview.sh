@@ -36,9 +36,6 @@ case "${1:-preview}" in
     ;;
 esac
 
-echo "==> building the interface"
-(cd apps/web && bun run build)
-
 echo "==> bundling the worker for workerd"
 mkdir -p .preview
 bun build apps/worker/src/index.ts \

@@ -1,6 +1,6 @@
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { api, CurrentPrincipal } from "../Api.ts";
 import { Database } from "../services/Database.ts";
 import { purgeWritesFor } from "../db/Erase.ts";

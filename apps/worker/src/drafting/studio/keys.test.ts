@@ -220,14 +220,17 @@ const arbProfile: fc.Arbitrary<Profile> = fc.record({
   }),
 });
 
+// Unique by question: answers are keyed `PRIMARY KEY (profileId, question)`
+// (db/schema.sql), so duplicate questions cannot exist in the domain.
 const arbAnswers: fc.Arbitrary<ReadonlyArray<Answer>> = fc
-  .array(
+  .uniqueArray(
     fc.tuple(
       smallText.filter((s) => /^[A-Za-z0-9_-]+$/.test(s)),
       smallText,
     ),
     {
       maxLength: 3,
+      selector: ([question]) => question,
     },
   )
   .map((pairs) => pairs.map(([question, value]) => answer(question, question, value)));
@@ -266,8 +269,13 @@ describe("key round-trip property (WS-0019 b)", () => {
         const unreferenced = facts.filter((fact) => !referenced.some((r) => r.key === fact.key));
         return (
           referencedValues.every((value) => result.content.includes(value)) &&
+          // An unreferenced value may legitimately appear when a referenced
+          // fact carries the same (or a containing) value.
           unreferenced.every(
-            (fact) => fact.value.length < 4 || !result.content.includes(fact.value),
+            (fact) =>
+              fact.value.length < 4 ||
+              referencedValues.some((value) => value.includes(fact.value)) ||
+              !result.content.includes(fact.value),
           ) &&
           !result.content.includes("{{")
         );

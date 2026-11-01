@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import * as Model from "effect/unstable/schema/Model";
+import * as Model from "effect/schema/Model";
 import { ProfileId, ProposalId } from "./Ids.ts";
 
 /**

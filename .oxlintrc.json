@@ -79,14 +79,6 @@
       "rules": {
         "effect/no-ambient-authority": "off"
       }
-    },
-    {
-      "files": [
-        "apps/web/**/*.ts"
-      ],
-      "rules": {
-        "effect/no-ambient-authority": "off"
-      }
     }
   ],
   "jsPlugins": [

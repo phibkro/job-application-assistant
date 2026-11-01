@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
+import * as HttpRouter from "effect/http/HttpRouter";
 import type { PlatformId, SourceId } from "@job-index/domain/Ids";
 import type { RawListing } from "@job-index/domain/Job";
 import { makeFakeD1 } from "../db/FakeD1.ts";

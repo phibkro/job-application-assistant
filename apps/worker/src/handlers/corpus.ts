@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import type { AcquisitionTier } from "@job-index/domain/Source";
 import { api, NotFound } from "../Api.ts";
 import { Corpus, type JobFilter } from "../services/Corpus.ts";

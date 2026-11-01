@@ -1,0 +1,17 @@
+;; WS-0024 R1 spike (exploration only). Evidence: evidence/WS-0024/README.md
+;; Every library resolves from Maven Central; Clojars is unreachable here.
+;; Run: nix shell nixpkgs#clojure nixpkgs#jdk21_headless -c clojure -M:test
+{:paths ["src"]
+ :mvn/repos {"clojars" nil}
+ :deps {org.clojure/clojure {:mvn/version "1.12.3"}
+        org.clojure/data.json {:mvn/version "2.5.2"}
+        com.datomic/local {:mvn/version "1.0.301"}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {org.clojure/test.check {:mvn/version "1.1.3"}}
+         :jvm-opts ["-Dstdout.encoding=UTF-8"]
+         :main-opts ["-m" "ws24.runner" "test"]}
+  :controls {:extra-paths ["test"]
+             :extra-deps {org.clojure/test.check {:mvn/version "1.1.3"}}
+             :jvm-opts ["-Dstdout.encoding=UTF-8"]
+             :main-opts ["-m" "ws24.runner" "controls"]}}}
