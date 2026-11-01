@@ -123,6 +123,12 @@ const MAIL_VERIFIED_DESTINATION = "philib.krogh@gmail.com";
  */
 const secretBindings = () => {
   const bindings: Record<string, Redacted.Redacted<string>> = {};
+  // WS-0029@2 pass B: the PR Preview host and every PR Preview carry no
+  // secret at all, whatever the deploying shell exports. Staging and
+  // production credentials must never reach a preview.
+  if (PR_STAGE || PREVIEW_HOST) {
+    return bindings;
+  }
   for (const name of [
     "NAV_API_TOKEN",
     "LINKEDIN_CLIENT_ID",

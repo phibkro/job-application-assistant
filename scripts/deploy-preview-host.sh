@@ -4,11 +4,18 @@
 # (`job-index-pr-previews-typescript-db`), then brings that D1 to this tree's
 # schema and seed.
 #
-# WS-0029@2 pass B. Run by the owner, from `main`, inside `devenv shell`: once
-# before the first PR Preview, and again whenever the parent should move to a
-# newer bundle. Pull requests never deploy this stage. The parent serves no
-# URL of its own (workers.dev stable URL off, Preview URLs on). Cloudflare
-# Access is enabled on it in the dashboard, not here.
+# WS-0029@2 pass B. Run only by the owner, inside `devenv shell`
+# (`vp run deploy-preview-host`):
+# - the first time from the pass B PR branch, because that PR's own preview
+#   CI needs the host before it can go green;
+# - afterwards from `main`, whenever the parent or the shared schema should
+#   move on;
+# - from a PR branch that adds a D1 migration, after reviewing it: this is
+#   the only path that applies migrations to the shared preview D1.
+# Pull requests never deploy this stage. The parent serves no URL of its own
+# (workers.dev stable URL off, Preview URLs on) and binds no secret
+# (`secretBindings()` is empty for this stage). Cloudflare Access is enabled
+# on it in the dashboard, not here.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -64,7 +71,7 @@ if [ -z "$DB_NAME" ] || [ -z "$DB_ID" ] || [ -z "$WORKER" ]; then
   exit 1
 fi
 
-./scripts/seed-preview-db.sh "$DB_NAME" "$DB_ID" "host"
+./scripts/seed-preview-db.sh "$DB_NAME" "$DB_ID" "host" apply
 
 echo "==> preview host ready: Worker ${WORKER}, shared D1 ${DB_NAME}"
 echo "    Enable Cloudflare Access on ${WORKER} (Previews only) before the first PR Preview."

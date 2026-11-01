@@ -17,8 +17,14 @@
 # - Schema and catalogue are idempotent already (`CREATE ... IF NOT EXISTS`,
 #   `INSERT OR IGNORE`, `INSERT OR REPLACE`), and Wrangler records each
 #   applied migration, so a run after another one is a no-op.
+# - Only the host deploy applies D1 migrations (lead decision, WS-0029 pass B
+#   review round 1, M1). A pull request's migration would change the schema
+#   every other Preview reads, permanently. With `refuse`, the run lists the
+#   pending remote migrations first, before any write, and fails if there is
+#   one; the owner applies it with `vp run deploy-preview-host` from that
+#   branch.
 #
-# Usage: scripts/seed-preview-db.sh DB_NAME DB_ID HOLDER
+# Usage: scripts/seed-preview-db.sh DB_NAME DB_ID HOLDER apply|refuse
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,10 +33,18 @@ cd "$ROOT"
 DB_NAME="${1:-}"
 DB_ID="${2:-}"
 HOLDER="${3:-}"
+MIGRATIONS="${4:-}"
 if [ -z "$DB_NAME" ] || [ -z "$DB_ID" ] || [ -z "$HOLDER" ]; then
-  echo "Usage: scripts/seed-preview-db.sh DB_NAME DB_ID HOLDER" >&2
+  echo "Usage: scripts/seed-preview-db.sh DB_NAME DB_ID HOLDER apply|refuse" >&2
   exit 2
 fi
+case "$MIGRATIONS" in
+  apply | refuse) ;;
+  *)
+    echo "seed-preview-db: the fourth argument must be apply (host deploy) or refuse (PR deploy)" >&2
+    exit 2
+    ;;
+esac
 # The holder is interpolated into SQL: accept only a plain slug.
 case "$HOLDER" in
   *[!a-z0-9-]*)
@@ -48,8 +62,10 @@ case "$DB_NAME" in
 esac
 
 LEASE_SECONDS=600
-WAIT_ATTEMPTS=30
-WAIT_SECONDS=10
+# Waiters outlast the lease (review L2): a run that died holding it is taken
+# over once it expires instead of failing every deploy queued behind it.
+WAIT_SECONDS="${SEED_PREVIEW_WAIT_SECONDS:-10}"
+WAIT_ATTEMPTS=$(((LEASE_SECONDS / 10) + 6))
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -98,9 +114,41 @@ if [ "$acquired" -ne 1 ]; then
 fi
 trap 'd1 --command "DELETE FROM preview_seed_lease WHERE id = 1 AND holder = '"'"'$HOLDER'"'"'" >/dev/null || true; rm -rf "$work"' EXIT
 
-echo "==> applying schema, migrations and seed data to ${DB_NAME} (lease ${HOLDER})"
+if [ "$MIGRATIONS" = "refuse" ]; then
+  # `wrangler d1 migrations list` has no --json in wrangler 4.120.0: it logs
+  # "No migrations to apply!" or "Migrations to be applied:" and a table
+  # (wrangler-dist/cli.js `d1MigrationsListCommand`). Anything else fails.
+  migrations_config="$work/migrations.jsonc"
+  cat >"$migrations_config" <<JSON
+{
+  "name": "job-index-preview-migrations-check",
+  "compatibility_date": "2026-05-25",
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "$DB_NAME",
+    "database_id": "$DB_ID",
+    "migrations_dir": "$ROOT/db/migrations"
+  }]
+}
+JSON
+  pending="$(CI=1 wrangler d1 migrations list "$DB_NAME" --remote --config "$migrations_config")"
+  if printf '%s\n' "$pending" | grep -q "Migrations to be applied"; then
+    printf '%s\n' "$pending" >&2
+    echo "This PR adds D1 migrations; the owner applies them to the shared preview D1 with \`vp run deploy-preview-host\` from this branch." >&2
+    exit 1
+  fi
+  if ! printf '%s\n' "$pending" | grep -q "No migrations to apply"; then
+    printf '%s\n' "$pending" >&2
+    echo "Could not read the shared preview D1's pending migrations." >&2
+    exit 1
+  fi
+fi
+
+echo "==> applying schema and seed data to ${DB_NAME} (lease ${HOLDER}, migrations: ${MIGRATIONS})"
 d1 --file db/schema.sql --yes >/dev/null
-./scripts/migrate-d1.sh remote "$DB_NAME" "$DB_ID"
+if [ "$MIGRATIONS" = "apply" ]; then
+  ./scripts/migrate-d1.sh remote "$DB_NAME" "$DB_ID"
+fi
 d1 --file db/catalog-seed.sql --yes >/dev/null
 # The local fixture resets its tables; the shared database must not.
 grep -v '^DELETE FROM ' dev/preview-seed.sql | sed 's/^INSERT INTO /INSERT OR IGNORE INTO /' >"$work/preview-seed.sql"

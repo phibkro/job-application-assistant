@@ -155,10 +155,32 @@ assert "grep -v '^DELETE FROM ' dev/preview-seed.sql | sed 's/^INSERT INTO /INSE
 )
 assert "--file dev/preview-seed.sql" not in preview_seed, "the resetting local fixture must not run on the shared D1"
 assert "ON CONFLICT(id) DO UPDATE SET holder = excluded.holder" in preview_seed, "shared seeding must take the lease"
+# (4b) Review round 1, M1 (lead decision): only the host deploy applies D1
+# migrations to the shared D1. A PR deploy refuses when one is pending, and
+# its path never calls migrate-d1.sh. scripts/test_seed_preview_db.sh tests
+# both modes against a stub wrangler.
+preview_pr_path = preview_deploy.split('echo "==> preview ready: ${DEPLOYMENT_URL}"\n  exit 0\nfi\n', 1)
+assert len(preview_pr_path) == 2, "deploy-preview.sh must keep the preview stage path separate from the PR path"
+assert "migrate-d1.sh" not in preview_pr_path[1], "the PR deploy path must never call migrate-d1.sh"
+assert './scripts/seed-preview-db.sh "$DB_NAME" "$DB_ID" "$STAGE" refuse' in preview_pr_path[1], (
+    "the PR deploy must seed with migrations refused"
+)
+assert './scripts/seed-preview-db.sh "$DB_NAME" "$DB_ID" "host" apply' in preview_host, "only the host deploy applies migrations"
+assert preview_seed.count("migrate-d1.sh") == 1 and (
+    'if [ "$MIGRATIONS" = "apply" ]; then\n  ./scripts/migrate-d1.sh remote "$DB_NAME" "$DB_ID"\nfi' in preview_seed
+), "seed-preview-db.sh may migrate only in apply mode"
+# (4c) Review round 1, I3: neither the host nor a PR Preview binds a secret,
+# whatever the deploying shell exports.
+assert re.search(
+    r"const secretBindings = \(\) => \{\n  const bindings: Record<string, Redacted\.Redacted<string>> = \{\};\n"
+    r"(?:  //.*\n)*  if \(PR_STAGE \|\| PREVIEW_HOST\) \{\n    return bindings;\n  \}\n",
+    infra,
+), "secretBindings() must return {} for the PR Preview host and every PR stage"
 # (5) The deploy ends with the Access smoke, and teardown proves the Preview
 # is gone; the smoke's behaviour is tested by scripts/test_smoke_preview.sh.
 vite_policy = (ROOT / "vite.config.ts").read_text()
 assert '"bash scripts/test_smoke_preview.sh",' in vite_policy, "policy must run the smoke-preview tests"
+assert '"bash scripts/test_seed_preview_db.sh",' in vite_policy, "policy must run the seed-preview-db tests"
 assert preview_deploy.rstrip().endswith('./scripts/smoke-preview.sh deployed "$DEPLOYMENT_URL" "$STAGE"'), (
     "deploy-preview.sh must end with the Access smoke"
 )

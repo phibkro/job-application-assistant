@@ -11,7 +11,7 @@
 #        /api/v1/jobs?limit=1 must answer 200 with at least one seeded job.
 #
 #   smoke-preview.sh deleted URL
-#     After teardown, the service token must no longer reach the Preview.
+#     After teardown, the service token's request must get a 404.
 #
 # The token comes from CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET. It is
 # written to a private header file, so it is on no command line.
@@ -135,12 +135,18 @@ PY
     status=""
     for _ in $(seq 1 "$ATTEMPTS"); do
       status="$(authenticated "$url/api/health")" || true
-      [ "$status" != "200" ] && break
+      [ "$status" = "404" ] && break
       sleep "$WAIT_SECONDS"
     done
     echo "teardown check: service token GET /api/health -> ${status}"
     if [ "$status" = "200" ]; then
       echo "The Preview still answers after teardown." >&2
+      exit 1
+    fi
+    # Only a not-found proves the Preview is gone (review L3): a 403 is a
+    # refused token, a 5xx or 000 an outage, and neither shows deletion.
+    if [ "$status" != "404" ]; then
+      echo "Teardown not shown: expected 404 from the deleted Preview, got ${status}." >&2
       exit 1
     fi
     echo "smoke-preview: PASS, ${url} no longer serves the Preview"

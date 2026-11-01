@@ -120,7 +120,7 @@ fi
 
 # The shared schema and seed (dev/preview-seed.sql, as INSERT OR IGNORE)
 # first, so the Preview never starts against an older schema.
-./scripts/seed-preview-db.sh "$DB_NAME" "$DB_ID" "$STAGE"
+./scripts/seed-preview-db.sh "$DB_NAME" "$DB_ID" "$STAGE" refuse
 
 echo "==> deploying Worker Preview ${STAGE}"
 (cd infra && ALCHEMY_STAGE="$STAGE" bun run alchemy deploy --stage "$STAGE" --yes)

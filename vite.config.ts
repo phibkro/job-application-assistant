@@ -159,6 +159,7 @@ export default defineConfig({
           "bash scripts/test_nav_key.sh",
           "bash scripts/test_deploy_preflight.sh",
           "bash scripts/test_smoke_preview.sh",
+          "bash scripts/test_seed_preview_db.sh",
           "python3 scripts/test_environment_safety.py",
           "python3 scripts/test_d1_migrations.py",
           "python3 scripts/test_d1_restore.py",

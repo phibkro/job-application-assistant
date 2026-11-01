@@ -93,6 +93,8 @@ expect 1 "service token: GET /api/health -> 403" UNAUTH_STATUS=403 AUTH_STATUS=4
 # Teardown: a Preview that still answers fails; a gone one passes.
 expect 1 "still answers after teardown" UNAUTH_STATUS=403 AUTH_STATUS=200 -- deleted "$url"
 expect 0 "no longer serves the Preview" UNAUTH_STATUS=403 AUTH_STATUS=404 -- deleted "$url"
+expect 1 "expected 404 from the deleted Preview, got 403" UNAUTH_STATUS=403 AUTH_STATUS=403 -- deleted "$url"
+expect 1 "expected 404 from the deleted Preview, got 503" UNAUTH_STATUS=403 AUTH_STATUS=503 -- deleted "$url"
 # Only workers.dev Preview URLs, and only with the token present.
 expect 2 "workers.dev URL" UNAUTH_STATUS=403 -- deployed "https://job-index.phibkro.org" pr-7
 expect 2 "CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET" UNAUTH_STATUS=403 CF_ACCESS_CLIENT_SECRET= -- deployed "$url" pr-7
