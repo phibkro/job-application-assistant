@@ -12,6 +12,7 @@ Store immutable or versioned work-scope instances here. Do not use ad hoc task n
 - [WS-0021@3](WS-0021-r3-effect-4-1-legacy-web-freeze.md): effect ~4.1 for worker/domain/adapters, with the Foldkit app frozen as a legacy island. **Approved, next** (supersedes [r2](WS-0021-r2-effect-4-1-and-foldkit.md) and [r1](WS-0021-r1-effect-4-1-upgrade.md)).
 - [WS-0024@1](WS-0024-r1-jvm-stack-spike.md): Clojure + Datomic Local stack spike, **done** (`450103c`); owner kept TS and ported the model.
 - [WS-0022@1](WS-0022-r1-tb01-workload-facts.md): TB-01 workload facts, **proposed**, after WS-0021@3.
+- [WS-0026@1](WS-0026-r1-agent-dev-tooling.md): agent development tooling, **approved**, after WS-0021@3.
 
 ## Current work
 

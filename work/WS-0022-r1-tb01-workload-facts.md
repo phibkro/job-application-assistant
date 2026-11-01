@@ -26,7 +26,8 @@ An advert with no stated percentage is excluded as full-time, or `40–80%` is r
 5. **Bounded background hydration** (option A): N detail fetches per ingestion run, with N a `Config` value. The default is chosen from a recorded measurement, not invented.
 6. **Workload pass @1** (pure, with coded diagnostics as data), plus a rebuildable projection (`workload_min`, `workload_max`, `workload_state`) and the additive read-API filter.
 7. **Conformance suite** `defineSourceConformance(adapter, fixtures)` with numbered guarantees, each with a broken twin (pg-outbox/file-transfer pattern). NAV is the first subject.
-8. **Source-quirk catalogue** as data, seeded from WS-0020 and WS-0024 (`verifiedBy: docs | fixture | unverified`).
+8. **Pure-core enforcement** (owner decision 2026-11-01): the new IR, the workload pass and the projection logic are plain pure functions, with no Effect services. A boundary test fails if they import Effect services, with a control twin. `oxlint-plugin-immutable` is scoped to those modules. Ingestion run and hydration lifecycles are expressed through `TransitionSystem`.
+9. **Source-quirk catalogue** as data, seeded from WS-0020 and WS-0024 (`verifiedBy: docs | fixture | unverified`).
 
 ## Acceptance
 
