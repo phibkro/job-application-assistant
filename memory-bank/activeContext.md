@@ -3,7 +3,7 @@
 ## Now
 
 - **Merged to `main` under the delegation:** #23–#27. The latest is #27 `bbd9b4c` (WS-0022 TB-01: IR v0, append-only observation store, workload pass). #26 `9565d91` was WS-0025@2 (the index-web client).
-- **Starting WS-0029@2 pass A:** upgrade `infra/` to Alchemy beta.84 and effect ~4.1, with no behaviour change. Pass B (Workers Previews behind Access) waits on owner prerequisites P1–P4 ([WorkScope](../work/WS-0029-r2-infra-alchemy-previews.md)).
+- **WS-0029@3 pass A (attempt 2):** upgrade `infra/` to Alchemy beta.84 on effect 4.0.7. beta.84 imports `effect/Crypto`, which effect 4.1 dropped. Merging needs the owner's local `alchemy plan`. Pass B prerequisites: P1–P3 met, P4 likely not needed ([r3](../work/WS-0029-r3-infra-alchemy-previews.md)).
 - **Fork safety:** PRs from external contributors need the owner's approval to run CI. The policy gate and the preview same-repo guard also apply.
 
 ## Next
@@ -21,7 +21,7 @@
 | `infra/` Effect pin (rc.108) | Follow-up ticket |
 | Production qualification | Superseded; a new gate is defined after TB-05 |
 | Anonymous presets (better-auth): needs `nodejs_compat` (moved from WS-0029 to the presets ticket) and `BETTER_AUTH_SECRET` (WS-0028) | Later ticket |
-| WS-0029 pass B prerequisites P1–P4 (Zero Trust team, access policy identity, CI service token, Access-capable API token) | Owner |
+| `infra/` to effect ~4.1: waits for an Alchemy release on the 4.1 module layout | Follow-up |
 
 ## Recent decisions
 

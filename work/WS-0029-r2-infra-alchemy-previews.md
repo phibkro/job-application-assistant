@@ -2,7 +2,7 @@
 
 - ID: WS-0029
 - Revision: 2. Refines [r1](WS-0029-r1-infra-alchemy-previews.md) now that WS-0027@2 has landed. Splits the work into two passes so that pass A needs no new owner capability.
-- Status: **Approved** (owner, 2026-11-01: "agree proceed"). Pass B starts only once its prerequisites P1–P4 are met.
+- Status: **Approved** (owner, 2026-11-01: "agree proceed"). **Pass A superseded by [r3](WS-0029-r3-infra-alchemy-previews.md)** (Effect 4.0.7 target). Pass B starts only once its prerequisites P1–P4 are met.
 - Owner: Human product owner (phibkro)
 - Risk tier: **R2** (infra and deploy configuration). It becomes R3 if any production credential changes; that belongs to WS-0028.
 - Roles: implementer and independent reviewer, both at the `complex-reasoning` tier.
