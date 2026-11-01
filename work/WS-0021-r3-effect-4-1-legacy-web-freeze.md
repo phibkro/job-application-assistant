@@ -40,3 +40,15 @@ No behaviour, schema, migration, route, canonical-ID or `infra/` changes. No Ast
 ## Rollback
 
 Revert the single commit; the lockfiles and the vendored copy move with it.
+
+## Revisions
+
+### 2026-11-01: A1, vendor the worker API contract (owner decision)
+
+Execution stopped before any edit. `apps/web` also imports `apps/worker/src/Api.ts` from 15 files, which the original design missed. Owner decision:
+
+- Copy `apps/worker/src/Api.ts` **byte-identically** at the start commit to `apps/web/vendor/worker-api/Api.ts` (with `PROVENANCE.md`).
+- Lay out the vendored domain as `apps/web/vendor/domain/src/` (byte-identical) plus a copied `package.json`. The web resolves `@job-index/domain` to it (e.g. `"@job-index/domain": "file:./vendor/domain"`), so the vendored `Api.ts` needs no edits.
+- **D-21b extended:** import-specifier-only edits are allowed in the 15 web files that import `Api.ts`, including the test `apps/web/src/saved/update.test.ts`. Every assertion stays byte-identical, and the reviewer verifies that those diffs touch import lines only.
+- Web tests move to the web package's own runner (the root `vitest.config.ts` excludes `apps/web`). Use the same `vitest` version as the root (4.1.10) in the web lockfile.
+- The hash list in evidence covers both vendored trees.
