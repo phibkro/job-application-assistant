@@ -15,9 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+      # WS-0030 P1. `name` is the cache this job pushes to; the pinned action's README documents `extraPullNames`
+      # for additional pull-only caches, so the devenv cache stays a read source. Without a token (fork PRs get no
+      # secrets, so `authToken` is empty) the action only pulls: it logs "Missing a Cachix auth token" and does not fail.
       - uses: cachix/cachix-action@97e5ff84d02b3b4f9936339f767e17f03c9252ed # v16
         with:
-          name: devenv
+          name: phibkro
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       # The same pinned devenv CLI as phibkro/vektorprogrammet-reimagined's checks.yml.
       - name: Install pinned devenv CLI
         run: nix profile add github:cachix/devenv/b904dcb51fe48c30db250038241507f60752f222
