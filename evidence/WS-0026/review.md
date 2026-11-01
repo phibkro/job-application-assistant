@@ -1,3 +1,5 @@
+> Archived by the lead from `/tmp/ws-0026-review.md` (sha256 `ec980ca831c4852bdd5b60e51766c83d0abe7646c51a86b7c961d86c7f215629`). Planted-link examples are split so `check_repo.py` does not parse them as links; the meaning is unchanged.
+
 # WS-0026 review: commit b6e7000 (parent 0771ed7), branch ws26
 
 **Verdict: ACCEPT WITH NITS**
@@ -57,7 +59,7 @@ No blocking findings. The gate fails on planted errors and passes clean. The ski
    - The real `setup.sh` prelude (`bun install`, hooks) was not run.
 
 6. **`check_repo.py` exclusion.** Partial. See N1.
-   - Planted `docs/repos/a.md` with `[x](nope.md)`: the check still passed, so a broken link was hidden.
+   - Planted `docs/repos/a.md` with ``[x]` + `(nope.md)``: the check still passed, so a broken link was hidden.
    - Planted a broken link in `.claude/skills/z.md`: the check passed, so it was also hidden.
    - Real repo-owned docs outside those two locations are still checked.
 
