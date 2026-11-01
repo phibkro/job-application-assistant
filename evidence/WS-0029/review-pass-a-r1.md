@@ -111,3 +111,26 @@ The backend defaults to `configured` with `alchemy.run.ts` (`state.ts:22-40`), s
 | L1: second Worker / `bundle: false`, safety script | 0 / 0 |
 | controls: opt-out removed / `new_module_registry` added / `state get` restored | 1 / 1 / 1 |
 | workerd: legacy + nodejs_compat / new_module_registry | serves / fatal (experimental) |
+
+---
+
+# Round 2 (head `70611d2`)
+
+**Verdict: mergeable under the round-1–3 rule. Nothing is open at medium or above.** M1 is closed. L1–L5 remain recorded follow-ups.
+
+- **M1 fix verified.** `scripts/test_environment_safety.py` now also asserts `not re.search(r"\bmigrations\s*:", infra_code)`.
+  - Round-1 repro (`migrations: "../db/migrations",` on `TypeScriptDb`): exit **1**.
+  - Object form (`migrations: { dir: … }`): exit 1.
+  - Restored tree: exit 0.
+- **L6 (low, new): two forms still slip past the regex.** A quoted key (`"migrations": "../db/migrations",`) and object shorthand (`migrations,` with a `const migrations`) both give exit 0. Neither is idiomatic in this file, so this is defence in depth only. A follow-up could forbid `\bmigrations\b` outright in the code of the `Cloudflare.D1.Database(...)` calls.
+- **Rest of `70611d2`:**
+  - The archived `review-pass-a-r1.md` is byte-identical to the round-1 report.
+  - The README integration note maps the commits correctly and records P0, CI run 41357548035 and the follow-ups. No secrets or personal data are added.
+  - Nit: the README line "Current state: … implemented in `f32ece1` … P0 is still open" is now stale; P0 has been run and the commit is `21b4709`.
+- **Gates** (`70611d2` copy, scratch `git init`, exit codes read directly):
+
+| Command | Exit |
+| --- | --- |
+| `python3 scripts/test_environment_safety.py` | 0 |
+| `nix shell nixpkgs#shellcheck -c bash -c 'DEVENV_ROOT=/x PATH="/tmp/stubbin:$PWD/node_modules/.bin:$PATH" vp run policy'` | 0 (7/7 successful) |
+| M1 repro / object form / quoted key / shorthand | 1 / 1 / 0 / 0 |

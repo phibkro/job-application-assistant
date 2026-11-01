@@ -30,10 +30,16 @@ jobs:
       - run: devenv shell -- bun install --frozen-lockfile
       - run: devenv shell -- vp run setup
       - run: devenv shell -- vp run verify
-      - name: Deploy isolated seeded preview
+      # WS-0029@2 pass B: a Worker Preview of job-index-pr-previews, bound to
+      # the shared seeded preview D1. The script ends with the Access smoke:
+      # an unauthenticated request must be refused, the service token must
+      # reach /api/health and seeded /api/v1/jobs.
+      - name: Deploy Worker Preview behind Access
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CI: "1"
         run: devenv shell -- ./scripts/deploy-preview.sh "${{ github.event.pull_request.number }}"
 
@@ -55,9 +61,11 @@ jobs:
         run: nix profile add github:cachix/devenv/b904dcb51fe48c30db250038241507f60752f222
       - run: devenv shell -- bun install --frozen-lockfile
       - run: devenv shell -- vp run setup
-      - name: Destroy isolated preview
+      - name: Delete Worker Preview
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CI: "1"
         run: devenv shell -- ./scripts/destroy-preview.sh "${{ github.event.pull_request.number }}"
