@@ -13,11 +13,12 @@
 ## Read in order
 
 1. `AGENTS.md` and the six memory-bank files listed there. They describe **currently approved** product/code, not the proposed pivot.
-2. [RFC 0016](../docs/internal/rfcs/0016-read-only-norwegian-market-index.md) — proposed goal, invariants, exclusions and approval gates.
-3. [Target technical architecture](../docs/internal/architecture/read-only-market-index.md) — phase contracts and data/query semantics.
-4. [Tracer-bullet roadmap](../docs/internal/architecture/market-index-tracers.md) — incremental, user-visible test program.
-5. [WS-0020@1](WS-0020-r1-market-index-baseline.md) and [execution plan](WS-0020-r1-execution-plan.md) — first **proposed** bounded Ticket.
-6. Current `packages/domain/`, `packages/adapters/`, `apps/worker/`, `apps/web/`, `infra/alchemy.run.ts`, `db/schema.sql`, and relevant tests. Confirm implementation from source at pinned commit rather than a stale summary.
+2. [Technical product/project lead brief](../docs/internal/product/market-index-lead-handoff.md) — decision register and readiness gates; confirm human acceptance before execution.
+3. [RFC 0016](../docs/internal/rfcs/0016-read-only-norwegian-market-index.md) — proposed goal, invariants, exclusions and approval gates.
+4. [Target technical architecture](../docs/internal/architecture/read-only-market-index.md) — phase contracts and data/query semantics.
+5. [Tracer-bullet roadmap](../docs/internal/architecture/market-index-tracers.md) — incremental, user-visible test program.
+6. [WS-0020@1](WS-0020-r1-market-index-baseline.md) and [execution plan](WS-0020-r1-execution-plan.md) — first **proposed** bounded Ticket.
+7. Current `packages/domain/`, `packages/adapters/`, `apps/worker/`, `apps/web/`, `infra/alchemy.run.ts`, `db/schema.sql`, and relevant tests. Confirm implementation from source at pinned commit rather than a stale summary.
 
 ## Before owner approval
 
