@@ -4,6 +4,7 @@ Store immutable or versioned work-scope instances here. Do not use ad hoc task n
 
 ## Proposed market-index transition (review only)
 
+- [Technical lead handoff and decision register](../docs/internal/product/market-index-lead-handoff.md) — proposal completeness and work readiness.
 - [RFC 0016](../docs/internal/rfcs/0016-read-only-norwegian-market-index.md) is **Proposed**, not accepted.
 - [Tracer program](../docs/internal/architecture/market-index-tracers.md) is a roadmap, not bulk implementation authority.
 - [Coding-agent handoff](HANDOFF-market-index.md) provides a scoped, copyable entry point.
