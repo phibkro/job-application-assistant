@@ -431,3 +431,30 @@ Everything in "Only the real PR can verify" above, plus:
 - **I2:** the shared D1 is the new `job-index-pr-previews-typescript-db`, not the `preview` stage's. The owner should acknowledge this deviation.
 - **I4:** remote `--file` imports briefly make the shared D1 unavailable to every Preview.
 - **I5:** `ALLOW_DEMO_MUTATIONS` is unread. Demo-principal writes are shared across Previews, and `INSERT OR IGNORE` never restores a mutated row.
+
+## Pass B: real-PR results (PR #29, merged as `4c08a97`)
+
+Before the CI re-run, the owner:
+- deployed the preview host with `vp run deploy-preview-host` from the PR branch: Worker `job-index-pr-previews`, D1 `job-index-pr-previews-typescript-db`, no secret bindings, wrangler 4.148.0 printing `No migrations to apply!`;
+- enabled Worker-level Access ("Previews only") with two policies: Allow for *Cloudflare Workers Preview URLs* (account members) and Service Auth for `ci-pr-preview`.
+
+The results are from these runs, on head `9838290`:
+- **Deploy:** run 41362769750, job 125018731141.
+- **Teardown:** run 41363906100, job 125019905429.
+
+| End state | Log line | Result |
+| --- | --- | --- |
+| 1. unauthenticated refused | `unauthenticated GET /api/health -> 302 (redirect host: phibkro.cloudflareaccess.com)` | ✅ |
+| 2. token gets seeded data | `GET /api/health -> 200`, environment `pr-29`; `GET /api/v1/jobs?limit=1 -> 200`, 1 job (`cj_1`) | ✅ |
+| 3. deleted on close | `[Api] deleted`; `teardown check: service token GET /api/health -> 404` | ✅ |
+| 4. staging/production unchanged | offline dumps (above) | ✅ |
+| 5. CI fails if Access is off | the smoke requires a non-2xx unauthenticated response; control C15 | ✅ |
+
+The PR path also logged `migrations: refuse`, with nothing pending.
+
+Questions answered by these runs:
+- Worker Previews are available on this account.
+- Preview URLs serve while the parent URL is off: `pr-29-job-index-pr-previews.philib-krogh-d23.workers.dev`.
+- A deleted preview returns 404, so review finding R2-L3 does not occur.
+
+Still not observed: a separate Durable Object namespace per preview, and the lease under truly concurrent deploys.
